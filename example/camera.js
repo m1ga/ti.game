@@ -10,6 +10,9 @@
 //   working while zoomed because touch mapping goes through the camera
 // - 💥 triggers a native camera shake (projection-only, so follow,
 //   bounds and touches are unaffected)
+// - 🎛 cycles fullscreen camera effects (cameraEffect): a green
+//   night-vision tint, then a glitch filter — the whole scene renders
+//   into an offscreen texture and back through the effect shader
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -174,8 +177,26 @@ module.exports = function () {
 		makeButton('−', { left: '24dp' }, function () {
 			setZoom(1 / 1.25);
 		});
-		makeButton('💥', {}, function () {   // 💥 centered
+		makeButton('💥', { left: '104dp' }, function () {
 			gameView.shake({ strength: W * 0.02, duration: 500 });
+		});
+		// 🎛 cycles the fullscreen camera effects: night-vision tint → glitch
+		var EFFECTS = [
+			{ effect: 'none' },
+			{ effect: 'tint', tint: '#4f8', intensity: 0.7 },
+			{ effect: 'glitch', intensity: 1.6 }
+		];
+		var effectIndex = 0;
+		makeButton('🎛', { right: '104dp' }, function () {
+			effectIndex = (effectIndex + 1) % EFFECTS.length;
+			var fx = EFFECTS[effectIndex];
+			gameView.cameraEffect = fx.effect;
+			if (fx.tint) {
+				gameView.cameraTint = fx.tint;
+			}
+			if (fx.intensity !== undefined) {
+				gameView.cameraEffectIntensity = fx.intensity;
+			}
 		});
 		makeButton('+', { right: '24dp' }, function () {
 			setZoom(1.25);

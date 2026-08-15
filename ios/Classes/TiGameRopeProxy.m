@@ -115,6 +115,16 @@
 	return @(self.rope.segmentLength);
 }
 
+- (void)setMaxLength:(id)value
+{
+	self.rope.maxLength = [TiUtils floatValue:value def:0];
+}
+
+- (NSNumber *)maxLength
+{
+	return @(self.rope.maxLength);
+}
+
 - (void)setThickness:(id)value
 {
 	self.rope.thickness = [TiUtils floatValue:value def:10];

@@ -34,6 +34,15 @@ public class Sprite
 	public volatile boolean visible = true;
 	public volatile int zIndex = 0;
 
+	// Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
+	// frame draws behind the sprite (selection highlights, power-ups).
+	// glowBlur is the blur radius in px; color as parsed 0..1 channels.
+	public volatile float glowBlur = 0f;
+	public volatile float glowOpacity = 1f; // halo strength 0..1
+	public volatile float glowR = 1f;
+	public volatile float glowG = 1f;
+	public volatile float glowB = 1f;
+
 	// Depth sorting for top-down scenes: within the same zIndex, ySort
 	// sprites draw in order of their bottom edge (feet/base), so a player
 	// below a tree renders in front of it and above renders behind.
@@ -41,6 +50,11 @@ public class Sprite
 
 	// Interaction flags
 	public volatile boolean draggable = false;
+
+	// True while a finger actively drags this sprite (set by the touch
+	// controller). Constraints like the rope tether yield at the other
+	// end instead of fighting the finger.
+	public volatile boolean dragged = false;
 	public volatile boolean pinchable = false;
 	public volatile boolean rotatable = false;
 

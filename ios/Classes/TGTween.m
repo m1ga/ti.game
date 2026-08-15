@@ -3,7 +3,7 @@
 #import "TGSprite.h"
 
 @implementation TGTween {
-	float _fromX, _fromY, _fromScaleX, _fromScaleY, _fromRotation, _fromOpacity;
+	float _fromX, _fromY, _fromScaleX, _fromScaleY, _fromRotation, _fromOpacity, _fromGlowOpacity;
 	float _elapsed;
 	BOOL _started;
 }
@@ -25,6 +25,7 @@
 	_fromScaleY = s.scaleY;
 	_fromRotation = s.rotation;
 	_fromOpacity = s.opacity;
+	_fromGlowOpacity = s.glowOpacity;
 }
 
 - (BOOL)update:(TGSprite *)s delta:(float)dt
@@ -58,6 +59,9 @@
 	}
 	if (_toOpacity != nil) {
 		s.opacity = _fromOpacity + (_toOpacity.floatValue - _fromOpacity) * e;
+	}
+	if (_toGlowOpacity != nil) {
+		s.glowOpacity = _fromGlowOpacity + (_toGlowOpacity.floatValue - _fromGlowOpacity) * e;
 	}
 	return t >= 1.0f;
 }

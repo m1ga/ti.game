@@ -8,7 +8,11 @@
 //   Verlet solver (integration + distance constraints) reads its
 //   position each frame — zero bridge traffic in the whole interaction
 // - a second rope hangs from a fixed anchor with a ball pinned to its
-//   tail, showing the head/tail pinning options
+//   tail and a maxLength tether: drag the weight past the limit and the
+//   rope pulls it back; release it and it swings like a pendulum
+// - a third rope connects two draggable balls: drag either one and once
+//   the rope is taut the other ball is towed behind it (the tether
+//   yields at whichever end the finger doesn't own)
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -68,7 +72,7 @@ module.exports = function () {
 			zIndex: 5
 		}));
 
-		// --- Rope 2: fixed anchor, ball pinned to the tail ---------------
+		// --- Rope 2: fixed anchor, tail weight on a maxLength tether -----
 
 		var weight = Game.createSprite({
 			sheet: ballSheet,
@@ -78,6 +82,7 @@ module.exports = function () {
 			height: BALL * 0.7,
 			zIndex: 10,
 			draggable: true,
+			gravity: H * 1.6,          // falls when released — the tether catches it
 			hitboxShape: 'circle'
 		});
 		gameView.add(weight);
@@ -91,6 +96,45 @@ module.exports = function () {
 			x: W * 0.15,               // fixed head anchor
 			y: H * 0.1,
 			tail: weight,              // ...and the weight hangs off the end
+			maxLength: (SEGMENTS - 4) * SEG_LEN, // drag it too far → pulled back, swings
+			zIndex: 5
+		}));
+
+		// --- Rope 3: a ball on each end — drag one, tow the other --------
+
+		var TOW_SEGS = 8;
+		var ballA = Game.createSprite({
+			sheet: ballSheet,
+			x: W * 0.3,
+			y: H * 0.8,
+			width: BALL * 0.7,
+			height: BALL * 0.7,
+			zIndex: 10,
+			draggable: true,
+			hitboxShape: 'circle'
+		});
+		var ballB = Game.createSprite({
+			sheet: ballSheet,
+			x: W * 0.7,
+			y: H * 0.8,
+			width: BALL * 0.7,
+			height: BALL * 0.7,
+			zIndex: 10,
+			draggable: true,
+			hitboxShape: 'circle'
+		});
+		gameView.add(ballA);
+		gameView.add(ballB);
+
+		gameView.add(Game.createRope({
+			sheet: ropeSheet,
+			segments: TOW_SEGS,
+			segmentLength: SEG_LEN,
+			thickness: THICKNESS * 0.8,
+			gravity: H * 1.6,          // the slack still droops between the balls
+			head: ballA,
+			tail: ballB,
+			maxLength: TOW_SEGS * SEG_LEN, // taut rope tows the other ball
 			zIndex: 5
 		}));
 

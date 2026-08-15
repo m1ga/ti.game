@@ -121,12 +121,38 @@ public class TouchController implements View.OnTouchListener
 
 					if (!dragging && distance(tx, ty, downX, downY) > touchSlop) {
 						dragging = true;
+						s.dragged = true;
 						s.clearPositionTweens();
 						fire(s, "dragstart", positionData(s));
 					}
 					if (dragging) {
-						s.x = tx - grabOffsetX;
-						s.y = ty - grabOffsetY;
+						float nx = tx - grabOffsetX;
+						float ny = ty - grabOffsetY;
+						// Clamp against any fixed-anchor rope tethering this
+						// sprite here at the source — the rope's own
+						// per-frame clamp would only pull it back a frame
+						// later, which renders as a visible jump past the
+						// rope end. Sprite-headed ropes are skipped: those
+						// tow the head sprite behind the drag instead.
+						for (Rope r : scene.ropesSnapshot()) {
+							if (r.tail == s && r.maxLength > 0f && r.head == null) {
+								float ax = r.x;
+								float ay = r.y;
+								float dx = nx - ax;
+								float dy = ny - ay;
+								float d = (float) Math.sqrt(dx * dx + dy * dy);
+								if (d > r.maxLength && d > 1e-5f) {
+									nx = ax + dx / d * r.maxLength;
+									ny = ay + dy / d * r.maxLength;
+								}
+							}
+						}
+						s.x = nx;
+						s.y = ny;
+						// The finger owns the sprite: keep physics from
+						// accumulating velocity underneath the drag.
+						s.velocityX = 0f;
+						s.velocityY = 0f;
 						long now = event.getEventTime();
 						if (now - lastDragEventMs >= DRAG_EVENT_INTERVAL_MS) {
 							lastDragEventMs = now;
@@ -189,6 +215,10 @@ public class TouchController implements View.OnTouchListener
 
 	private void resetGesture()
 	{
+		Sprite s = activeSprite;
+		if (s != null) {
+			s.dragged = false;
+		}
 		activeSprite = null;
 		activePointerId = MotionEvent.INVALID_POINTER_ID;
 		dragging = false;

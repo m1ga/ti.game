@@ -6,6 +6,9 @@ import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.view.TiUIView;
 
+import android.graphics.Color;
+
+import ti.game.engine.PostEffect;
 import ti.game.engine.Scene;
 
 /**
@@ -41,6 +44,99 @@ public class GameViewProxy extends TiViewProxy
 		if (options.containsKey("debug")) {
 			scene.debugAll = org.appcelerator.titanium.util.TiConvert.toBoolean(options.get("debug"));
 		}
+		if (options.containsKey("cameraEffect")) {
+			setCameraEffect(org.appcelerator.titanium.util.TiConvert.toString(options.get("cameraEffect")));
+		}
+		if (options.containsKey("cameraTint")) {
+			setCameraTint(org.appcelerator.titanium.util.TiConvert.toString(options.get("cameraTint")));
+		}
+		if (options.containsKey("cameraEffectIntensity")) {
+			scene.effectIntensity = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("cameraEffectIntensity"));
+		}
+	}
+
+	// --- Fullscreen camera effects ---------------------------------------
+
+	/** 'none', 'tint' or 'glitch' — applied to the whole rendered scene. */
+	@Kroll.setProperty
+	public void setCameraEffect(String value)
+	{
+		if ("tint".equals(value)) {
+			scene.cameraEffect = PostEffect.TINT;
+		} else if ("glitch".equals(value)) {
+			scene.cameraEffect = PostEffect.GLITCH;
+		} else {
+			scene.cameraEffect = PostEffect.NONE;
+		}
+	}
+
+	@Kroll.getProperty
+	public String getCameraEffect()
+	{
+		switch (scene.cameraEffect) {
+			case PostEffect.TINT:
+				return "tint";
+			case PostEffect.GLITCH:
+				return "glitch";
+			default:
+				return "none";
+		}
+	}
+
+	/** Tint color for the 'tint' effect, e.g. '#3f6' or '#33ff66'. */
+	@Kroll.setProperty
+	public void setCameraTint(String value)
+	{
+		cameraTint = value;
+		if (value == null) {
+			scene.effectTintR = 1f;
+			scene.effectTintG = 1f;
+			scene.effectTintB = 1f;
+			return;
+		}
+		try {
+			int color = Color.parseColor(expandShortHex(value));
+			scene.effectTintR = Color.red(color) / 255f;
+			scene.effectTintG = Color.green(color) / 255f;
+			scene.effectTintB = Color.blue(color) / 255f;
+		} catch (IllegalArgumentException e) {
+			// keep previous tint
+		}
+	}
+
+	@Kroll.getProperty
+	public String getCameraTint()
+	{
+		return cameraTint;
+	}
+
+	private String cameraTint;
+
+	/** Color.parseColor can't handle Titanium's '#rgb' shorthand. */
+	private static String expandShortHex(String value)
+	{
+		if (value.length() == 4 && value.charAt(0) == '#') {
+			return new String(new char[] {
+				'#',
+				value.charAt(1), value.charAt(1),
+				value.charAt(2), value.charAt(2),
+				value.charAt(3), value.charAt(3)
+			});
+		}
+		return value;
+	}
+
+	/** Effect strength 0..1 (tint mix / glitch amount). */
+	@Kroll.getProperty
+	public float getCameraEffectIntensity()
+	{
+		return scene.effectIntensity;
+	}
+
+	@Kroll.setProperty
+	public void setCameraEffectIntensity(float value)
+	{
+		scene.effectIntensity = value;
 	}
 
 	/** Renders debug overlays (collision box, bounds, anchor) for every sprite. */

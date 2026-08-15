@@ -19,6 +19,7 @@
 @property (nonatomic, strong) NSNumber *toScaleY;
 @property (nonatomic, strong) NSNumber *toRotation;
 @property (nonatomic, strong) NSNumber *toOpacity;
+@property (nonatomic, strong) NSNumber *toGlowOpacity;
 @property (nonatomic, assign) float duration; // seconds
 @property (nonatomic, assign) float delay;
 @property (nonatomic, copy) NSString *easing;

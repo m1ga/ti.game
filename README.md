@@ -21,6 +21,9 @@ identical on both platforms.
   bursts, follow a sprite, tint/scale/fade over lifetime
 - Verlet ropes (`createRope`) — pin ends to sprites or points, swings
   natively (chains, capes, bridges, grappling hooks)
+- Fullscreen camera effects (`cameraEffect`) — tint and glitch shader
+  passes over the whole rendered scene; sprite glow highlights
+  (`glowColor`/`glowBlur`)
 - 15 example games in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
@@ -173,8 +176,8 @@ performance for free.
 - **Frame animations**: declare named animations on the sprite
   (`{ frames, fps, loop }`), control with `play(name)` / `stop()` / the
   `frame` property. Non-looping animations fire `animationcomplete`.
-- **Tweens**: `sprite.animate({ x, y, scale, rotation, opacity, duration,
-  delay, easing })` (ms; easing from the `EASE_*` constants) animates
+- **Tweens**: `sprite.animate({ x, y, scale, rotation, opacity, glowOpacity,
+  duration, delay, easing })` (ms; easing from the `EASE_*` constants) animates
   natively and fires `complete`. Chain moves by re-calling `animate` from
   the `complete` handler.
 - **Idle wobble**: `idleAnimation: true` adds a gentle organic sway —
@@ -231,6 +234,12 @@ Notes:
   world space automatically (zoom included), so taps and drags work
   while scrolled; overlaid Titanium controls are screen-fixed and
   unaffected.
+- **Camera effects**: `cameraEffect` (`'none'`/`'tint'`/`'glitch'`)
+  applies a fullscreen shader pass to the whole rendered scene —
+  `'tint'` multiplies with `cameraTint` (night vision, flashback,
+  poison), `'glitch'` is a broken-signal filter (sliced row offsets,
+  RGB split, flicker). `cameraEffectIntensity` (0..1) scales either.
+  With `'none'` the extra pass is skipped entirely.
 - **Screen wrapping**: `wrapAround: true` re-enters from the opposite edge
   (Asteroids). For scrolling backgrounds use `wrapX`/`wrapShift`: two
   screen-wide copies with `{ wrapX: -W/2, wrapShift: 2*W }` and a negative
@@ -336,6 +345,16 @@ character's hand — and the rope follows with zero bridge traffic, or use
 (hanging weights, bridges). `endX`/`endY` read the live position of the
 loose end (grappling-hook tips). See `rope.js` for both variants.
 
+With a `tail` sprite, `maxLength` (px, 0 = off) turns the rope into a
+tether: whenever the head→tail distance exceeds it, the rope pulls the
+sprites back onto the limit each frame and cancels their outward
+velocity — so a falling weight snaps taut and swings like a pendulum
+instead of stretching the rope (leashes, wrecking balls, yo-yos). The
+tether yields at the end no finger owns: with a fixed head anchor the
+tail sprite is simply leashed, but with sprites on both ends you can
+drag either one and the other is towed behind once the rope goes taut
+(carts, chained crates).
+
 ### Depth in top-down scenes
 
 `ySort: true` sorts sprites within the same `zIndex` by their **bottom
@@ -358,14 +377,14 @@ a feature set — find the one closest to your game and start there:
 | `platformer.js` | `solidWith`, `onGround`/`land` (trampolines via the landed-on solid), camera `follow`, multitouch d-pad buttons |
 | `volley.js` | `restitution` ball, JS-driven hit response, simple AI timer |
 | `racing.js` | `carMode` drifting, skid marks, pixel art, lap/checkpoint logic |
-| `cards.js` | Fanned hand UI, selection tweens, idle wobble |
+| `cards.js` | Deck dealing, fanned hand UI, selection tweens, idle wobble |
 | `asteroids.js` | `thrust`/`angularVelocity`, `wrapAround`, bullet pooling |
 | `topdown.js` | Tile map from a string array, solid tiles/house, `ySort` depth, 8-way d-pad, follower NPC on a decision timer |
 | `skate.js` | Endless runner: pixel-art parallax street, jump-button ollie over pooled obstacles, raised road sections to ride, crash sprite on collision |
 | `pointclick.js` | Adventure scene: tap-to-walk via distance-sized tweens, verb-coin icons on a hotspot, JS hit-testing vs. view taps, `ySort` depth |
 | `particles.js` | Emitter playground: continuous spark fountain, tap-for-fireworks bursts, smoke trail following a dragged sprite |
 | `rhythm.js` | DDR-style note catcher: pooled notes on native velocity, `press`-event pads, timing-based good/bad sounds, tinted hit bursts, miss trigger zone |
-| `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, `tileRepeat` ground |
+| `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground |
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
 
 Run them with `ti build -p android` from `android/` (executes
@@ -399,6 +418,9 @@ Run them with `ti build -p android` from `android/` (executes
 | `follow(sprite, options)` | Native dead-zone camera follow. Vertical: `topMargin`/`bottomMargin` (fractions of the visible height, defaults 0.33/0.7), clamped to `maxY` (default 0). Horizontal: enabled by `leftMargin`/`rightMargin` (defaults 0.35/0.65). `smoothing` (0..1, default 0 = snap) eases by that fraction of the remaining distance per 1/60 s |
 | `stopFollow()` | Stop following; the camera stays where it is |
 | `shake({ strength, duration })` | Camera shake: `strength` px (default 12), `duration` ms (default 400) — offsets only the projection, so follow/bounds/touches are unaffected |
+| `cameraEffect` | Fullscreen shader over the whole scene: `'none'` (default), `'tint'`, `'glitch'` |
+| `cameraTint` | Color for the `'tint'` effect, e.g. `'#4f8'` |
+| `cameraEffectIntensity` | Effect strength 0..1 (tint mix / glitch amount; default 1) |
 | `debug` | Draw collision shapes for every sprite |
 
 Events: `press`, `tap`, `release` (any touch; payload `x`, `y`) and
@@ -433,6 +455,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | Flight | `thrust`, `angularVelocity`, `wrapAround` |
 | Wrap/loop | `wrapX`, `wrapShift` |
 | Idle wobble | `idleAnimation`, `idleRotation`, `idleMovement`, `idleSpeed` |
+| Glow | `glowColor` (e.g. `'#ffc94d'`), `glowBlur` (blur radius in px; `0` = off), `glowOpacity` (halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur) — a tinted, blurred silhouette of the current frame drawn behind the sprite by a shader pass (selection highlights, power-ups); follows the sprite's shape, rotation and opacity |
 
 Methods: `play(name)`, `stop()`, `animate(options)`, `clearTweens()`.
 

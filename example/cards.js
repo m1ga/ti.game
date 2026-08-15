@@ -1,10 +1,15 @@
-// ti.game card demo — pick three cards from your hand and play them.
+// ti.game card demo — cards are dealt from a deck, pick three and play them.
 //
-// - five cards fanned at the bottom ("my hand")
-// - tap a card to select it: it slides up a bit and scales slightly up
-//   (tap again to deselect; at most three can be selected)
+// - a face-down deck sits in the top-right corner; on start the five hand
+//   cards fly from the deck into a fan at the bottom, flipping face up as
+//   they land (a runtime `frame` swap from the card back to the face)
+// - tap a card to select it: it slides up a bit, scales slightly up and
+//   gets a golden glow (native glow shader — glowColor/glowBlur); tap
+//   again to deselect; at most three can be selected
 // - the Done button tweens the three selected cards to the middle of the
 //   screen, placed next to each other — then turns into Reset
+// - Reset sweeps every card off the left edge, then deals five fresh
+//   cards from the deck
 //
 // Everything is sprite taps + native tweens; no engine additions needed.
 //
@@ -38,6 +43,7 @@ module.exports = function () {
 		var CARD_H = Math.round(CARD_W * 1.5);
 		var LIFT = CARD_H * 0.35;       // how far a selected card pops up
 		var MAX_SELECTED = 3;
+		var BACK_FRAME = 5;             // face-down card art in the sheet
 
 		var cards = [];
 		var played = false;
@@ -51,51 +57,83 @@ module.exports = function () {
 			};
 		}
 
-		// --- The hand: five cards in a slight fan ------------------------
+		// --- The deck: a face-down stack in the top-right corner ---------
+
+		var DECK_X = W - CARD_W * 0.85;
+		var DECK_Y = CARD_H * 0.85;
+
+		for (var d = 0; d < 3; d++) {
+			gameView.add(Game.createSprite({
+				sheet: sheet,
+				frame: BACK_FRAME,
+				x: DECK_X - d * 3,
+				y: DECK_Y - d * 3,
+				rotation: (d - 1) * 2,
+				width: CARD_W,
+				height: CARD_H,
+				zIndex: d
+			}));
+		}
+
+		// --- The hand: five cards, dealt from the deck --------------------
 
 		for (var i = 0; i < 5; i++) {
 			(function (index) {
 				var home = handPosition(index - 2); // -2..2 around the middle
 				var sprite = Game.createSprite({
 					sheet: sheet,
-					frame: index,
-					x: home.x,
-					y: home.y,
-					rotation: home.rotation,
+					frame: BACK_FRAME,
+					x: DECK_X,
+					y: DECK_Y,
 					width: CARD_W,
 					height: CARD_H,
-					zIndex: index,
-					// gentle native wobble; each sprite has its own phase
-					idleAnimation: true,
+					zIndex: 30 + index,
+					// gentle native wobble once in the hand; each sprite has
+					// its own phase — off while flying so tweens land exactly
+					idleAnimation: false,
 					idleRotation: 2.5,              // degrees of sway
 					idleMovement: CARD_H * 0.035,   // px of drift
 					idleSpeed: 0.7
 				});
-				var card = { sprite: sprite, home: home, selected: false, played: false };
+				// state: 'dealing' (deck → hand), 'hand', 'leaving' (reset sweep)
+				var card = { sprite: sprite, home: home, face: index, index: index,
+					state: 'dealing', selected: false, played: false };
 
 				sprite.addEventListener('tap', function () {
-					if (card.played || played) {
+					if (card.state !== 'hand' || card.played || played) {
 						return;
 					}
 					if (card.selected) {
 						card.selected = false;
 						sprite.animate({
 							x: home.x, y: home.y, rotation: home.rotation,
-							scale: 1, duration: 150, easing: Game.EASE_OUT
+							scale: 1, glowOpacity: 0, // fade the halo out
+							duration: 150, easing: Game.EASE_OUT
 						});
 					} else if (selectedCards().length < MAX_SELECTED) {
 						card.selected = true;
+						// golden halo fades in with the lift — a native glow
+						// shader pass, no extra sprites needed
+						sprite.glowColor = '#ffc94d';
+						sprite.glowBlur = CARD_W * 0.14;
+						sprite.glowOpacity = 0;
 						sprite.animate({
-							y: home.y - LIFT, scale: 1.12,
+							y: home.y - LIFT, scale: 1.12, glowOpacity: 1,
 							duration: 150, easing: Game.EASE_OUT
 						});
 					}
 				});
 
 				sprite.addEventListener('complete', function () {
+					if (card.state === 'dealing') {
+						// landed in the fan: flip face up and settle into the hand
+						card.state = 'hand';
+						sprite.frame = card.face;
+						sprite.zIndex = card.index;
+					}
 					// wobble again once a tween lands the card in the hand;
-					// played cards stay still so the middle row stays aligned
-					if (!card.played) {
+					// played and leaving cards stay still
+					if (card.state === 'hand' && !card.played) {
 						sprite.idleAnimation = true;
 					}
 				});
@@ -111,6 +149,39 @@ module.exports = function () {
 			});
 		}
 
+		function busy() {
+			return cards.some(function (card) {
+				return card.state !== 'hand';
+			});
+		}
+
+		// Fly every card from the deck into its fan slot, face down,
+		// flipping on arrival (see the complete listener)
+		function dealHand() {
+			played = false;
+			cards.forEach(function (card, index) {
+				card.state = 'dealing';
+				card.played = false;
+				card.selected = false;
+				card.sprite.idleAnimation = false;
+				card.sprite.frame = BACK_FRAME;
+				card.sprite.x = DECK_X;
+				card.sprite.y = DECK_Y;
+				card.sprite.rotation = 0;
+				card.sprite.scale = 1;
+				card.sprite.glowOpacity = 0;
+				card.sprite.zIndex = 30 + index; // above the deck while flying
+				card.sprite.animate({
+					x: card.home.x,
+					y: card.home.y,
+					rotation: card.home.rotation,
+					duration: 380,
+					delay: index * 140,             // one card after another
+					easing: Game.EASE_IN_OUT
+				});
+			});
+		}
+
 		// --- Done / Reset button -----------------------------------------
 
 		var doneButton = Ti.UI.createButton({
@@ -123,6 +194,9 @@ module.exports = function () {
 			if (played) {
 				reset();
 				return;
+			}
+			if (busy()) {
+				return; // still dealing or sweeping
 			}
 			var selection = selectedCards();
 			if (selection.length < MAX_SELECTED) {
@@ -144,6 +218,7 @@ module.exports = function () {
 					y: H * 0.4,
 					rotation: 0,
 					scale: 1,
+					glowOpacity: 0,                     // halo fades out in flight
 					duration: 350,
 					delay: k * 120,                     // staggered for effect
 					easing: Game.EASE_IN_OUT
@@ -170,26 +245,32 @@ module.exports = function () {
 		});
 
 		function reset() {
-			played = false;
 			doneButton.title = 'Done';
-			// everything tweens back to its original fan slot; the complete
-			// listener re-enables the wobble once each card has arrived
+			// sweep everything off the left edge, then deal a fresh hand
 			cards.forEach(function (card, index) {
-				card.played = false;
+				card.state = 'leaving';
 				card.selected = false;
-				card.sprite.zIndex = index;
+				card.sprite.idleAnimation = false;
+				card.sprite.zIndex = 20 + index;
 				card.sprite.animate({
-					x: card.home.x,
-					y: card.home.y,
-					rotation: card.home.rotation,
+					x: -CARD_W * 2,
+					y: H * 0.5,
+					rotation: -120,
 					scale: 1,
-					duration: 300,
-					easing: Game.EASE_IN_OUT
+					glowOpacity: 0,
+					duration: 320,
+					delay: index * 60,
+					easing: Game.EASE_IN
 				});
 			});
+			// last card leaves at 4*60+320 = 560ms; a short beat, then redeal
+			setTimeout(dealHand, 750);
 		}
 
 		win.add(doneButton);
+
+		// opening deal — a short beat so the deck is seen first
+		setTimeout(dealHand, 350);
 	}
 
 	win.add(gameView);

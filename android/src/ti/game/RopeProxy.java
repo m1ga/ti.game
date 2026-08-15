@@ -61,6 +61,9 @@ public class RopeProxy extends KrollProxy
 		if (options.containsKey("segmentLength")) {
 			rope.segmentLength = TiConvert.toFloat(options.get("segmentLength"));
 		}
+		if (options.containsKey("maxLength")) {
+			rope.maxLength = TiConvert.toFloat(options.get("maxLength"));
+		}
 		if (options.containsKey("thickness")) {
 			rope.thickness = TiConvert.toFloat(options.get("thickness"));
 		}
@@ -166,6 +169,19 @@ public class RopeProxy extends KrollProxy
 	public void setSegmentLength(float value)
 	{
 		rope.segmentLength = value;
+	}
+
+	/** Tether limit for the tail sprite, px (0 = off). */
+	@Kroll.getProperty
+	public float getMaxLength()
+	{
+		return rope.maxLength;
+	}
+
+	@Kroll.setProperty
+	public void setMaxLength(float value)
+	{
+		rope.maxLength = value;
 	}
 
 	@Kroll.getProperty

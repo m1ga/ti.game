@@ -48,6 +48,47 @@ static const int kMaxSegments = 200;
 
 	TGSprite *t = self.tail;
 	BOOL tailPinned = (t != nil);
+	float limit = self.maxLength;
+	if (tailPinned && limit > 0.0f) {
+		float tdx = t.x - headX;
+		float tdy = t.y - headY;
+		float td = sqrtf(tdx * tdx + tdy * tdy);
+		if (td > limit && td > 1e-5f) {
+			// The tether yields at the end no finger owns: drag either
+			// sprite past the limit and the other is towed behind.
+			// With both ends free the correction splits evenly.
+			float nx = tdx / td;
+			float ny = tdy / td;
+			float excess = td - limit;
+			BOOL headYields = (h != nil) && !h.dragged;
+			float headShare = !headYields ? 0.0f : (t.dragged ? 1.0f : 0.5f);
+			if (headShare > 0.0f) {
+				h.x += nx * excess * headShare;
+				h.y += ny * excess * headShare;
+				// Strip the velocity component pointing away from the
+				// tail so the towed sprite doesn't fight the rope.
+				float radial = -(h.velocityX * nx + h.velocityY * ny);
+				if (radial > 0.0f) {
+					h.velocityX += radial * nx;
+					h.velocityY += radial * ny;
+				}
+				headX = h.x;
+				headY = h.y;
+			}
+			float tailShare = 1.0f - headShare;
+			if (tailShare > 0.0f) {
+				t.x -= nx * excess * tailShare;
+				t.y -= ny * excess * tailShare;
+				// Strip the outward velocity component so a hanging
+				// sprite swings instead of accelerating into the leash.
+				float radial = t.velocityX * nx + t.velocityY * ny;
+				if (radial > 0.0f) {
+					t.velocityX -= radial * nx;
+					t.velocityY -= radial * ny;
+				}
+			}
+		}
+	}
 	float damp = self.damping;
 	float fall = self.gravity * dt * dt;
 	int lastFree = tailPinned ? count - 2 : count - 1;

@@ -33,6 +33,11 @@ public class Rope
 	public volatile Sprite head;
 	public volatile Sprite tail;
 
+	// Tether: when > 0 and the head→tail distance exceeds it, the tail
+	// sprite is pulled back onto the limit circle each frame (leash,
+	// pendulum, yo-yo). 0 = off.
+	public volatile float maxLength = 0f;
+
 	// Live tail-end position, mirrored for JS reads (hook tips, hit tests)
 	public volatile float endX, endY;
 
@@ -54,6 +59,47 @@ public class Rope
 
 		Sprite t = tail;
 		boolean tailPinned = (t != null);
+		float limit = maxLength;
+		if (tailPinned && limit > 0f) {
+			float tdx = t.x - headX;
+			float tdy = t.y - headY;
+			float td = (float) Math.sqrt(tdx * tdx + tdy * tdy);
+			if (td > limit && td > 1e-5f) {
+				// The tether yields at the end no finger owns: drag either
+				// sprite past the limit and the other is towed behind.
+				// With both ends free the correction splits evenly.
+				float nx = tdx / td;
+				float ny = tdy / td;
+				float excess = td - limit;
+				boolean headYields = (h != null) && !h.dragged;
+				float headShare = !headYields ? 0f : (t.dragged ? 1f : 0.5f);
+				if (headShare > 0f) {
+					h.x += nx * excess * headShare;
+					h.y += ny * excess * headShare;
+					// Strip the velocity component pointing away from the
+					// tail so the towed sprite doesn't fight the rope.
+					float radial = -(h.velocityX * nx + h.velocityY * ny);
+					if (radial > 0f) {
+						h.velocityX += radial * nx;
+						h.velocityY += radial * ny;
+					}
+					headX = h.x;
+					headY = h.y;
+				}
+				float tailShare = 1f - headShare;
+				if (tailShare > 0f) {
+					t.x -= nx * excess * tailShare;
+					t.y -= ny * excess * tailShare;
+					// Strip the outward velocity component so a hanging
+					// sprite swings instead of accelerating into the leash.
+					float radial = t.velocityX * nx + t.velocityY * ny;
+					if (radial > 0f) {
+						t.velocityX -= radial * nx;
+						t.velocityY -= radial * ny;
+					}
+				}
+			}
+		}
 		float damp = damping;
 		float fall = gravity * dt * dt;
 		int lastFree = tailPinned ? count - 2 : count - 1;

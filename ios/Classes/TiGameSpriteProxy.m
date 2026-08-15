@@ -6,6 +6,7 @@
 
 @implementation TiGameSpriteProxy {
 	TiGameSpriteSheetProxy *_sheetProxy;
+	NSString *_glowColor;
 }
 
 - (instancetype)init
@@ -171,6 +172,51 @@ static NSSet<NSString *> *toGroupSet(id value)
 - (NSNumber *)opacity
 {
 	return @(self.sprite.opacity);
+}
+
+/** Glow tint, e.g. '#ffd54a'; visible once glowBlur > 0. */
+- (void)setGlowColor:(id)value
+{
+	_glowColor = [TiUtils stringValue:value];
+	TiColor *tiColor = [TiUtils colorValue:value];
+	if (tiColor == nil) {
+		self.sprite.glowR = 1.0f;
+		self.sprite.glowG = 1.0f;
+		self.sprite.glowB = 1.0f;
+		return;
+	}
+	CGFloat r = 1, g = 1, b = 1, a = 1;
+	[[tiColor color] getRed:&r green:&g blue:&b alpha:&a];
+	self.sprite.glowR = (float)r;
+	self.sprite.glowG = (float)g;
+	self.sprite.glowB = (float)b;
+}
+
+- (NSString *)glowColor
+{
+	return _glowColor;
+}
+
+/** Glow blur radius in px; 0 = no glow. */
+- (void)setGlowBlur:(id)value
+{
+	self.sprite.glowBlur = [TiUtils floatValue:value def:0];
+}
+
+- (NSNumber *)glowBlur
+{
+	return @(self.sprite.glowBlur);
+}
+
+/** Halo strength 0..1 (fade the glow without touching the blur). */
+- (void)setGlowOpacity:(id)value
+{
+	self.sprite.glowOpacity = [TiUtils floatValue:value def:1];
+}
+
+- (NSNumber *)glowOpacity
+{
+	return @(self.sprite.glowOpacity);
 }
 
 - (void)setVisible:(id)value
@@ -687,6 +733,9 @@ static NSSet<NSString *> *toGroupSet(id value)
 	}
 	if (options[@"opacity"] != nil) {
 		tween.toOpacity = @([TiUtils floatValue:options[@"opacity"] def:1]);
+	}
+	if (options[@"glowOpacity"] != nil) {
+		tween.toGlowOpacity = @([TiUtils floatValue:options[@"glowOpacity"] def:1]);
 	}
 	if (options[@"duration"] != nil) {
 		tween.duration = [TiUtils floatValue:options[@"duration"] def:300] / 1000.0f;

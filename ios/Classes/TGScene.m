@@ -34,6 +34,10 @@ static float bottomEdge(TGSprite *s)
 		_emitters = [NSMutableArray array];
 		_ropes = [NSMutableArray array];
 		_skidTrail = [[TGSkidTrail alloc] init];
+		_effectTintR = 1.0f;
+		_effectTintG = 1.0f;
+		_effectTintB = 1.0f;
+		_effectIntensity = 1.0f;
 		_cameraScale = 1.0f;
 		_followTopFraction = 0.33f;
 		_followBottomFraction = 0.7f;

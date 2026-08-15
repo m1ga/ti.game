@@ -23,9 +23,11 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	private final org.appcelerator.kroll.KrollProxy viewProxy; // fires 'resize'
 	private final SpriteBatch batch = new SpriteBatch();
 	private final TextureManager textures = new TextureManager();
+	private final PostEffect postEffect = new PostEffect();
 	private final float[] projection = new float[16];
 
 	private long lastFrameNanos = 0;
+	private float effectTime = 0f; // drives the glitch animation
 	private volatile int surfaceWidth = 0;
 	private volatile int surfaceHeight = 0;
 
@@ -51,6 +53,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		// A new context means every texture and shader is gone
 		textures.invalidateAll();
 		batch.createGLResources();
+		postEffect.createGLResources();
 		lastFrameNanos = 0;
 	}
 
@@ -86,6 +89,13 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		}
 
 		scene.update(dt);
+		effectTime += dt;
+
+		// Camera effect: render the whole scene into an offscreen texture,
+		// then draw it to the screen through the effect shader at the end
+		int effectMode = scene.cameraEffect;
+		boolean effectActive = (effectMode != PostEffect.NONE)
+			&& postEffect.begin(surfaceWidth, surfaceHeight);
 
 		// Projection follows the camera (position, zoom, shake) — sprites
 		// live in world coordinates
@@ -153,6 +163,12 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			}
 		}
 		batch.end();
+
+		if (effectActive) {
+			postEffect.finish(effectMode,
+				scene.effectTintR, scene.effectTintG, scene.effectTintB,
+				scene.effectIntensity, effectTime);
+		}
 	}
 
 	private void ensureSheetLoaded(SpriteSheet sheet)

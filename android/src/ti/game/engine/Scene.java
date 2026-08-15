@@ -102,6 +102,15 @@ public class Scene
 	public volatile float bgBlue = 0f;
 	public volatile float bgAlpha = 1f;
 
+	// Fullscreen camera effect (JS thread writes, GL thread reads): the
+	// scene renders into an offscreen texture and PostEffect draws it to
+	// the screen through the effect shader. NONE renders directly.
+	public volatile int cameraEffect = PostEffect.NONE;
+	public volatile float effectTintR = 1f;
+	public volatile float effectTintG = 1f;
+	public volatile float effectTintB = 1f;
+	public volatile float effectIntensity = 1f; // 0..1 mix/strength
+
 	private static final Comparator<Sprite> BY_Z = new Comparator<Sprite>() {
 		@Override
 		public int compare(Sprite a, Sprite b)

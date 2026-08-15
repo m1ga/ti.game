@@ -1,5 +1,6 @@
 #import "TGSceneRenderer.h"
 #import "TGParticleEmitter.h"
+#import "TGPostEffect.h"
 #import "TGRope.h"
 #import "TGScene.h"
 #import "TGSkidTrail.h"
@@ -31,8 +32,10 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	__weak TiProxy *_viewProxy; // fires 'resize'
 	TGSpriteBatch *_batch;
 	TGTextureManager *_textures;
+	TGPostEffect *_postEffect;
 	float _projection[16];
 	CFTimeInterval _lastFrameTime;
+	float _effectTime; // drives the glitch animation
 	float _debugAabb[4];
 }
 
@@ -43,6 +46,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		_viewProxy = viewProxy;
 		_batch = [[TGSpriteBatch alloc] init];
 		_textures = [[TGTextureManager alloc] init];
+		_postEffect = [[TGPostEffect alloc] init];
 	}
 	return self;
 }
@@ -52,6 +56,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	// A new context means every texture and shader is gone
 	[_textures invalidateAll];
 	[_batch createGLResources];
+	[_postEffect createGLResources];
 	_lastFrameTime = 0;
 }
 
@@ -86,6 +91,13 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 
 	[_scene update:dt];
+	_effectTime += dt;
+
+	// Camera effect: render the whole scene into an offscreen texture,
+	// then draw it to the screen through the effect shader at the end
+	int effectMode = _scene.cameraEffect;
+	BOOL effectActive = (effectMode != TGPostEffectNone)
+		&& [_postEffect beginWithWidth:_surfaceWidth height:_surfaceHeight];
 
 	// Projection follows the camera (position, zoom, shake) — sprites
 	// live in world coordinates
@@ -153,6 +165,12 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		}
 	}
 	[_batch end];
+
+	if (effectActive) {
+		[_postEffect finish:effectMode
+					  tintR:_scene.effectTintR tintG:_scene.effectTintG tintB:_scene.effectTintB
+				  intensity:_scene.effectIntensity time:_effectTime];
+	}
 }
 
 - (void)ensureSheetLoaded:(TGSpriteSheet *)sheet

@@ -68,6 +68,16 @@
 - (float)screenToWorldX:(float)sx;
 - (float)screenToWorldY:(float)sy;
 
+// Fullscreen camera effect (main thread writes, render thread reads):
+// the scene renders into an offscreen texture and TGPostEffect draws it
+// to the screen through the effect shader. TGPostEffectNone renders
+// directly. Values mirror engine/PostEffect constants.
+@property (atomic, assign) int cameraEffect;
+@property (atomic, assign) float effectTintR;
+@property (atomic, assign) float effectTintG;
+@property (atomic, assign) float effectTintB;
+@property (atomic, assign) float effectIntensity; // 0..1 mix/strength
+
 @property (atomic, assign) float bgRed;
 @property (atomic, assign) float bgGreen;
 @property (atomic, assign) float bgBlue;

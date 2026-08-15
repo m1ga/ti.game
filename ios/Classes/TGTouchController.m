@@ -1,4 +1,5 @@
 #import "TGTouchController.h"
+#import "TGRope.h"
 #import "TGScene.h"
 #import "TGSprite.h"
 #import <TitaniumKit/TitaniumKit.h>
@@ -176,12 +177,37 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 
 		if (!_dragging && distanceBetween(tx, ty, _downX, _downY) > _touchSlop) {
 			_dragging = YES;
+			s.dragged = YES;
 			[s clearPositionTweens];
 			fireOnSprite(s, @"dragstart", [self positionData:s]);
 		}
 		if (_dragging) {
-			s.x = tx - _grabOffsetX;
-			s.y = ty - _grabOffsetY;
+			float nx = tx - _grabOffsetX;
+			float ny = ty - _grabOffsetY;
+			// Clamp against any fixed-anchor rope tethering this sprite
+			// here at the source — the rope's own per-frame clamp would
+			// only pull it back a frame later, which renders as a
+			// visible jump past the rope end. Sprite-headed ropes are
+			// skipped: those tow the head sprite behind the drag instead.
+			for (TGRope *r in [_scene ropesSnapshot]) {
+				if (r.tail == s && r.maxLength > 0.0f && r.head == nil) {
+					float ax = r.x;
+					float ay = r.y;
+					float dx = nx - ax;
+					float dy = ny - ay;
+					float d = sqrtf(dx * dx + dy * dy);
+					if (d > r.maxLength && d > 1e-5f) {
+						nx = ax + dx / d * r.maxLength;
+						ny = ay + dy / d * r.maxLength;
+					}
+				}
+			}
+			s.x = nx;
+			s.y = ny;
+			// The finger owns the sprite: keep physics from
+			// accumulating velocity underneath the drag.
+			s.velocityX = 0.0f;
+			s.velocityY = 0.0f;
 			NSTimeInterval now = _primaryTouch.timestamp;
 			if (now - _lastDragEventTime >= kDragEventInterval) {
 				_lastDragEventTime = now;
@@ -259,6 +285,7 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 
 - (void)resetGesture
 {
+	_activeSprite.dragged = NO;
 	_activeSprite = nil;
 	_primaryTouch = nil;
 	_dragging = NO;

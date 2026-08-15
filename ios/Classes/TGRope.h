@@ -32,6 +32,11 @@
 @property (atomic, strong) TGSprite *head;
 @property (atomic, strong) TGSprite *tail;
 
+// Tether: when > 0 and the head→tail distance exceeds it, the tail
+// sprite is pulled back onto the limit circle each frame (leash,
+// pendulum, yo-yo). 0 = off.
+@property (atomic, assign) float maxLength;
+
 // Live tail-end position, mirrored for JS reads
 @property (atomic, assign) float endX;
 @property (atomic, assign) float endY;

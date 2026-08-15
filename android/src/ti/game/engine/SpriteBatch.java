@@ -42,13 +42,57 @@ public class SpriteBatch
 		+ "  gl_FragColor = texture2D(uTex, vUV) * vColor;\n"
 		+ "}\n";
 
+	// Silhouette shader for glows: the frame's alpha tinted with the
+	// vertex color, ignoring the art's own colors — stamped in soft
+	// rings behind the sprite it reads as a blurred halo.
+	private static final String GLOW_FRAGMENT_SHADER =
+		"precision mediump float;\n"
+		+ "uniform sampler2D uTex;\n"
+		+ "varying vec2 vUV;\n"
+		+ "varying vec4 vColor;\n"
+		+ "void main() {\n"
+		+ "  gl_FragColor = vColor * texture2D(uTex, vUV).a;\n"
+		+ "}\n";
+
+	// Attribute locations are bound identically for both programs so
+	// flush() never cares which one is active.
+	private static final int ATTR_POS = 0;
+	private static final int ATTR_UV = 1;
+	private static final int ATTR_COLOR = 2;
+
+	// Glow stamp pattern: unit (x, y, alpha) triples — an outer ring of 8
+	// at the full blur radius and an inner ring of 8 at 0.55r, rotated
+	// half a step. Overlaps build a solid core with soft edges.
+	private static final float[] GLOW_RING = buildGlowRing();
+
+	private static float[] buildGlowRing()
+	{
+		float[] ring = new float[16 * 3];
+		for (int i = 0; i < 8; i++) {
+			double outer = Math.PI * 2.0 * i / 8.0;
+			double inner = outer + Math.PI / 8.0;
+			int o = i * 3;
+			ring[o] = (float) Math.cos(outer);
+			ring[o + 1] = (float) Math.sin(outer);
+			ring[o + 2] = 0.20f;
+			int n = (8 + i) * 3;
+			ring[n] = (float) Math.cos(inner) * 0.55f;
+			ring[n + 1] = (float) Math.sin(inner) * 0.55f;
+			ring[n + 2] = 0.30f;
+		}
+		return ring;
+	}
+
 	private final float[] vertices = new float[MAX_QUADS * VERTICES_PER_QUAD * FLOATS_PER_VERTEX];
 	private final FloatBuffer buffer;
 	private int quadCount = 0;
 	private int currentTexture = -1;
 
 	private int program = 0;
-	private int aPos, aUV, aColor, uProj, uTex;
+	private int glowProgram = 0;
+	private int activeProgram = 0;
+	private int uProj, uTex;             // main program
+	private int uProjGlow, uTexGlow;     // glow program
 	private float[] projection;
 
 	public SpriteBatch()
@@ -61,19 +105,28 @@ public class SpriteBatch
 	/** (Re)creates shaders; call from onSurfaceCreated. */
 	public void createGLResources()
 	{
-		int vs = compileShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER);
-		int fs = compileShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
-		program = GLES20.glCreateProgram();
-		GLES20.glAttachShader(program, vs);
-		GLES20.glAttachShader(program, fs);
-		GLES20.glLinkProgram(program);
-		GLES20.glDeleteShader(vs);
-		GLES20.glDeleteShader(fs);
-		aPos = GLES20.glGetAttribLocation(program, "aPos");
-		aUV = GLES20.glGetAttribLocation(program, "aUV");
-		aColor = GLES20.glGetAttribLocation(program, "aColor");
+		program = buildProgram(FRAGMENT_SHADER);
 		uProj = GLES20.glGetUniformLocation(program, "uProj");
 		uTex = GLES20.glGetUniformLocation(program, "uTex");
+		glowProgram = buildProgram(GLOW_FRAGMENT_SHADER);
+		uProjGlow = GLES20.glGetUniformLocation(glowProgram, "uProj");
+		uTexGlow = GLES20.glGetUniformLocation(glowProgram, "uTex");
+	}
+
+	private static int buildProgram(String fragmentSource)
+	{
+		int vs = compileShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER);
+		int fs = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource);
+		int p = GLES20.glCreateProgram();
+		GLES20.glAttachShader(p, vs);
+		GLES20.glAttachShader(p, fs);
+		GLES20.glBindAttribLocation(p, ATTR_POS, "aPos");
+		GLES20.glBindAttribLocation(p, ATTR_UV, "aUV");
+		GLES20.glBindAttribLocation(p, ATTR_COLOR, "aColor");
+		GLES20.glLinkProgram(p);
+		GLES20.glDeleteShader(vs);
+		GLES20.glDeleteShader(fs);
+		return p;
 	}
 
 	private static int compileShader(int type, String source)
@@ -89,12 +142,24 @@ public class SpriteBatch
 		projection = projectionMatrix;
 		quadCount = 0;
 		currentTexture = -1;
-		GLES20.glUseProgram(program);
-		GLES20.glUniformMatrix4fv(uProj, 1, false, projection, 0);
-		GLES20.glUniform1i(uTex, 0);
+		activeProgram = 0;
+		useProgram(program);
 		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
 		GLES20.glEnable(GLES20.GL_BLEND);
 		GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+	}
+
+	/** Flush and switch programs; both share attribute locations. */
+	private void useProgram(int p)
+	{
+		if (p == activeProgram) {
+			return;
+		}
+		flush();
+		GLES20.glUseProgram(p);
+		GLES20.glUniformMatrix4fv((p == program) ? uProj : uProjGlow, 1, false, projection, 0);
+		GLES20.glUniform1i((p == program) ? uTex : uTexGlow, 0);
+		activeProgram = p;
 	}
 
 	private void ensureCapacity(int texture)
@@ -152,6 +217,29 @@ public class SpriteBatch
 		float x1 = s.x + lx1 * cos - ly1 * sin, y1 = s.y + lx1 * sin + ly1 * cos;
 		float x2 = s.x + lx2 * cos - ly2 * sin, y2 = s.y + lx2 * sin + ly2 * cos;
 		float x3 = s.x + lx3 * cos - ly3 * sin, y3 = s.y + lx3 * sin + ly3 * cos;
+
+		float blur = s.glowBlur;
+		float glow = Math.max(0f, Math.min(1f, s.glowOpacity)) * alpha;
+		if (blur > 0f && glow > 0f) {
+			useProgram(glowProgram);
+			float gr = s.glowR;
+			float gg = s.glowG;
+			float gb = s.glowB;
+			int texture = sheet.textureId();
+			for (int k = 0; k < GLOW_RING.length; k += 3) {
+				float ox = GLOW_RING[k] * blur;
+				float oy = GLOW_RING[k + 1] * blur;
+				float ga = GLOW_RING[k + 2] * glow;
+				ensureCapacity(texture);
+				putQuad(x0 + ox, y0 + oy, f.u0, f.v0,
+					x1 + ox, y1 + oy, u1, f.v0,
+					x2 + ox, y2 + oy, f.u0, v1,
+					x3 + ox, y3 + oy, u1, v1,
+					gr * ga, gg * ga, gb * ga, ga);
+			}
+			useProgram(program);
+			ensureCapacity(texture);
+		}
 
 		putQuad(x0, y0, f.u0, f.v0,
 			x1, y1, u1, f.v0,
@@ -275,14 +363,14 @@ public class SpriteBatch
 
 		int stride = FLOATS_PER_VERTEX * 4;
 		buffer.position(0);
-		GLES20.glVertexAttribPointer(aPos, 2, GLES20.GL_FLOAT, false, stride, buffer);
-		GLES20.glEnableVertexAttribArray(aPos);
+		GLES20.glVertexAttribPointer(ATTR_POS, 2, GLES20.GL_FLOAT, false, stride, buffer);
+		GLES20.glEnableVertexAttribArray(ATTR_POS);
 		buffer.position(2);
-		GLES20.glVertexAttribPointer(aUV, 2, GLES20.GL_FLOAT, false, stride, buffer);
-		GLES20.glEnableVertexAttribArray(aUV);
+		GLES20.glVertexAttribPointer(ATTR_UV, 2, GLES20.GL_FLOAT, false, stride, buffer);
+		GLES20.glEnableVertexAttribArray(ATTR_UV);
 		buffer.position(4);
-		GLES20.glVertexAttribPointer(aColor, 4, GLES20.GL_FLOAT, false, stride, buffer);
-		GLES20.glEnableVertexAttribArray(aColor);
+		GLES20.glVertexAttribPointer(ATTR_COLOR, 4, GLES20.GL_FLOAT, false, stride, buffer);
+		GLES20.glEnableVertexAttribArray(ATTR_COLOR);
 
 		GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount);
 		quadCount = 0;

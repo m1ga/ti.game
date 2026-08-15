@@ -1,4 +1,5 @@
 #import "TiGameGameViewProxy.h"
+#import "TGPostEffect.h"
 #import "TGScene.h"
 #import "TGSceneRenderer.h"
 #import "TGSprite.h"
@@ -10,6 +11,7 @@
 
 @implementation TiGameGameViewProxy {
 	NSDictionary *_cameraBoundsDict;
+	NSString *_cameraTint;
 }
 
 - (instancetype)init
@@ -42,6 +44,67 @@
 }
 
 #pragma mark Properties
+
+#pragma mark Fullscreen camera effects
+
+/** 'none', 'tint' or 'glitch' — applied to the whole rendered scene. */
+- (void)setCameraEffect:(id)value
+{
+	NSString *name = [TiUtils stringValue:value];
+	if ([@"tint" isEqualToString:name]) {
+		self.scene.cameraEffect = TGPostEffectTint;
+	} else if ([@"glitch" isEqualToString:name]) {
+		self.scene.cameraEffect = TGPostEffectGlitch;
+	} else {
+		self.scene.cameraEffect = TGPostEffectNone;
+	}
+}
+
+- (NSString *)cameraEffect
+{
+	switch (self.scene.cameraEffect) {
+		case TGPostEffectTint:
+			return @"tint";
+		case TGPostEffectGlitch:
+			return @"glitch";
+		default:
+			return @"none";
+	}
+}
+
+/** Tint color for the 'tint' effect, e.g. '#3f6' or '#33ff66'. */
+- (void)setCameraTint:(id)value
+{
+	_cameraTint = [TiUtils stringValue:value];
+	TiColor *tiColor = [TiUtils colorValue:value];
+	if (tiColor == nil) {
+		self.scene.effectTintR = 1.0f;
+		self.scene.effectTintG = 1.0f;
+		self.scene.effectTintB = 1.0f;
+		return;
+	}
+	CGFloat r = 1, g = 1, b = 1, a = 1;
+	[[tiColor color] getRed:&r green:&g blue:&b alpha:&a];
+	self.scene.effectTintR = (float)r;
+	self.scene.effectTintG = (float)g;
+	self.scene.effectTintB = (float)b;
+}
+
+- (NSString *)cameraTint
+{
+	return _cameraTint;
+}
+
+/** Effect strength 0..1 (tint mix / glitch amount). */
+- (void)setCameraEffectIntensity:(id)value
+{
+	self.scene.effectIntensity = [TiUtils floatValue:value def:1];
+}
+
+- (NSNumber *)cameraEffectIntensity
+{
+	return @(self.scene.effectIntensity);
+}
 
 /** Renders debug overlays (collision box, bounds, anchor) for every sprite. */
 - (void)setDebug:(id)value

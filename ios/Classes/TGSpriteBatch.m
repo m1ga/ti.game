@@ -29,6 +29,42 @@ static const char *kFragmentShader =
 	"  gl_FragColor = texture2D(uTex, vUV) * vColor;\n"
 	"}\n";
 
+// Silhouette shader for glows: the frame's alpha tinted with the
+// vertex color, ignoring the art's own colors — stamped in soft
+// rings behind the sprite it reads as a blurred halo.
+static const char *kGlowFragmentShader =
+	"precision mediump float;\n"
+	"uniform sampler2D uTex;\n"
+	"varying vec2 vUV;\n"
+	"varying vec4 vColor;\n"
+	"void main() {\n"
+	"  gl_FragColor = vColor * texture2D(uTex, vUV).a;\n"
+	"}\n";
+
+// Attribute locations are bound identically for both programs so
+// flush never cares which one is active.
+enum { kAttrPos = 0, kAttrUV = 1, kAttrColor = 2 };
+
+// Glow stamp pattern: unit (x, y, alpha) triples — an outer ring of 8
+// at the full blur radius and an inner ring of 8 at 0.55r, rotated
+// half a step. Overlaps build a solid core with soft edges.
+static float kGlowRing[16 * 3];
+static void buildGlowRing(void)
+{
+	for (int i = 0; i < 8; i++) {
+		float outer = (float)(M_PI * 2.0 * i / 8.0);
+		float inner = outer + (float)(M_PI / 8.0);
+		int o = i * 3;
+		kGlowRing[o] = cosf(outer);
+		kGlowRing[o + 1] = sinf(outer);
+		kGlowRing[o + 2] = 0.20f;
+		int n = (8 + i) * 3;
+		kGlowRing[n] = cosf(inner) * 0.55f;
+		kGlowRing[n + 1] = sinf(inner) * 0.55f;
+		kGlowRing[n + 2] = 0.30f;
+	}
+}
+
 static GLuint compileShader(GLenum type, const char *source)
 {
 	GLuint shader = glCreateShader(type);
@@ -37,13 +73,33 @@ static GLuint compileShader(GLenum type, const char *source)
 	return shader;
 }
 
+static GLuint buildProgram(const char *fragmentSource)
+{
+	GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
+	GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragmentSource);
+	GLuint p = glCreateProgram();
+	glAttachShader(p, vs);
+	glAttachShader(p, fs);
+	glBindAttribLocation(p, kAttrPos, "aPos");
+	glBindAttribLocation(p, kAttrUV, "aUV");
+	glBindAttribLocation(p, kAttrColor, "aColor");
+	glLinkProgram(p);
+	glDeleteShader(vs);
+	glDeleteShader(fs);
+	return p;
+}
+
 @implementation TGSpriteBatch {
 	float *_vertices;
 	int _quadCount;
 	GLint _currentTexture;
 
 	GLuint _program;
-	GLint _aPos, _aUV, _aColor, _uProj, _uTex;
+	GLuint _glowProgram;
+	GLuint _activeProgram;
+	GLint _uProj, _uTex;         // main program
+	GLint _uProjGlow, _uTexGlow; // glow program
+	const float *_projection;
 }
 
 - (instancetype)init
@@ -62,31 +118,39 @@ static GLuint compileShader(GLenum type, const char *source)
 
 - (void)createGLResources
 {
-	GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
-	GLuint fs = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
-	_program = glCreateProgram();
-	glAttachShader(_program, vs);
-	glAttachShader(_program, fs);
-	glLinkProgram(_program);
-	glDeleteShader(vs);
-	glDeleteShader(fs);
-	_aPos = glGetAttribLocation(_program, "aPos");
-	_aUV = glGetAttribLocation(_program, "aUV");
-	_aColor = glGetAttribLocation(_program, "aColor");
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{ buildGlowRing(); });
+	_program = buildProgram(kFragmentShader);
 	_uProj = glGetUniformLocation(_program, "uProj");
 	_uTex = glGetUniformLocation(_program, "uTex");
+	_glowProgram = buildProgram(kGlowFragmentShader);
+	_uProjGlow = glGetUniformLocation(_glowProgram, "uProj");
+	_uTexGlow = glGetUniformLocation(_glowProgram, "uTex");
 }
 
 - (void)begin:(const float *)projectionMatrix
 {
+	_projection = projectionMatrix;
 	_quadCount = 0;
 	_currentTexture = -1;
-	glUseProgram(_program);
-	glUniformMatrix4fv(_uProj, 1, GL_FALSE, projectionMatrix);
-	glUniform1i(_uTex, 0);
+	_activeProgram = 0;
+	[self useProgram:_program];
 	glActiveTexture(GL_TEXTURE0);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+/** Flush and switch programs; both share attribute locations. */
+- (void)useProgram:(GLuint)p
+{
+	if (p == _activeProgram) {
+		return;
+	}
+	[self flush];
+	glUseProgram(p);
+	glUniformMatrix4fv((p == _program) ? _uProj : _uProjGlow, 1, GL_FALSE, _projection);
+	glUniform1i((p == _program) ? _uTex : _uTexGlow, 0);
+	_activeProgram = p;
 }
 
 - (void)ensureCapacity:(GLint)texture
@@ -146,6 +210,29 @@ static GLuint compileShader(GLenum type, const char *source)
 	float x1 = x + lx1 * cosr - ly1 * sinr, y1 = y + lx1 * sinr + ly1 * cosr;
 	float x2 = x + lx2 * cosr - ly2 * sinr, y2 = y + lx2 * sinr + ly2 * cosr;
 	float x3 = x + lx3 * cosr - ly3 * sinr, y3 = y + lx3 * sinr + ly3 * cosr;
+
+	float blur = s.glowBlur;
+	float glow = MAX(0.0f, MIN(1.0f, s.glowOpacity)) * alpha;
+	if (blur > 0.0f && glow > 0.0f) {
+		[self useProgram:_glowProgram];
+		float gr = s.glowR;
+		float gg = s.glowG;
+		float gb = s.glowB;
+		GLint texture = [sheet textureId];
+		for (int k = 0; k < 16 * 3; k += 3) {
+			float ox = kGlowRing[k] * blur;
+			float oy = kGlowRing[k + 1] * blur;
+			float ga = kGlowRing[k + 2] * glow;
+			[self ensureCapacity:texture];
+			[self putQuadX0:x0 + ox y0:y0 + oy u0:f.u0 v0:f.v0
+						 x1:x1 + ox y1:y1 + oy u1:u1 v1:f.v0
+						 x2:x2 + ox y2:y2 + oy u2:f.u0 v2:v1
+						 x3:x3 + ox y3:y3 + oy u3:u1 v3:v1
+						  r:gr * ga g:gg * ga b:gb * ga a:ga];
+		}
+		[self useProgram:_program];
+		[self ensureCapacity:texture];
+	}
 
 	[self putQuadX0:x0 y0:y0 u0:f.u0 v0:f.v0
 				 x1:x1 y1:y1 u1:u1 v1:f.v0
@@ -260,12 +347,12 @@ static GLuint compileShader(GLenum type, const char *source)
 	glBindTexture(GL_TEXTURE_2D, (GLuint)_currentTexture);
 
 	GLsizei stride = kFloatsPerVertex * sizeof(float);
-	glVertexAttribPointer(_aPos, 2, GL_FLOAT, GL_FALSE, stride, _vertices);
-	glEnableVertexAttribArray(_aPos);
-	glVertexAttribPointer(_aUV, 2, GL_FLOAT, GL_FALSE, stride, _vertices + 2);
-	glEnableVertexAttribArray(_aUV);
-	glVertexAttribPointer(_aColor, 4, GL_FLOAT, GL_FALSE, stride, _vertices + 4);
-	glEnableVertexAttribArray(_aColor);
+	glVertexAttribPointer(kAttrPos, 2, GL_FLOAT, GL_FALSE, stride, _vertices);
+	glEnableVertexAttribArray(kAttrPos);
+	glVertexAttribPointer(kAttrUV, 2, GL_FLOAT, GL_FALSE, stride, _vertices + 2);
+	glEnableVertexAttribArray(kAttrUV);
+	glVertexAttribPointer(kAttrColor, 4, GL_FLOAT, GL_FALSE, stride, _vertices + 4);
+	glEnableVertexAttribArray(kAttrColor);
 
 	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
 	_quadCount = 0;

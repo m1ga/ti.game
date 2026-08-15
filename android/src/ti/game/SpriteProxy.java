@@ -1,5 +1,7 @@
 package ti.game;
 
+import android.graphics.Color;
+
 import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.KrollProxy;
 import org.appcelerator.kroll.annotations.Kroll;
@@ -39,6 +41,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 
 	private final Sprite sprite = new Sprite();
 	private SpriteSheetProxy sheetProxy;
+	private String glowColor;
 
 	public SpriteProxy()
 	{
@@ -97,6 +100,15 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("opacity")) {
 			sprite.opacity = TiConvert.toFloat(options.get("opacity"));
+		}
+		if (options.containsKey("glowColor")) {
+			setGlowColor(TiConvert.toString(options.get("glowColor")));
+		}
+		if (options.containsKey("glowBlur")) {
+			sprite.glowBlur = TiConvert.toFloat(options.get("glowBlur"));
+		}
+		if (options.containsKey("glowOpacity")) {
+			sprite.glowOpacity = TiConvert.toFloat(options.get("glowOpacity"));
 		}
 		if (options.containsKey("visible")) {
 			sprite.visible = TiConvert.toBoolean(options.get("visible"));
@@ -386,6 +398,73 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setOpacity(float value)
 	{
 		sprite.opacity = value;
+	}
+
+	/** Glow tint, e.g. '#ffd54a'; visible once glowBlur > 0. */
+	@Kroll.setProperty
+	public void setGlowColor(String value)
+	{
+		glowColor = value;
+		if (value == null) {
+			sprite.glowR = 1f;
+			sprite.glowG = 1f;
+			sprite.glowB = 1f;
+			return;
+		}
+		try {
+			int color = Color.parseColor(expandShortHex(value));
+			sprite.glowR = Color.red(color) / 255f;
+			sprite.glowG = Color.green(color) / 255f;
+			sprite.glowB = Color.blue(color) / 255f;
+		} catch (IllegalArgumentException e) {
+			// keep previous color
+		}
+	}
+
+	@Kroll.getProperty
+	public String getGlowColor()
+	{
+		return glowColor;
+	}
+
+	/** Color.parseColor can't handle Titanium's '#rgb' shorthand. */
+	private static String expandShortHex(String value)
+	{
+		if (value.length() == 4 && value.charAt(0) == '#') {
+			return new String(new char[] {
+				'#',
+				value.charAt(1), value.charAt(1),
+				value.charAt(2), value.charAt(2),
+				value.charAt(3), value.charAt(3)
+			});
+		}
+		return value;
+	}
+
+	/** Glow blur radius in px; 0 = no glow. */
+	@Kroll.getProperty
+	public float getGlowBlur()
+	{
+		return sprite.glowBlur;
+	}
+
+	@Kroll.setProperty
+	public void setGlowBlur(float value)
+	{
+		sprite.glowBlur = value;
+	}
+
+	/** Halo strength 0..1 (fade the glow without touching the blur). */
+	@Kroll.getProperty
+	public float getGlowOpacity()
+	{
+		return sprite.glowOpacity;
+	}
+
+	@Kroll.setProperty
+	public void setGlowOpacity(float value)
+	{
+		sprite.glowOpacity = value;
 	}
 
 	@Kroll.getProperty
@@ -980,6 +1059,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("opacity")) {
 			tween.toOpacity = TiConvert.toFloat(options.get("opacity"));
+		}
+		if (options.containsKey("glowOpacity")) {
+			tween.toGlowOpacity = TiConvert.toFloat(options.get("glowOpacity"));
 		}
 		if (options.containsKey("duration")) {
 			tween.duration = TiConvert.toFloat(options.get("duration")) / 1000f;

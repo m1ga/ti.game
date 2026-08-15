@@ -47,6 +47,15 @@
 @property (atomic, assign) BOOL visible;
 @property (atomic, assign) int zIndex;
 
+// Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
+// frame draws behind the sprite (selection highlights, power-ups).
+// glowBlur is the blur radius in px; color as parsed 0..1 channels.
+@property (atomic, assign) float glowBlur;
+@property (atomic, assign) float glowOpacity; // halo strength 0..1
+@property (atomic, assign) float glowR;
+@property (atomic, assign) float glowG;
+@property (atomic, assign) float glowB;
+
 // Depth sorting for top-down scenes: within the same zIndex, ySort
 // sprites draw in order of their bottom edge (feet/base).
 @property (atomic, assign) BOOL ySort;
@@ -55,6 +64,11 @@
 @property (atomic, assign) BOOL draggable;
 @property (atomic, assign) BOOL pinchable;
 @property (atomic, assign) BOOL rotatable;
+
+// YES while a finger actively drags this sprite (set by the touch
+// controller). Constraints like the rope tether yield at the other
+// end instead of fighting the finger.
+@property (atomic, assign) BOOL dragged;
 
 // NO = invisible to hit-testing: touches pass through to sprites
 // underneath (falling blocks over a button, decorative overlays)
