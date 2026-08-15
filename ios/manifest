@@ -2,7 +2,7 @@
 # this is your module manifest and used by Titanium
 # during compilation, packaging, distribution, etc.
 #
-version: 1.0.0
+version: 0.1.0
 apiversion: 2
 architectures: arm64 x86_64
 description: ti.game
@@ -15,4 +15,4 @@ name: ti.game
 moduleid: ti.game
 guid: 6dadd1f9-b40b-4f8d-807d-f433997953ab
 platform: iphone
-minsdk: 13.4.0.GA
+minsdk: 13.3.0.GA
