@@ -185,5 +185,16 @@ module.exports = function () {
 	}
 
 	win.add(gameView);
+	// Back — return to the launcher
+	var backButton = Ti.UI.createButton({
+		title: 'Back',
+		top: 40,
+		left: 20
+	});
+	backButton.addEventListener('click', function () {
+		win.close();
+	});
+	win.add(backButton);
+
 	win.open();
 };
