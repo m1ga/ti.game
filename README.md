@@ -1,9 +1,10 @@
 # ti.game
 
-A 2D sprite game engine module for Titanium SDK (Android), rendered with
-OpenGL ES 2.0. You describe your scene and react to events from
-JavaScript; everything that runs every frame — rendering, animation,
-physics, collision, gestures — runs natively at 60 fps.
+A 2D sprite game engine module for Titanium SDK (Android and iOS),
+rendered with OpenGL ES 2.0. You describe your scene and react to events
+from JavaScript; everything that runs every frame — rendering, animation,
+physics, collision, gestures — runs natively at 60 fps. The JS API is
+identical on both platforms.
 
 **Features**
 
@@ -373,15 +374,14 @@ android/src/ti/game/
 Contribution rules for the codebase live in `AGENTS.md`; planned features
 (sound, particles, font rendering) in `TODO.md`.
 
-### iOS port (experimental)
+### iOS
 
 `ios/` contains an Obj-C twin of the module — same JS API, same engine
 class-per-class (`Classes/TG*` mirrors `engine/`, `Classes/TiGame*` the
 proxies), rendered with OpenGL ES 2.0 and driven by a `CADisplayLink` on
-a dedicated render thread. It has not been compiled or run yet: the
-Xcode project must be scaffolded once on a Mac and the first build will
-need shaking out — see `ios/README.md` for the exact steps and the
-implementation notes (threading, pixel coordinates, backgrounding).
+a dedicated render thread. Implementation notes (threading, pixel
+coordinates, backgrounding) are in `ios/README.md`; when changing engine
+behavior, change both platforms (see `AGENTS.md`).
 
 ## Build
 
@@ -390,6 +390,6 @@ cd android
 ti build -p android --build-only   # package android/dist/ti.game-android-<version>.zip
 ti build -p android                # run the example app on a device/emulator
 
-cd ios                             # macOS only; scaffold first (ios/README.md)
+cd ios                             # macOS only
 ti build -p ios --build-only       # package the iOS module zip
 ```
