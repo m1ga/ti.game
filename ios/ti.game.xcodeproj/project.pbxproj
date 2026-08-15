@@ -1,0 +1,623 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 52;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		24416B8111C4CA220047AFDD /* Build & Test */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 24416B8A11C4CA520047AFDD /* Build configuration list for PBXAggregateTarget "Build & Test" */;
+			buildPhases = (
+				24416B8011C4CA220047AFDD /* ShellScript */,
+			);
+			dependencies = (
+				24416B8511C4CA280047AFDD /* PBXTargetDependency */,
+			);
+			name = "Build & Test";
+			productName = "Build & test";
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		24DD6CF91134B3F500162E58 /* TiGameModule.h in Headers */ = {isa = PBXBuildFile; fileRef = 24DD6CF71134B3F500162E58 /* TiGameModule.h */; };
+		24DD6CFA1134B3F500162E58 /* TiGameModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 24DD6CF81134B3F500162E58 /* TiGameModule.m */; };
+		24DE9E1111C5FE74003F90F6 /* TiGameModuleAssets.h in Headers */ = {isa = PBXBuildFile; fileRef = 24DE9E0F11C5FE74003F90F6 /* TiGameModuleAssets.h */; };
+		24DE9E1211C5FE74003F90F6 /* TiGameModuleAssets.m in Sources */ = {isa = PBXBuildFile; fileRef = 24DE9E1011C5FE74003F90F6 /* TiGameModuleAssets.m */; };
+		AA747D9F0F9514B9006C5449 /* TiGame_Prefix.pch in Headers */ = {isa = PBXBuildFile; fileRef = AA747D9E0F9514B9006C5449 /* TiGame_Prefix.pch */; };
+		AACBBE4A0F95108600F1A2B1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AACBBE490F95108600F1A2B1 /* Foundation.framework */; };
+		B11E042C241AC5C100EFA7DC /* TitaniumKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B11E042B241AC5C100EFA7DC /* TitaniumKit.xcframework */; };
+		A1B2C3D40003000000000000 /* TGAnimation.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001000000000000 /* TGAnimation.h */; };
+		A1B2C3D40004000000000000 /* TGAnimation.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40002000000000000 /* TGAnimation.m */; };
+		A1B2C3D40103000000000000 /* TGEasing.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40101000000000000 /* TGEasing.h */; };
+		A1B2C3D40104000000000000 /* TGEasing.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40102000000000000 /* TGEasing.m */; };
+		A1B2C3D40203000000000000 /* TGGLView.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40201000000000000 /* TGGLView.h */; };
+		A1B2C3D40204000000000000 /* TGGLView.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40202000000000000 /* TGGLView.m */; };
+		A1B2C3D40303000000000000 /* TGScene.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40301000000000000 /* TGScene.h */; };
+		A1B2C3D40304000000000000 /* TGScene.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40302000000000000 /* TGScene.m */; };
+		A1B2C3D40403000000000000 /* TGSceneRenderer.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40401000000000000 /* TGSceneRenderer.h */; };
+		A1B2C3D40404000000000000 /* TGSceneRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40402000000000000 /* TGSceneRenderer.m */; };
+		A1B2C3D40503000000000000 /* TGSkidTrail.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40501000000000000 /* TGSkidTrail.h */; };
+		A1B2C3D40504000000000000 /* TGSkidTrail.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40502000000000000 /* TGSkidTrail.m */; };
+		A1B2C3D40603000000000000 /* TGSprite.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40601000000000000 /* TGSprite.h */; };
+		A1B2C3D40604000000000000 /* TGSprite.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40602000000000000 /* TGSprite.m */; };
+		A1B2C3D40703000000000000 /* TGSpriteBatch.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40701000000000000 /* TGSpriteBatch.h */; };
+		A1B2C3D40704000000000000 /* TGSpriteBatch.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40702000000000000 /* TGSpriteBatch.m */; };
+		A1B2C3D40803000000000000 /* TGSpriteSheet.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40801000000000000 /* TGSpriteSheet.h */; };
+		A1B2C3D40804000000000000 /* TGSpriteSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40802000000000000 /* TGSpriteSheet.m */; };
+		A1B2C3D40903000000000000 /* TGTextureManager.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40901000000000000 /* TGTextureManager.h */; };
+		A1B2C3D40904000000000000 /* TGTextureManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40902000000000000 /* TGTextureManager.m */; };
+		A1B2C3D40A03000000000000 /* TGTouchController.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40A01000000000000 /* TGTouchController.h */; };
+		A1B2C3D40A04000000000000 /* TGTouchController.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40A02000000000000 /* TGTouchController.m */; };
+		A1B2C3D40B03000000000000 /* TGTween.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40B01000000000000 /* TGTween.h */; };
+		A1B2C3D40B04000000000000 /* TGTween.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40B02000000000000 /* TGTween.m */; };
+		A1B2C3D40C03000000000000 /* TiGameGameView.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40C01000000000000 /* TiGameGameView.h */; };
+		A1B2C3D40C04000000000000 /* TiGameGameView.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40C02000000000000 /* TiGameGameView.m */; };
+		A1B2C3D40D03000000000000 /* TiGameGameViewProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40D01000000000000 /* TiGameGameViewProxy.h */; };
+		A1B2C3D40D04000000000000 /* TiGameGameViewProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40D02000000000000 /* TiGameGameViewProxy.m */; };
+		A1B2C3D40E03000000000000 /* TiGameSpriteProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40E01000000000000 /* TiGameSpriteProxy.h */; };
+		A1B2C3D40E04000000000000 /* TiGameSpriteProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40E02000000000000 /* TiGameSpriteProxy.m */; };
+		A1B2C3D40F03000000000000 /* TiGameSpriteSheetProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40F01000000000000 /* TiGameSpriteSheetProxy.h */; };
+		A1B2C3D40F04000000000000 /* TiGameSpriteSheetProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40F02000000000000 /* TiGameSpriteSheetProxy.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		24416B8411C4CA280047AFDD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D2AAC07D0554694100DB518D;
+			remoteInfo = "ti.game";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		24DD6CF71134B3F500162E58 /* TiGameModule.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameModule.h"; path = "Classes/TiGameModule.h"; sourceTree = "<group>"; };
+		24DD6CF81134B3F500162E58 /* TiGameModule.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameModule.m"; path = "Classes/TiGameModule.m"; sourceTree = "<group>"; };
+		24DD6D1B1134B66800162E58 /* titanium.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = titanium.xcconfig; sourceTree = "<group>"; };
+		24DE9E0F11C5FE74003F90F6 /* TiGameModuleAssets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameModuleAssets.h"; path = "Classes/TiGameModuleAssets.h"; sourceTree = "<group>"; };
+		24DE9E1011C5FE74003F90F6 /* TiGameModuleAssets.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameModuleAssets.m"; path = "Classes/TiGameModuleAssets.m"; sourceTree = "<group>"; };
+		AA747D9E0F9514B9006C5449 /* TiGame_Prefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "TiGame_Prefix.pch"; sourceTree = SOURCE_ROOT; };
+		AACBBE490F95108600F1A2B1 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		B11E042B241AC5C100EFA7DC /* TitaniumKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = TitaniumKit.xcframework; path = "$(TITANIUM_SDK)/iphone/Frameworks/TitaniumKit.xcframework"; sourceTree = "<group>"; };
+		D2AAC07E0554694100DB518D /* libti.game.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libti.game.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D40001000000000000 /* TGAnimation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGAnimation.h"; path = "Classes/TGAnimation.h"; sourceTree = "<group>"; };
+		A1B2C3D40002000000000000 /* TGAnimation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGAnimation.m"; path = "Classes/TGAnimation.m"; sourceTree = "<group>"; };
+		A1B2C3D40101000000000000 /* TGEasing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGEasing.h"; path = "Classes/TGEasing.h"; sourceTree = "<group>"; };
+		A1B2C3D40102000000000000 /* TGEasing.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGEasing.m"; path = "Classes/TGEasing.m"; sourceTree = "<group>"; };
+		A1B2C3D40201000000000000 /* TGGLView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGGLView.h"; path = "Classes/TGGLView.h"; sourceTree = "<group>"; };
+		A1B2C3D40202000000000000 /* TGGLView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGGLView.m"; path = "Classes/TGGLView.m"; sourceTree = "<group>"; };
+		A1B2C3D40301000000000000 /* TGScene.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGScene.h"; path = "Classes/TGScene.h"; sourceTree = "<group>"; };
+		A1B2C3D40302000000000000 /* TGScene.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGScene.m"; path = "Classes/TGScene.m"; sourceTree = "<group>"; };
+		A1B2C3D40401000000000000 /* TGSceneRenderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGSceneRenderer.h"; path = "Classes/TGSceneRenderer.h"; sourceTree = "<group>"; };
+		A1B2C3D40402000000000000 /* TGSceneRenderer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGSceneRenderer.m"; path = "Classes/TGSceneRenderer.m"; sourceTree = "<group>"; };
+		A1B2C3D40501000000000000 /* TGSkidTrail.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGSkidTrail.h"; path = "Classes/TGSkidTrail.h"; sourceTree = "<group>"; };
+		A1B2C3D40502000000000000 /* TGSkidTrail.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGSkidTrail.m"; path = "Classes/TGSkidTrail.m"; sourceTree = "<group>"; };
+		A1B2C3D40601000000000000 /* TGSprite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGSprite.h"; path = "Classes/TGSprite.h"; sourceTree = "<group>"; };
+		A1B2C3D40602000000000000 /* TGSprite.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGSprite.m"; path = "Classes/TGSprite.m"; sourceTree = "<group>"; };
+		A1B2C3D40701000000000000 /* TGSpriteBatch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGSpriteBatch.h"; path = "Classes/TGSpriteBatch.h"; sourceTree = "<group>"; };
+		A1B2C3D40702000000000000 /* TGSpriteBatch.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGSpriteBatch.m"; path = "Classes/TGSpriteBatch.m"; sourceTree = "<group>"; };
+		A1B2C3D40801000000000000 /* TGSpriteSheet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGSpriteSheet.h"; path = "Classes/TGSpriteSheet.h"; sourceTree = "<group>"; };
+		A1B2C3D40802000000000000 /* TGSpriteSheet.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGSpriteSheet.m"; path = "Classes/TGSpriteSheet.m"; sourceTree = "<group>"; };
+		A1B2C3D40901000000000000 /* TGTextureManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTextureManager.h"; path = "Classes/TGTextureManager.h"; sourceTree = "<group>"; };
+		A1B2C3D40902000000000000 /* TGTextureManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTextureManager.m"; path = "Classes/TGTextureManager.m"; sourceTree = "<group>"; };
+		A1B2C3D40A01000000000000 /* TGTouchController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTouchController.h"; path = "Classes/TGTouchController.h"; sourceTree = "<group>"; };
+		A1B2C3D40A02000000000000 /* TGTouchController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTouchController.m"; path = "Classes/TGTouchController.m"; sourceTree = "<group>"; };
+		A1B2C3D40B01000000000000 /* TGTween.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTween.h"; path = "Classes/TGTween.h"; sourceTree = "<group>"; };
+		A1B2C3D40B02000000000000 /* TGTween.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTween.m"; path = "Classes/TGTween.m"; sourceTree = "<group>"; };
+		A1B2C3D40C01000000000000 /* TiGameGameView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameGameView.h"; path = "Classes/TiGameGameView.h"; sourceTree = "<group>"; };
+		A1B2C3D40C02000000000000 /* TiGameGameView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameGameView.m"; path = "Classes/TiGameGameView.m"; sourceTree = "<group>"; };
+		A1B2C3D40D01000000000000 /* TiGameGameViewProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameGameViewProxy.h"; path = "Classes/TiGameGameViewProxy.h"; sourceTree = "<group>"; };
+		A1B2C3D40D02000000000000 /* TiGameGameViewProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameGameViewProxy.m"; path = "Classes/TiGameGameViewProxy.m"; sourceTree = "<group>"; };
+		A1B2C3D40E01000000000000 /* TiGameSpriteProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameSpriteProxy.h"; path = "Classes/TiGameSpriteProxy.h"; sourceTree = "<group>"; };
+		A1B2C3D40E02000000000000 /* TiGameSpriteProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameSpriteProxy.m"; path = "Classes/TiGameSpriteProxy.m"; sourceTree = "<group>"; };
+		A1B2C3D40F01000000000000 /* TiGameSpriteSheetProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameSpriteSheetProxy.h"; path = "Classes/TiGameSpriteSheetProxy.h"; sourceTree = "<group>"; };
+		A1B2C3D40F02000000000000 /* TiGameSpriteSheetProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameSpriteSheetProxy.m"; path = "Classes/TiGameSpriteSheetProxy.m"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D2AAC07C0554694100DB518D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AACBBE4A0F95108600F1A2B1 /* Foundation.framework in Frameworks */,
+				B11E042C241AC5C100EFA7DC /* TitaniumKit.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		034768DFFF38A50411DB9C8B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D2AAC07E0554694100DB518D /* libti.game.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		0867D691FE84028FC02AAC07 /* game */ = {
+			isa = PBXGroup;
+			children = (
+				08FB77AEFE84172EC02AAC07 /* Classes */,
+				32C88DFF0371C24200C91783 /* Other Sources */,
+				0867D69AFE84028FC02AAC07 /* Frameworks */,
+				034768DFFF38A50411DB9C8B /* Products */,
+			);
+			name = "game";
+			sourceTree = "<group>";
+		};
+		0867D69AFE84028FC02AAC07 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B11E042B241AC5C100EFA7DC /* TitaniumKit.xcframework */,
+				AACBBE490F95108600F1A2B1 /* Foundation.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		08FB77AEFE84172EC02AAC07 /* Classes */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D40001000000000000 /* TGAnimation.h */,
+				A1B2C3D40002000000000000 /* TGAnimation.m */,
+				A1B2C3D40101000000000000 /* TGEasing.h */,
+				A1B2C3D40102000000000000 /* TGEasing.m */,
+				A1B2C3D40201000000000000 /* TGGLView.h */,
+				A1B2C3D40202000000000000 /* TGGLView.m */,
+				A1B2C3D40301000000000000 /* TGScene.h */,
+				A1B2C3D40302000000000000 /* TGScene.m */,
+				A1B2C3D40401000000000000 /* TGSceneRenderer.h */,
+				A1B2C3D40402000000000000 /* TGSceneRenderer.m */,
+				A1B2C3D40501000000000000 /* TGSkidTrail.h */,
+				A1B2C3D40502000000000000 /* TGSkidTrail.m */,
+				A1B2C3D40601000000000000 /* TGSprite.h */,
+				A1B2C3D40602000000000000 /* TGSprite.m */,
+				A1B2C3D40701000000000000 /* TGSpriteBatch.h */,
+				A1B2C3D40702000000000000 /* TGSpriteBatch.m */,
+				A1B2C3D40801000000000000 /* TGSpriteSheet.h */,
+				A1B2C3D40802000000000000 /* TGSpriteSheet.m */,
+				A1B2C3D40901000000000000 /* TGTextureManager.h */,
+				A1B2C3D40902000000000000 /* TGTextureManager.m */,
+				A1B2C3D40A01000000000000 /* TGTouchController.h */,
+				A1B2C3D40A02000000000000 /* TGTouchController.m */,
+				A1B2C3D40B01000000000000 /* TGTween.h */,
+				A1B2C3D40B02000000000000 /* TGTween.m */,
+				A1B2C3D40C01000000000000 /* TiGameGameView.h */,
+				A1B2C3D40C02000000000000 /* TiGameGameView.m */,
+				A1B2C3D40D01000000000000 /* TiGameGameViewProxy.h */,
+				A1B2C3D40D02000000000000 /* TiGameGameViewProxy.m */,
+				A1B2C3D40E01000000000000 /* TiGameSpriteProxy.h */,
+				A1B2C3D40E02000000000000 /* TiGameSpriteProxy.m */,
+				A1B2C3D40F01000000000000 /* TiGameSpriteSheetProxy.h */,
+				A1B2C3D40F02000000000000 /* TiGameSpriteSheetProxy.m */,
+				24DE9E0F11C5FE74003F90F6 /* TiGameModuleAssets.h */,
+				24DE9E1011C5FE74003F90F6 /* TiGameModuleAssets.m */,
+				24DD6CF71134B3F500162E58 /* TiGameModule.h */,
+				24DD6CF81134B3F500162E58 /* TiGameModule.m */,
+			);
+			name = Classes;
+			sourceTree = "<group>";
+		};
+		32C88DFF0371C24200C91783 /* Other Sources */ = {
+			isa = PBXGroup;
+			children = (
+				AA747D9E0F9514B9006C5449 /* TiGame_Prefix.pch */,
+				24DD6D1B1134B66800162E58 /* titanium.xcconfig */,
+			);
+			name = "Other Sources";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		D2AAC07A0554694100DB518D /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA747D9F0F9514B9006C5449 /* TiGame_Prefix.pch in Headers */,
+				24DD6CF91134B3F500162E58 /* TiGameModule.h in Headers */,
+				24DE9E1111C5FE74003F90F6 /* TiGameModuleAssets.h in Headers */,
+				A1B2C3D40003000000000000 /* TGAnimation.h in Headers */,
+				A1B2C3D40103000000000000 /* TGEasing.h in Headers */,
+				A1B2C3D40203000000000000 /* TGGLView.h in Headers */,
+				A1B2C3D40303000000000000 /* TGScene.h in Headers */,
+				A1B2C3D40403000000000000 /* TGSceneRenderer.h in Headers */,
+				A1B2C3D40503000000000000 /* TGSkidTrail.h in Headers */,
+				A1B2C3D40603000000000000 /* TGSprite.h in Headers */,
+				A1B2C3D40703000000000000 /* TGSpriteBatch.h in Headers */,
+				A1B2C3D40803000000000000 /* TGSpriteSheet.h in Headers */,
+				A1B2C3D40903000000000000 /* TGTextureManager.h in Headers */,
+				A1B2C3D40A03000000000000 /* TGTouchController.h in Headers */,
+				A1B2C3D40B03000000000000 /* TGTween.h in Headers */,
+				A1B2C3D40C03000000000000 /* TiGameGameView.h in Headers */,
+				A1B2C3D40D03000000000000 /* TiGameGameViewProxy.h in Headers */,
+				A1B2C3D40E03000000000000 /* TiGameSpriteProxy.h in Headers */,
+				A1B2C3D40F03000000000000 /* TiGameSpriteSheetProxy.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		D2AAC07D0554694100DB518D /* game */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1DEB921E08733DC00010E9CD /* Build configuration list for PBXNativeTarget "game" */;
+			buildPhases = (
+				D2AAC07A0554694100DB518D /* Headers */,
+				D2AAC07B0554694100DB518D /* Sources */,
+				D2AAC07C0554694100DB518D /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ti.game";
+			productName = "ti.game";
+			productReference = D2AAC07E0554694100DB518D /* libti.game.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0867D690FE84028FC02AAC07 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1400;
+			};
+			buildConfigurationList = 1DEB922208733DC00010E9CD /* Build configuration list for PBXProject "{{ModuleName}}" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 1;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 0867D691FE84028FC02AAC07 /* game */;
+			productRefGroup = 034768DFFF38A50411DB9C8B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D2AAC07D0554694100DB518D /* game */,
+				24416B8111C4CA220047AFDD /* Build & Test */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		24416B8011C4CA220047AFDD /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here\n\nti build --project-dir \"${PROJECT_DIR}\"\nexit $?\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D2AAC07B0554694100DB518D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				24DD6CFA1134B3F500162E58 /* TiGameModule.m in Sources */,
+				24DE9E1211C5FE74003F90F6 /* TiGameModuleAssets.m in Sources */,
+				A1B2C3D40004000000000000 /* TGAnimation.m in Sources */,
+				A1B2C3D40104000000000000 /* TGEasing.m in Sources */,
+				A1B2C3D40204000000000000 /* TGGLView.m in Sources */,
+				A1B2C3D40304000000000000 /* TGScene.m in Sources */,
+				A1B2C3D40404000000000000 /* TGSceneRenderer.m in Sources */,
+				A1B2C3D40504000000000000 /* TGSkidTrail.m in Sources */,
+				A1B2C3D40604000000000000 /* TGSprite.m in Sources */,
+				A1B2C3D40704000000000000 /* TGSpriteBatch.m in Sources */,
+				A1B2C3D40804000000000000 /* TGSpriteSheet.m in Sources */,
+				A1B2C3D40904000000000000 /* TGTextureManager.m in Sources */,
+				A1B2C3D40A04000000000000 /* TGTouchController.m in Sources */,
+				A1B2C3D40B04000000000000 /* TGTween.m in Sources */,
+				A1B2C3D40C04000000000000 /* TiGameGameView.m in Sources */,
+				A1B2C3D40D04000000000000 /* TiGameGameViewProxy.m in Sources */,
+				A1B2C3D40E04000000000000 /* TiGameSpriteProxy.m in Sources */,
+				A1B2C3D40F04000000000000 /* TiGameSpriteSheetProxy.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		24416B8511C4CA280047AFDD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D2AAC07D0554694100DB518D /* game */;
+			targetProxy = 24416B8411C4CA280047AFDD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1DEB921F08733DC00010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 24DD6D1B1134B66800162E58 /* titanium.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DSTROOT = /tmp/TiGame.dst;
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = TiGame_Prefix.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = "TI_VERSION=$(TI_VERSION)";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				GCC_VERSION = "";
+				GCC_WARN_ABOUT_RETURN_TYPE = NO;
+				GCC_WARN_MISSING_PARENTHESES = NO;
+				GCC_WARN_SHADOW = NO;
+				GCC_WARN_STRICT_SELECTOR_MATCH = NO;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_PARAMETER = NO;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = NO;
+				INSTALL_PATH = /usr/local/lib;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				LIBRARY_SEARCH_PATHS = "";
+				OTHER_CFLAGS = (
+					"-DDEBUG",
+					"-DTI_POST_1_2",
+				);
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = ti.game;
+				PROVISIONING_PROFILE = "";
+				"PROVISIONING_PROFILE[sdk=iphoneos*]" = "";
+				RUN_CLANG_STATIC_ANALYZER = NO;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				USER_HEADER_SEARCH_PATHS = "";
+				WARNING_CFLAGS = "-Wno-arc-performSelector-leaks";
+			};
+			name = Debug;
+		};
+		1DEB922008733DC00010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 24DD6D1B1134B66800162E58 /* titanium.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				DEPLOYMENT_POSTPROCESSING = YES;
+				DSTROOT = /tmp/TiGame.dst;
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_MODEL_TUNING = G5;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = TiGame_Prefix.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"TI_VERSION=$(TI_VERSION)",
+					NDEBUG,
+				);
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				GCC_VERSION = "";
+				GCC_WARN_ABOUT_RETURN_TYPE = NO;
+				GCC_WARN_MISSING_PARENTHESES = NO;
+				GCC_WARN_SHADOW = NO;
+				GCC_WARN_STRICT_SELECTOR_MATCH = NO;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_PARAMETER = NO;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = NO;
+				INSTALL_PATH = /usr/local/lib;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				LIBRARY_SEARCH_PATHS = "";
+				OTHER_CFLAGS = "-DTI_POST_1_2";
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = ti.game;
+				RUN_CLANG_STATIC_ANALYZER = NO;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				USER_HEADER_SEARCH_PATHS = "";
+				WARNING_CFLAGS = "-Wno-arc-performSelector-leaks";
+			};
+			name = Release;
+		};
+		1DEB922308733DC00010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 24DD6D1B1134B66800162E58 /* titanium.xcconfig */;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DSTROOT = /tmp/TiGame.dst;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = TiGame_Prefix.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = "TI_VERSION=$(TI_VERSION)";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				GCC_VERSION = "";
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = NO;
+				GCC_WARN_MISSING_PARENTHESES = NO;
+				GCC_WARN_SHADOW = NO;
+				GCC_WARN_STRICT_SELECTOR_MATCH = NO;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_PARAMETER = NO;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = NO;
+				INSTALL_PATH = /usr/local/lib;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"-DDEBUG",
+					"-DTI_POST_1_2",
+				);
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = ti.game;
+				PROVISIONING_PROFILE = "";
+				"PROVISIONING_PROFILE[sdk=iphoneos*]" = "";
+				RUN_CLANG_STATIC_ANALYZER = NO;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				USER_HEADER_SEARCH_PATHS = "";
+			};
+			name = Debug;
+		};
+		1DEB922408733DC00010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 24DD6D1B1134B66800162E58 /* titanium.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DSTROOT = /tmp/TiGame.dst;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_MODEL_TUNING = G5;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = TiGame_Prefix.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = "TI_VERSION=$(TI_VERSION)";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				GCC_VERSION = "";
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = NO;
+				GCC_WARN_MISSING_PARENTHESES = NO;
+				GCC_WARN_SHADOW = NO;
+				GCC_WARN_STRICT_SELECTOR_MATCH = NO;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_PARAMETER = NO;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = NO;
+				INSTALL_PATH = /usr/local/lib;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				OTHER_CFLAGS = "-DTI_POST_1_2";
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = ti.game;
+				RUN_CLANG_STATIC_ANALYZER = NO;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				USER_HEADER_SEARCH_PATHS = "";
+			};
+			name = Release;
+		};
+		24416B8211C4CA220047AFDD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 24DD6D1B1134B66800162E58 /* titanium.xcconfig */;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = "Build & test";
+			};
+			name = Debug;
+		};
+		24416B8311C4CA220047AFDD /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 24DD6D1B1134B66800162E58 /* titanium.xcconfig */;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				PRODUCT_NAME = "Build & test";
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1DEB921E08733DC00010E9CD /* Build configuration list for PBXNativeTarget "game" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB921F08733DC00010E9CD /* Debug */,
+				1DEB922008733DC00010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1DEB922208733DC00010E9CD /* Build configuration list for PBXProject "{{ModuleName}}" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB922308733DC00010E9CD /* Debug */,
+				1DEB922408733DC00010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		24416B8A11C4CA520047AFDD /* Build configuration list for PBXAggregateTarget "Build & Test" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				24416B8211C4CA220047AFDD /* Debug */,
+				24416B8311C4CA220047AFDD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0867D690FE84028FC02AAC07 /* Project object */;
+}
