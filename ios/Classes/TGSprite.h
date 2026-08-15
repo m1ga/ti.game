@@ -56,6 +56,15 @@
 @property (atomic, assign) BOOL pinchable;
 @property (atomic, assign) BOOL rotatable;
 
+// NO = invisible to hit-testing: touches pass through to sprites
+// underneath (falling blocks over a button, decorative overlays)
+@property (atomic, assign) BOOL touchEnabled;
+
+// Tile the sheet frame across the sprite instead of stretching it (per
+// axis). Needs a sheet with repeat=YES whose frame spans the texture.
+@property (atomic, assign) BOOL tileRepeatX;
+@property (atomic, assign) BOOL tileRepeatY;
+
 // Physics, integrated natively every frame (px/s, px/s^2)
 @property (atomic, assign) float velocityX;
 @property (atomic, assign) float velocityY;
@@ -73,6 +82,10 @@
 
 // Shrinks the collision AABB around the anchor (1 = full frame).
 @property (atomic, assign) float hitboxScale;
+
+// YES = the hitbox is a circle (radius = half the smaller drawn side
+// x hitboxScale, centered on the sprite center) — balls, asteroids.
+@property (atomic, assign) BOOL circleHitbox;
 
 // Draws debug overlays; TGScene.debugAll enables it for everyone.
 @property (atomic, assign) BOOL debug;
@@ -140,6 +153,12 @@
 
 /** World-space axis-aligned bounding box: out = {minX, minY, maxX, maxY}. */
 - (void)computeAABB:(float *)out;
+
+/** Collision radius for circle hitboxes. */
+- (float)hitRadius;
+
+/** World position of the sprite's geometric center: out = {x, y}. */
+- (void)hitCenter:(float *)out;
 
 /** Hit test in world coordinates, respecting rotation, scale and anchor. */
 - (BOOL)hitTestX:(float)px y:(float)py;

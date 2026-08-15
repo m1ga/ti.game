@@ -52,6 +52,7 @@ public class SpriteSheetProxy extends KrollProxy implements SpriteSheet.Loader
 		int frameHeight = options.optInt("frameHeight", 0);
 		sheet = new SpriteSheet(this, frameWidth, frameHeight);
 		sheet.smoothing = options.optBoolean("smoothing", true);
+		sheet.repeat = options.optBoolean("repeat", false);
 		if (imagePath == null) {
 			Log.e(LCAT, "createSpriteSheet requires an 'image' property");
 		}

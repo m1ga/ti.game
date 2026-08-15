@@ -1,4 +1,6 @@
 #import "TGSceneRenderer.h"
+#import "TGParticleEmitter.h"
+#import "TGRope.h"
 #import "TGScene.h"
 #import "TGSkidTrail.h"
 #import "TGSprite.h"
@@ -85,36 +87,51 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 
 	[_scene update:dt];
 
-	// Projection follows the camera — sprites live in world coordinates
-	float camX = _scene.cameraX;
-	float camY = _scene.cameraY;
-	orthoM(_projection, camX, camX + _surfaceWidth, camY + _surfaceHeight, camY, -1.0f, 1.0f);
+	// Projection follows the camera (position, zoom, shake) — sprites
+	// live in world coordinates
+	float scale = MAX(0.0001f, _scene.cameraScale);
+	float left = [_scene viewOriginX] + _scene.shakeOffsetX;
+	float top = [_scene viewOriginY] + _scene.shakeOffsetY;
+	float visibleW = _surfaceWidth / scale;
+	float visibleH = _surfaceHeight / scale;
+	orthoM(_projection, left, left + visibleW, top + visibleH, top, -1.0f, 1.0f);
 
 	glClearColor(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	NSArray<TGSprite *> *sprites = [_scene snapshot];
+	NSArray<TGParticleEmitter *> *emitters = [_scene emittersSnapshot];
+	NSArray<TGRope *> *ropes = [_scene ropesSnapshot];
 
 	// Lazy texture upload happens here, on the render thread
 	for (TGSprite *s in sprites) {
-		TGSpriteSheet *sheet = s.sheet;
-		if (sheet != nil && ![sheet isReady]) {
-			[sheet ensureLoaded:_textures];
-			if ([sheet isReady]) {
-				[_textures track:sheet];
-			}
-		}
+		[self ensureSheetLoaded:s.sheet];
+	}
+	for (TGParticleEmitter *e in emitters) {
+		[self ensureSheetLoaded:e.sheet];
+	}
+	for (TGRope *rope in ropes) {
+		[self ensureSheetLoaded:rope.sheet];
 	}
 
 	[_batch begin:_projection];
 	// Skid marks slot between background (zIndex <= 0, e.g. the track)
 	// and foreground sprites (the car), so they overlay the road but
-	// stay under whatever drives across them.
+	// stay under whatever drives across them. Emitters merge into the
+	// sprite pass by zIndex; on equal zIndex, particles draw on top.
 	BOOL trailDrawn = NO;
+	NSUInteger nextEmitter = 0;
+	NSUInteger nextRope = 0;
 	for (TGSprite *s in sprites) {
 		if (!trailDrawn && s.zIndex > 0) {
 			[self drawSkidTrail];
 			trailDrawn = YES;
+		}
+		while (nextEmitter < emitters.count && emitters[nextEmitter].zIndex < s.zIndex) {
+			[emitters[nextEmitter++] draw:_batch];
+		}
+		while (nextRope < ropes.count && ropes[nextRope].zIndex < s.zIndex) {
+			[ropes[nextRope++] draw:_batch];
 		}
 		if (s.visible && s.opacity > 0.0f) {
 			[_batch draw:s];
@@ -123,6 +140,12 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	if (!trailDrawn) {
 		[self drawSkidTrail];
 	}
+	while (nextEmitter < emitters.count) {
+		[emitters[nextEmitter++] draw:_batch];
+	}
+	while (nextRope < ropes.count) {
+		[ropes[nextRope++] draw:_batch];
+	}
 	BOOL debugAll = _scene.debugAll;
 	for (TGSprite *s in sprites) {
 		if (debugAll || s.debug) {
@@ -130,6 +153,16 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		}
 	}
 	[_batch end];
+}
+
+- (void)ensureSheetLoaded:(TGSpriteSheet *)sheet
+{
+	if (sheet != nil && ![sheet isReady]) {
+		[sheet ensureLoaded:_textures];
+		if ([sheet isReady]) {
+			[_textures track:sheet];
+		}
+	}
 }
 
 - (void)drawSkidTrail
@@ -149,14 +182,29 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	GLuint white = [_textures whiteTexture];
 	float t = 1.5f; // half line thickness
 
-	// Collision AABB — green
-	[s computeAABB:_debugAabb];
-	float minX = _debugAabb[0], minY = _debugAabb[1];
-	float maxX = _debugAabb[2], maxY = _debugAabb[3];
-	[_batch drawLine:white fromX:minX y:minY toX:maxX y:minY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
-	[_batch drawLine:white fromX:maxX y:minY toX:maxX y:maxY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
-	[_batch drawLine:white fromX:maxX y:maxY toX:minX y:maxY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
-	[_batch drawLine:white fromX:minX y:maxY toX:minX y:minY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
+	// Collision shape — green (AABB, or circle for circleHitbox)
+	if (s.circleHitbox) {
+		float center[2];
+		[s hitCenter:center];
+		float r = [s hitRadius];
+		int segments = 20;
+		for (int i = 0; i < segments; i++) {
+			float a0 = 2.0f * (float)M_PI * i / segments;
+			float a1 = 2.0f * (float)M_PI * (i + 1) / segments;
+			[_batch drawLine:white
+					   fromX:center[0] + r * cosf(a0) y:center[1] + r * sinf(a0)
+						 toX:center[0] + r * cosf(a1) y:center[1] + r * sinf(a1)
+			   halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
+		}
+	} else {
+		[s computeAABB:_debugAabb];
+		float minX = _debugAabb[0], minY = _debugAabb[1];
+		float maxX = _debugAabb[2], maxY = _debugAabb[3];
+		[_batch drawLine:white fromX:minX y:minY toX:maxX y:minY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
+		[_batch drawLine:white fromX:maxX y:minY toX:maxX y:maxY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
+		[_batch drawLine:white fromX:maxX y:maxY toX:minX y:maxY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
+		[_batch drawLine:white fromX:minX y:maxY toX:minX y:minY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
+	}
 
 	// Sprite/touch bounds — blue, rotated (differs from AABB when rotated
 	// or when hitboxScale != 1)

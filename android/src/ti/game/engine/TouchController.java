@@ -70,9 +70,9 @@ public class TouchController implements View.OnTouchListener
 
 		switch (event.getActionMasked()) {
 			case MotionEvent.ACTION_DOWN: {
-				// world space: hit-testing and drags must track the camera
-				downX = event.getX() + scene.cameraX;
-				downY = event.getY() + scene.cameraY;
+				// world space: hit-testing and drags must track camera + zoom
+				downX = scene.screenToWorldX(event.getX());
+				downY = scene.screenToWorldY(event.getY());
 				downTime = event.getEventTime();
 				activePointerId = event.getPointerId(0);
 				dragging = false;
@@ -116,8 +116,8 @@ public class TouchController implements View.OnTouchListener
 					if (pointerIndex < 0) {
 						return true;
 					}
-					float tx = event.getX(pointerIndex) + scene.cameraX;
-					float ty = event.getY(pointerIndex) + scene.cameraY;
+					float tx = scene.screenToWorldX(event.getX(pointerIndex));
+					float ty = scene.screenToWorldY(event.getY(pointerIndex));
 
 					if (!dragging && distance(tx, ty, downX, downY) > touchSlop) {
 						dragging = true;
@@ -145,8 +145,8 @@ public class TouchController implements View.OnTouchListener
 			}
 
 			case MotionEvent.ACTION_UP: {
-				float upX = event.getX() + scene.cameraX;
-				float upY = event.getY() + scene.cameraY;
+				float upX = scene.screenToWorldX(event.getX());
+				float upY = scene.screenToWorldY(event.getY());
 				if (!rotating
 						&& event.getEventTime() - downTime < TAP_TIMEOUT_MS
 						&& distance(upX, upY, downX, downY) <= touchSlop) {
@@ -172,7 +172,7 @@ public class TouchController implements View.OnTouchListener
 			}
 
 			case MotionEvent.ACTION_CANCEL: {
-				fireOnView("release", event.getX() + scene.cameraX, event.getY() + scene.cameraY);
+				fireOnView("release", scene.screenToWorldX(event.getX()), scene.screenToWorldY(event.getY()));
 				Sprite s = activeSprite;
 				if (s != null) {
 					if (dragging) {

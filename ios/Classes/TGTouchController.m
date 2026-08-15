@@ -44,10 +44,12 @@ static const NSTimeInterval kTapTimeout = 0.3;
 
 // --- Geometry helpers ---------------------------------------------------
 
-- (CGPoint)surfacePoint:(UITouch *)touch inView:(UIView *)view
+/** Touch in world space: surface pixels mapped through camera + zoom. */
+- (CGPoint)worldPoint:(UITouch *)touch inView:(UIView *)view
 {
 	CGPoint p = [touch locationInView:view];
-	return CGPointMake(p.x * _contentScale, p.y * _contentScale);
+	return CGPointMake([_scene screenToWorldX:(float)(p.x * _contentScale)],
+					   [_scene screenToWorldY:(float)(p.y * _contentScale)]);
 }
 
 static float distanceBetween(float x0, float y0, float x1, float y1)
@@ -108,9 +110,9 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 
 		if (_activeTouches.count == 1) {
 			// ACTION_DOWN — world space: hit-testing and drags track the camera
-			CGPoint p = [self surfacePoint:touch inView:view];
-			_downX = (float)p.x + _scene.cameraX;
-			_downY = (float)p.y + _scene.cameraY;
+			CGPoint p = [self worldPoint:touch inView:view];
+			_downX = (float)p.x;
+			_downY = (float)p.y;
 			_downTime = touch.timestamp;
 			_primaryTouch = touch;
 			_dragging = NO;
@@ -168,9 +170,9 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	// Single-finger drag
 	if (s != nil && s.draggable && _activeTouches.count == 1
 			&& _primaryTouch != nil && [_activeTouches containsObject:_primaryTouch]) {
-		CGPoint p = [self surfacePoint:_primaryTouch inView:view];
-		float tx = (float)p.x + _scene.cameraX;
-		float ty = (float)p.y + _scene.cameraY;
+		CGPoint p = [self worldPoint:_primaryTouch inView:view];
+		float tx = (float)p.x;
+		float ty = (float)p.y;
 
 		if (!_dragging && distanceBetween(tx, ty, _downX, _downY) > _touchSlop) {
 			_dragging = YES;
@@ -207,9 +209,9 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 		}
 
 		// ACTION_UP — last finger left the screen
-		CGPoint p = [self surfacePoint:touch inView:view];
-		float upX = (float)p.x + _scene.cameraX;
-		float upY = (float)p.y + _scene.cameraY;
+		CGPoint p = [self worldPoint:touch inView:view];
+		float upX = (float)p.x;
+		float upY = (float)p.y;
 		BOOL isTap = !_rotating
 			&& touch.timestamp - _downTime < kTapTimeout
 			&& distanceBetween(upX, upY, _downX, _downY) <= _touchSlop;
@@ -243,8 +245,8 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	}
 	// ACTION_CANCEL
 	UITouch *touch = touches.anyObject;
-	CGPoint p = [self surfacePoint:touch inView:view];
-	[self fireOnView:@"release" x:(float)p.x + _scene.cameraX y:(float)p.y + _scene.cameraY];
+	CGPoint p = [self worldPoint:touch inView:view];
+	[self fireOnView:@"release" x:(float)p.x y:(float)p.y];
 	TGSprite *s = _activeSprite;
 	if (s != nil) {
 		if (_dragging) {

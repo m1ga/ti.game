@@ -131,6 +131,17 @@ public class SpriteBatch
 		float sy = s.scaleY;
 		float alpha = Math.max(0f, Math.min(1f, s.opacity));
 
+		// tileRepeat: run the UVs past 1 so GL_REPEAT tiles the texture at
+		// its native pixel size instead of stretching it across the sprite
+		float u1 = f.u1;
+		float v1 = f.v1;
+		if (s.tileRepeatX && f.width > 0f) {
+			u1 = f.u0 + (f.u1 - f.u0) * (w / f.width);
+		}
+		if (s.tileRepeatY && f.height > 0f) {
+			v1 = f.v0 + (f.v1 - f.v0) * (h / f.height);
+		}
+
 		// Corners in local space relative to the anchor, scaled then rotated
 		float lx0 = -ax * sx, ly0 = -ay * sy;             // top-left
 		float lx1 = (w - ax) * sx, ly1 = -ay * sy;        // top-right
@@ -143,9 +154,47 @@ public class SpriteBatch
 		float x3 = s.x + lx3 * cos - ly3 * sin, y3 = s.y + lx3 * sin + ly3 * cos;
 
 		putQuad(x0, y0, f.u0, f.v0,
-			x1, y1, f.u1, f.v0,
-			x2, y2, f.u0, f.v1,
-			x3, y3, f.u1, f.v1,
+			x1, y1, u1, f.v0,
+			x2, y2, f.u0, v1,
+			x3, y3, u1, v1,
+			alpha, alpha, alpha, alpha);
+	}
+
+	/**
+	 * Axis-aligned textured quad with a straight-alpha tint color —
+	 * the particle path (premultiplied internally, like drawLine).
+	 */
+	public void drawFrame(int texture, SpriteSheet.Frame f, float cx, float cy,
+						  float halfW, float halfH, float r, float g, float b, float a)
+	{
+		ensureCapacity(texture);
+		putQuad(cx - halfW, cy - halfH, f.u0, f.v0,
+			cx + halfW, cy - halfH, f.u1, f.v0,
+			cx - halfW, cy + halfH, f.u0, f.v1,
+			cx + halfW, cy + halfH, f.u1, f.v1,
+			r * a, g * a, b * a, a);
+	}
+
+	/**
+	 * Textured quad oriented along a segment (rope links): u runs across
+	 * the width, v along the segment. Straight-alpha, premultiplied here.
+	 */
+	public void drawSegment(int texture, SpriteSheet.Frame f, float x0, float y0,
+							float x1, float y1, float halfWidth, float alpha)
+	{
+		float dx = x1 - x0;
+		float dy = y1 - y0;
+		float len = (float) Math.sqrt(dx * dx + dy * dy);
+		if (len < 1e-6f) {
+			return;
+		}
+		float nx = -dy / len * halfWidth;
+		float ny = dx / len * halfWidth;
+		ensureCapacity(texture);
+		putQuad(x0 - nx, y0 - ny, f.u0, f.v0,
+			x0 + nx, y0 + ny, f.u1, f.v0,
+			x1 - nx, y1 - ny, f.u0, f.v1,
+			x1 + nx, y1 + ny, f.u1, f.v1,
 			alpha, alpha, alpha, alpha);
 	}
 

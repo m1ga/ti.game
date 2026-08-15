@@ -30,6 +30,10 @@ typedef struct {
 /** NO = GL_NEAREST filtering — crisp pixels for pixel-art sheets. */
 @property (atomic, assign) BOOL smoothing;
 
+/** YES = GL_REPEAT wrap so sprites with tileRepeat tile the texture.
+ *  ES 2.0 requires power-of-two texture dimensions for this. */
+@property (atomic, assign) BOOL repeat;
+
 // Grid parameters; 0 means "atlas sheet", frames come from JSON
 @property (nonatomic, readonly) int gridFrameWidth;
 @property (nonatomic, readonly) int gridFrameHeight;

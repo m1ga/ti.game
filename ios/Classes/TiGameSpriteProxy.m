@@ -248,6 +248,44 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.rotatable);
 }
 
+/** NO = touches pass through to sprites underneath. */
+- (void)setTouchEnabled:(id)value
+{
+	self.sprite.touchEnabled = [TiUtils boolValue:value def:YES];
+}
+
+- (NSNumber *)touchEnabled
+{
+	return @(self.sprite.touchEnabled);
+}
+
+/** Tile the frame instead of stretching: true = both axes, 'x'/'y' = one. */
+- (void)setTileRepeat:(id)value
+{
+	if ([value isKindOfClass:[NSString class]]) {
+		self.sprite.tileRepeatX = [value isEqualToString:@"x"];
+		self.sprite.tileRepeatY = [value isEqualToString:@"y"];
+	} else {
+		BOOL both = [TiUtils boolValue:value def:NO];
+		self.sprite.tileRepeatX = both;
+		self.sprite.tileRepeatY = both;
+	}
+}
+
+- (id)tileRepeat
+{
+	if (self.sprite.tileRepeatX && self.sprite.tileRepeatY) {
+		return @YES;
+	}
+	if (self.sprite.tileRepeatX) {
+		return @"x";
+	}
+	if (self.sprite.tileRepeatY) {
+		return @"y";
+	}
+	return @NO;
+}
+
 #pragma mark Physics
 
 - (void)setVelocityX:(id)value
@@ -450,6 +488,17 @@ static NSSet<NSString *> *toGroupSet(id value)
 - (NSNumber *)hitboxScale
 {
 	return @(self.sprite.hitboxScale);
+}
+
+/** 'rect' (default) or 'circle' — balls and asteroids want circles. */
+- (void)setHitboxShape:(id)value
+{
+	self.sprite.circleHitbox = [@"circle" isEqualToString:[TiUtils stringValue:value]];
+}
+
+- (NSString *)hitboxShape
+{
+	return self.sprite.circleHitbox ? @"circle" : @"rect";
 }
 
 - (void)setDebug:(id)value

@@ -71,6 +71,7 @@ module.exports = function () {
 			maxSpeed: MAX_SPEED,
 			wrapAround: true,
 			hitboxScale: 0.6,
+			hitboxShape: 'circle',
 			collidesWith: ['asteroid'],
 			animations: {
 				thrust: { frames: [1, 2], fps: 14, loop: true } // flickering flame
@@ -90,6 +91,7 @@ module.exports = function () {
 				zIndex: 5,
 				wrapAround: true,
 				hitboxScale: 0.8,
+				hitboxShape: 'circle',   // round rocks collide as circles
 				collisionGroup: 'asteroid'
 			});
 			gameView.add(rock);

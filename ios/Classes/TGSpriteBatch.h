@@ -3,6 +3,7 @@
 //
 #import <Foundation/Foundation.h>
 #import <OpenGLES/ES2/gl.h>
+#import "TGSpriteSheet.h"
 
 @class TGSprite;
 
@@ -21,6 +22,20 @@
 
 - (void)begin:(const float *)projectionMatrix; // float[16], column-major
 - (void)draw:(TGSprite *)sprite;
+
+/** Axis-aligned textured quad with a straight-alpha tint color —
+ *  the particle path (premultiplied internally, like drawLine). */
+- (void)drawFrame:(GLuint)texture frame:(TGFrame)f
+			   cx:(float)cx cy:(float)cy
+			halfW:(float)halfW halfH:(float)halfH
+				r:(float)r g:(float)g b:(float)b a:(float)a;
+
+/** Textured quad oriented along a segment (rope links): u runs across
+ *  the width, v along the segment. */
+- (void)drawSegment:(GLuint)texture frame:(TGFrame)f
+			  fromX:(float)x0 y:(float)y0
+				toX:(float)x1 y:(float)y1
+		  halfWidth:(float)halfWidth alpha:(float)alpha;
 
 /** Debug/shape helper: a solid line segment of the given half-thickness,
  *  drawn with `texture` (normally the white texture). Color is

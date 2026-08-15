@@ -6,6 +6,11 @@
 //   along the higher level, and drop back down when it ends
 // - hitting an obstacle wipes you out: crash pose + impact burst sprite,
 //   tap anywhere to retry
+// - jumping and crashing play native sound effects, and a looping
+//   chiptune track runs on the music backend (createSound)
+// - native particles (createEmitter): a dust trail follows the board
+//   while rolling; crashing fires a spark burst via emit(n) plus a
+//   native camera shake (gameView.shake)
 // - dusk city skyline scrolls slowly behind (parallax), the street at
 //   full speed — both via native wrapX/wrapShift, no JS in the loop
 //
@@ -33,10 +38,20 @@ module.exports = function () {
 	});
 
 	var skaterSheet = Game.createSpriteSheet({ image: 'assets/skater.png', frameWidth: 32, frameHeight: 32, smoothing: false });
-	var streetSheet = Game.createSpriteSheet({ image: 'assets/street.png', frameWidth: 512, frameHeight: 64, smoothing: false });
-	var skylineSheet = Game.createSpriteSheet({ image: 'assets/skyline.png', frameWidth: 512, frameHeight: 64, smoothing: false });
+	// repeat: true = GL_REPEAT wrap, so tileRepeat sprites tile these
+	// textures at native pixel size instead of stretching them screen-wide
+	var streetSheet = Game.createSpriteSheet({ image: 'assets/street.png', frameWidth: 512, frameHeight: 64, smoothing: false, repeat: true });
+	var skylineSheet = Game.createSpriteSheet({ image: 'assets/skyline.png', frameWidth: 512, frameHeight: 64, smoothing: false, repeat: true });
 	var wallSheet = Game.createSpriteSheet({ image: 'assets/wall.png', frameWidth: 32, frameHeight: 32, smoothing: false });
 	var pitSheet = Game.createSpriteSheet({ image: 'assets/pit.png', frameWidth: 48, frameHeight: 24, smoothing: false });
+	// white particle frames (0 = soft puff, 1 = pixel spark), tinted per emitter
+	var sparkSheet = Game.createSpriteSheet({ image: 'assets/spark.png', frameWidth: 16, frameHeight: 16 });
+
+	// Low-latency effects from the shared native sound pool, plus a looping
+	// chiptune track on the streaming music backend (auto-pauses with the app)
+	var jumpSound = Game.createSound({ url: 'assets/jump.wav', volume: 0.8 });
+	var crashSound = Game.createSound({ url: 'assets/crash.wav' });
+	var music = Game.createSound({ url: 'assets/music.wav', music: true, loop: true, volume: 0.45 });
 
 	var spawnTimer = null;
 	var scoreTimer = null;
@@ -51,7 +66,10 @@ module.exports = function () {
 			scoreTimer = null;
 		}
 	}
-	win.addEventListener('close', clearTimers);
+	win.addEventListener('close', function () {
+		clearTimers();
+		music.stop();
+	});
 
 	var initialized = false;
 	gameView.addEventListener('resize', function (e) {
@@ -91,6 +109,7 @@ module.exports = function () {
 					width: W,
 					height: height,
 					zIndex: z,
+					tileRepeat: 'x',   // tile at native size, no horizontal stretch
 					wrapX: -W / 2,
 					wrapShift: 2 * W
 				});
@@ -177,6 +196,7 @@ module.exports = function () {
 				width: W,
 				height: H - raisedTop,
 				zIndex: 9,
+				tileRepeat: 'x',   // segment length varies — keep the texture density
 				collisionGroup: 'platform'
 			});
 			var face = Game.createSprite({
@@ -269,6 +289,50 @@ module.exports = function () {
 			}, 1100 + Math.random() * 800 + extraDelay);
 		}
 
+		// --- Particles ---------------------------------------------------
+
+		// Dust kicked up behind the board while rolling: a continuous
+		// emitter following the player (offset to the rear wheels).
+		// Everything runs natively — JS only toggles `emitting`.
+		var dust = Game.createEmitter({
+			sheet: sparkSheet,
+			frame: 0,
+			rate: 22,
+			lifetime: 450,
+			speed: W * 0.08,
+			angle: -35,               // up and back (0 = up, clockwise)
+			spread: 50,
+			size: PLAYER * 0.22,
+			startScale: 0.7,
+			endScale: 1.8,
+			startOpacity: 0.45,
+			endOpacity: 0,
+			tint: '#8a8580',
+			zIndex: 9,
+			offsetX: -PLAYER * 0.32,
+			offsetY: PLAYER * 0.42
+		});
+		gameView.add(dust);
+
+		// Crash sparks: burst-only emitter (rate 0), fired via emit(n)
+		var sparks = Game.createEmitter({
+			sheet: sparkSheet,
+			frame: 1,
+			rate: 0,
+			lifetime: 550,
+			speed: W * 0.55,
+			spread: 360,
+			gravity: H * 1.6,
+			size: PLAYER * 0.3,
+			startScale: 1,
+			endScale: 0.3,
+			startOpacity: 1,
+			endOpacity: 0,
+			tint: '#ffb030',
+			zIndex: 11
+		});
+		gameView.add(sparks);
+
 		// --- Player ------------------------------------------------------
 
 		var player = Game.createSprite({
@@ -287,6 +351,7 @@ module.exports = function () {
 			}
 		});
 		gameView.add(player);
+		dust.target = player; // dust follows the board from here on
 
 		// Impact burst shown on the player when crashing (same sheet —
 		// the whole scene stays a single texture batch)
@@ -351,10 +416,15 @@ module.exports = function () {
 				score++;
 				scoreLabel.text = score + ' m';
 			}, 100);
+			music.play(); // stop() rewinds, so every run starts the tune fresh
+			sparks.clear();
+			dust.emitting = true;
 		}
 
 		function crash(group) {
 			over = true;
+			music.stop();
+			crashSound.play();
 			clearTimers();
 			player.gravity = 0;
 			player.velocityY = 0;
@@ -372,6 +442,11 @@ module.exports = function () {
 			burst.y = player.y - PLAYER * 0.15;
 			burst.visible = true;
 			burst.play('pop');
+			dust.emitting = false;
+			sparks.x = player.x;
+			sparks.y = player.y;
+			sparks.emit(26);
+			gameView.shake({ strength: PLAYER * 0.12, duration: 450 });
 			statusLabel.text = 'Wipeout! Tap to retry';
 			statusLabel.visible = true;
 		}
@@ -385,11 +460,14 @@ module.exports = function () {
 		player.addEventListener('land', function () {
 			if (!over) {
 				player.play('roll');
+				dust.emitting = true;
 			}
 		});
 
 		function jump() {
 			if (!over && player.onGround) {
+				jumpSound.play();
+				dust.emitting = false; // no dust while airborne
 				player.velocityY = -JUMP;
 				player.stop();
 				player.frame = 2; // tuck pose until we land

@@ -24,7 +24,7 @@ module.exports = function () {
 	});
 	var gameView = Game.createGameView({
 		backgroundColor: '#8ed8f8',
-		debug: true  // show collision shapes for every sprite
+		// debug: true  // show collision shapes for every sprite
 	});
 
 	var GATE_COUNT = 5;

@@ -10,6 +10,10 @@
 //   Zelda: top-down tile level — solid house/water, depth-sorted trees
 //   Skate: endless skateboard runner — jump the walls and pits
 //   Point & click: adventure scene — walk by tapping, talk to the bird
+//   Particles: spark fountain, tap fireworks, smoke trail on a dragged ball
+//   Rhythm: DDR-style — catch falling gems on the beat pads
+//   Camera: dead-zone follow, bounds, zoom buttons and screen shake
+//   Rope: native Verlet ropes — drag the balls they hang from
 
 var demos = [
 	{ title: 'Basic demo', start: require('/basic') },
@@ -20,9 +24,13 @@ var demos = [
 	{ title: 'Racing', start: require('/racing') },
 	{ title: 'Cards', start: require('/cards') },
 	{ title: 'Asteroids', start: require('/asteroids') },
-	{ title: 'Zelda', start: require('/zelda') },
+	{ title: 'Top-Down Level', start: require('/topdown') },
 	{ title: 'Skate', start: require('/skate') },
-	{ title: 'Point & click', start: require('/pointclick') }
+	{ title: 'Point & click', start: require('/pointclick') },
+	{ title: 'Particles', start: require('/particles') },
+	{ title: 'Rhythm', start: require('/rhythm') },
+	{ title: 'Camera', start: require('/camera') },
+	{ title: 'Rope', start: require('/rope') }
 ];
 
 var win = Ti.UI.createWindow({
@@ -35,8 +43,18 @@ win.add(Ti.UI.createLabel({
 	text: 'ti.game examples',
 	color: '#fff',
 	font: { fontSize: 24, fontWeight: 'bold' },
-	top: 80
+	top: 20
 }));
+
+const sv = Ti.UI.createScrollView({
+  layout: "vertical",
+  top: 40,
+  bottom: 40,
+  contentHeight: Ti.UI.SIZE,
+  width: Ti.UI.FILL
+})
+
+win.add(sv);
 
 demos.forEach(function (demo, index) {
 	var button = Ti.UI.createButton({
@@ -47,7 +65,7 @@ demos.forEach(function (demo, index) {
 	button.addEventListener('click', function () {
 		demo.start();
 	});
-	win.add(button);
+	sv.add(button);
 });
 
 win.open();

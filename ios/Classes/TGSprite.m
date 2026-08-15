@@ -42,6 +42,7 @@ static _Atomic int TGIdleSequence = 0;
 		_anchorY = 0.5f;
 		_opacity = 1.0f;
 		_visible = YES;
+		_touchEnabled = YES;
 		_hitboxScale = 1.0f;
 		_enginePower = 600.0f;
 		_maxSpeed = 500.0f;
@@ -298,6 +299,26 @@ static _Atomic int TGIdleSequence = 0;
 	_skidActive = YES;
 }
 
+- (float)hitRadius
+{
+	float w = [self drawWidth] * fabsf(self.scaleX);
+	float h = [self drawHeight] * fabsf(self.scaleY);
+	return MIN(w, h) * 0.5f * self.hitboxScale;
+}
+
+- (void)hitCenter:(float *)out
+{
+	float w = [self drawWidth];
+	float h = [self drawHeight];
+	float lx = (w / 2.0f - self.anchorX * w) * self.scaleX;
+	float ly = (h / 2.0f - self.anchorY * h) * self.scaleY;
+	float rad = self.rotation * (float)M_PI / 180.0f;
+	float cosr = cosf(rad);
+	float sinr = sinf(rad);
+	out[0] = self.x + lx * cosr - ly * sinr;
+	out[1] = self.y + lx * sinr + ly * cosr;
+}
+
 - (void)computeAABB:(float *)out
 {
 	float w = [self drawWidth];
@@ -381,7 +402,7 @@ static _Atomic int TGIdleSequence = 0;
 
 - (BOOL)hitTestX:(float)px y:(float)py
 {
-	if (!self.visible || self.opacity <= 0.0f) {
+	if (!self.visible || self.opacity <= 0.0f || !self.touchEnabled) {
 		return NO;
 	}
 	float w = [self drawWidth];
@@ -402,6 +423,12 @@ static _Atomic int TGIdleSequence = 0;
 	float sy = (scaleY != 0.0f) ? scaleY : 1e-6f;
 	float lx = rx / sx + self.anchorX * w;
 	float ly = ry / sy + self.anchorY * h;
+	if (self.circleHitbox) {
+		// ellipse in local space, so touch matches the round art
+		float nx = lx / w - 0.5f;
+		float ny = ly / h - 0.5f;
+		return nx * nx + ny * ny <= 0.25f;
+	}
 	return lx >= 0.0f && lx <= w && ly >= 0.0f && ly <= h;
 }
 

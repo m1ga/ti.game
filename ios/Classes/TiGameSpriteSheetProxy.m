@@ -22,6 +22,7 @@
 									gridFrameWidth:frameWidth
 								   gridFrameHeight:frameHeight];
 	_sheet.smoothing = [TiUtils boolValue:properties[@"smoothing"] def:YES];
+	_sheet.repeat = [TiUtils boolValue:properties[@"repeat"] def:NO];
 	if (_imagePath == nil) {
 		NSLog(@"[ERROR] createSpriteSheet requires an 'image' property");
 	}

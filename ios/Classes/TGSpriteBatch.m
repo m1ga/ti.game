@@ -125,6 +125,17 @@ static GLuint compileShader(GLenum type, const char *source)
 	float x = s.x;
 	float y = s.y;
 
+	// tileRepeat: run the UVs past 1 so GL_REPEAT tiles the texture at
+	// its native pixel size instead of stretching it across the sprite
+	float u1 = f.u1;
+	float v1 = f.v1;
+	if (s.tileRepeatX && f.width > 0.0f) {
+		u1 = f.u0 + (f.u1 - f.u0) * (w / f.width);
+	}
+	if (s.tileRepeatY && f.height > 0.0f) {
+		v1 = f.v0 + (f.v1 - f.v0) * (h / f.height);
+	}
+
 	// Corners in local space relative to the anchor, scaled then rotated
 	float lx0 = -ax * sx, ly0 = -ay * sy;             // top-left
 	float lx1 = (w - ax) * sx, ly1 = -ay * sy;        // top-right
@@ -137,9 +148,43 @@ static GLuint compileShader(GLenum type, const char *source)
 	float x3 = x + lx3 * cosr - ly3 * sinr, y3 = y + lx3 * sinr + ly3 * cosr;
 
 	[self putQuadX0:x0 y0:y0 u0:f.u0 v0:f.v0
-				 x1:x1 y1:y1 u1:f.u1 v1:f.v0
-				 x2:x2 y2:y2 u2:f.u0 v2:f.v1
-				 x3:x3 y3:y3 u3:f.u1 v3:f.v1
+				 x1:x1 y1:y1 u1:u1 v1:f.v0
+				 x2:x2 y2:y2 u2:f.u0 v2:v1
+				 x3:x3 y3:y3 u3:u1 v3:v1
+				  r:alpha g:alpha b:alpha a:alpha];
+}
+
+- (void)drawFrame:(GLuint)texture frame:(TGFrame)f
+			   cx:(float)cx cy:(float)cy
+			halfW:(float)halfW halfH:(float)halfH
+				r:(float)r g:(float)g b:(float)b a:(float)a
+{
+	[self ensureCapacity:(GLint)texture];
+	[self putQuadX0:cx - halfW y0:cy - halfH u0:f.u0 v0:f.v0
+				 x1:cx + halfW y1:cy - halfH u1:f.u1 v1:f.v0
+				 x2:cx - halfW y2:cy + halfH u2:f.u0 v2:f.v1
+				 x3:cx + halfW y3:cy + halfH u3:f.u1 v3:f.v1
+				  r:r * a g:g * a b:b * a a:a];
+}
+
+- (void)drawSegment:(GLuint)texture frame:(TGFrame)f
+			  fromX:(float)x0 y:(float)y0
+				toX:(float)x1 y:(float)y1
+		  halfWidth:(float)halfWidth alpha:(float)alpha
+{
+	float dx = x1 - x0;
+	float dy = y1 - y0;
+	float len = sqrtf(dx * dx + dy * dy);
+	if (len < 1e-6f) {
+		return;
+	}
+	float nx = -dy / len * halfWidth;
+	float ny = dx / len * halfWidth;
+	[self ensureCapacity:(GLint)texture];
+	[self putQuadX0:x0 - nx y0:y0 - ny u0:f.u0 v0:f.v0
+				 x1:x0 + nx y1:y0 + ny u1:f.u1 v1:f.v0
+				 x2:x1 - nx y2:y1 - ny u2:f.u0 v2:f.v1
+				 x3:x1 + nx y3:y1 + ny u3:f.u1 v3:f.v1
 				  r:alpha g:alpha b:alpha a:alpha];
 }
 

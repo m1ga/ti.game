@@ -96,7 +96,7 @@
 															 frameWidth:_gridFrameWidth
 															frameHeight:_gridFrameHeight]];
 	}
-	_textureId = (GLint)[textures upload:image smoothing:self.smoothing];
+	_textureId = (GLint)[textures upload:image smoothing:self.smoothing repeat:self.repeat];
 }
 
 - (void)invalidateTexture

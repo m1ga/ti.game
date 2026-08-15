@@ -87,36 +87,51 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 
 		scene.update(dt);
 
-		// Projection follows the camera — sprites live in world coordinates
-		float camX = scene.cameraX;
-		float camY = scene.cameraY;
-		Matrix.orthoM(projection, 0, camX, camX + surfaceWidth, camY + surfaceHeight, camY, -1f, 1f);
+		// Projection follows the camera (position, zoom, shake) — sprites
+		// live in world coordinates
+		float scale = Math.max(0.0001f, scene.cameraScale);
+		float left = scene.viewOriginX() + scene.shakeOffsetX;
+		float top = scene.viewOriginY() + scene.shakeOffsetY;
+		float visibleW = surfaceWidth / scale;
+		float visibleH = surfaceHeight / scale;
+		Matrix.orthoM(projection, 0, left, left + visibleW, top + visibleH, top, -1f, 1f);
 
 		GLES20.glClearColor(scene.bgRed, scene.bgGreen, scene.bgBlue, scene.bgAlpha);
 		GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 
 		List<Sprite> sprites = scene.snapshot();
+		List<ParticleEmitter> emitters = scene.emittersSnapshot();
+		List<Rope> ropes = scene.ropesSnapshot();
 
 		// Lazy texture upload happens here, on the GL thread
 		for (Sprite s : sprites) {
-			SpriteSheet sheet = s.sheet;
-			if (sheet != null && !sheet.isReady()) {
-				sheet.ensureLoaded(textures);
-				if (sheet.isReady()) {
-					textures.track(sheet);
-				}
-			}
+			ensureSheetLoaded(s.sheet);
+		}
+		for (ParticleEmitter e : emitters) {
+			ensureSheetLoaded(e.sheet);
+		}
+		for (Rope rope : ropes) {
+			ensureSheetLoaded(rope.sheet);
 		}
 
 		batch.begin(projection);
 		// Skid marks slot between background (zIndex <= 0, e.g. the track)
 		// and foreground sprites (the car), so they overlay the road but
-		// stay under whatever drives across them.
+		// stay under whatever drives across them. Emitters merge into the
+		// sprite pass by zIndex; on equal zIndex, particles draw on top.
 		boolean trailDrawn = false;
+		int nextEmitter = 0;
+		int nextRope = 0;
 		for (Sprite s : sprites) {
 			if (!trailDrawn && s.zIndex > 0) {
 				drawSkidTrail();
 				trailDrawn = true;
+			}
+			while (nextEmitter < emitters.size() && emitters.get(nextEmitter).zIndex < s.zIndex) {
+				emitters.get(nextEmitter++).draw(batch);
+			}
+			while (nextRope < ropes.size() && ropes.get(nextRope).zIndex < s.zIndex) {
+				ropes.get(nextRope++).draw(batch);
 			}
 			if (s.visible && s.opacity > 0f) {
 				batch.draw(s);
@@ -124,6 +139,12 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		}
 		if (!trailDrawn) {
 			drawSkidTrail();
+		}
+		while (nextEmitter < emitters.size()) {
+			emitters.get(nextEmitter++).draw(batch);
+		}
+		while (nextRope < ropes.size()) {
+			ropes.get(nextRope++).draw(batch);
 		}
 		boolean debugAll = scene.debugAll;
 		for (Sprite s : sprites) {
@@ -134,6 +155,16 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		batch.end();
 	}
 
+	private void ensureSheetLoaded(SpriteSheet sheet)
+	{
+		if (sheet != null && !sheet.isReady()) {
+			sheet.ensureLoaded(textures);
+			if (sheet.isReady()) {
+				textures.track(sheet);
+			}
+		}
+	}
+
 	private void drawSkidTrail()
 	{
 		if (!scene.skidTrail.isEmpty()) {
@@ -142,6 +173,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	}
 
 	private final float[] debugAabb = new float[4];
+	private final float[] debugCenter = new float[2];
 
 	/**
 	 * Debug visualization: green = collision AABB (with hitboxScale),
@@ -153,13 +185,27 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		int white = textures.whiteTexture();
 		float t = 1.5f; // half line thickness
 
-		// Collision AABB — green
-		s.computeAABB(debugAabb);
-		float minX = debugAabb[0], minY = debugAabb[1], maxX = debugAabb[2], maxY = debugAabb[3];
-		batch.drawLine(white, minX, minY, maxX, minY, t, 0.2f, 1f, 0.4f, 0.9f);
-		batch.drawLine(white, maxX, minY, maxX, maxY, t, 0.2f, 1f, 0.4f, 0.9f);
-		batch.drawLine(white, maxX, maxY, minX, maxY, t, 0.2f, 1f, 0.4f, 0.9f);
-		batch.drawLine(white, minX, maxY, minX, minY, t, 0.2f, 1f, 0.4f, 0.9f);
+		// Collision shape — green (AABB, or circle for circleHitbox)
+		if (s.circleHitbox) {
+			s.hitCenter(debugCenter);
+			float r = s.hitRadius();
+			int segments = 20;
+			for (int i = 0; i < segments; i++) {
+				double a0 = 2.0 * Math.PI * i / segments;
+				double a1 = 2.0 * Math.PI * (i + 1) / segments;
+				batch.drawLine(white,
+					debugCenter[0] + r * (float) Math.cos(a0), debugCenter[1] + r * (float) Math.sin(a0),
+					debugCenter[0] + r * (float) Math.cos(a1), debugCenter[1] + r * (float) Math.sin(a1),
+					t, 0.2f, 1f, 0.4f, 0.9f);
+			}
+		} else {
+			s.computeAABB(debugAabb);
+			float minX = debugAabb[0], minY = debugAabb[1], maxX = debugAabb[2], maxY = debugAabb[3];
+			batch.drawLine(white, minX, minY, maxX, minY, t, 0.2f, 1f, 0.4f, 0.9f);
+			batch.drawLine(white, maxX, minY, maxX, maxY, t, 0.2f, 1f, 0.4f, 0.9f);
+			batch.drawLine(white, maxX, maxY, minX, maxY, t, 0.2f, 1f, 0.4f, 0.9f);
+			batch.drawLine(white, minX, maxY, minX, minY, t, 0.2f, 1f, 0.4f, 0.9f);
+		}
 
 		// Sprite/touch bounds — blue, rotated (differs from AABB when rotated
 		// or when hitboxScale != 1)

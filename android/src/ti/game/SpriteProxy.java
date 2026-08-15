@@ -116,6 +116,12 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("rotatable")) {
 			sprite.rotatable = TiConvert.toBoolean(options.get("rotatable"));
 		}
+		if (options.containsKey("touchEnabled")) {
+			sprite.touchEnabled = TiConvert.toBoolean(options.get("touchEnabled"));
+		}
+		if (options.containsKey("tileRepeat")) {
+			setTileRepeat(options.get("tileRepeat"));
+		}
 		if (options.containsKey("animations")) {
 			parseAnimations(options.get("animations"));
 		}
@@ -136,6 +142,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("hitboxScale")) {
 			sprite.hitboxScale = TiConvert.toFloat(options.get("hitboxScale"));
+		}
+		if (options.containsKey("hitboxShape")) {
+			setHitboxShape(TiConvert.toString(options.get("hitboxShape")));
 		}
 		if (options.containsKey("debug")) {
 			sprite.debug = TiConvert.toBoolean(options.get("debug"));
@@ -472,6 +481,53 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		sprite.rotatable = value;
 	}
 
+	/** false = touches pass through to sprites underneath. */
+	@Kroll.getProperty
+	public boolean getTouchEnabled()
+	{
+		return sprite.touchEnabled;
+	}
+
+	@Kroll.setProperty
+	public void setTouchEnabled(boolean value)
+	{
+		sprite.touchEnabled = value;
+	}
+
+	/**
+	 * Tile the frame at its native size instead of stretching it across
+	 * the sprite: true = both axes, 'x' / 'y' = one axis. The sheet needs
+	 * `repeat: true` (GL_REPEAT wrap; power-of-two texture on ES 2.0) and
+	 * a frame that spans the whole texture.
+	 */
+	@Kroll.setProperty
+	public void setTileRepeat(Object value)
+	{
+		if (value instanceof String) {
+			sprite.tileRepeatX = "x".equals(value);
+			sprite.tileRepeatY = "y".equals(value);
+		} else {
+			boolean both = TiConvert.toBoolean(value, false);
+			sprite.tileRepeatX = both;
+			sprite.tileRepeatY = both;
+		}
+	}
+
+	@Kroll.getProperty
+	public Object getTileRepeat()
+	{
+		if (sprite.tileRepeatX && sprite.tileRepeatY) {
+			return true;
+		}
+		if (sprite.tileRepeatX) {
+			return "x";
+		}
+		if (sprite.tileRepeatY) {
+			return "y";
+		}
+		return false;
+	}
+
 	// --- Physics ----------------------------------------------------------
 
 	@Kroll.getProperty
@@ -713,6 +769,19 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setHitboxScale(float value)
 	{
 		sprite.hitboxScale = value;
+	}
+
+	/** 'rect' (default) or 'circle' — balls and asteroids want circles. */
+	@Kroll.getProperty
+	public String getHitboxShape()
+	{
+		return sprite.circleHitbox ? "circle" : "rect";
+	}
+
+	@Kroll.setProperty
+	public void setHitboxShape(String value)
+	{
+		sprite.circleHitbox = "circle".equals(value);
 	}
 
 	@Kroll.getProperty

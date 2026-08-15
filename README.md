@@ -15,7 +15,13 @@ identical on both platforms.
 - Collision groups with events, invisible trigger zones, hitbox tuning
 - Parallax scroll looping, screen wrapping, idle wobble animation
 - Pixel-art mode (nearest-neighbor filtering), debug overlay for hitboxes
-- 11 example games in `example/` covering every feature
+- Sound: low-latency overlapping effects + looping music (`createSound`),
+  auto-paused and resumed with the app
+- Particles: native pooled emitters (`createEmitter`) — continuous rate or
+  bursts, follow a sprite, tint/scale/fade over lifetime
+- Verlet ropes (`createRope`) — pin ends to sprites or points, swings
+  natively (chains, capes, bridges, grappling hooks)
+- 15 example games in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -215,11 +221,16 @@ Notes:
   (`skidThreshold` tunes what counts, read-only `drifting` reports it —
   handy for sound effects).
 - **Camera**: sprites live in world coordinates; `cameraX`/`cameraY` on
-  the GameView scroll the view, and `follow(sprite, options)` tracks a
-  sprite natively with a vertical dead-zone (the platformer demo scrolls
-  up when the player climbs into the top third). Touch input is mapped
-  back to world space automatically, so taps and drags work while
-  scrolled; overlaid Titanium controls are screen-fixed and unaffected.
+  the GameView scroll the view, `cameraScale` zooms around the view
+  center, and `cameraBounds` clamps the visible rect into a level rect.
+  `follow(sprite, options)` tracks a sprite natively with dead-zones —
+  vertical always (the platformer demo scrolls up when the player climbs
+  into the top third), horizontal when `leftMargin`/`rightMargin` are
+  given, optionally eased with `smoothing`. `shake()` adds impact rumble
+  without touching the camera position. Touch input is mapped back to
+  world space automatically (zoom included), so taps and drags work
+  while scrolled; overlaid Titanium controls are screen-fixed and
+  unaffected.
 - **Screen wrapping**: `wrapAround: true` re-enters from the opposite edge
   (Asteroids). For scrolling backgrounds use `wrapX`/`wrapShift`: two
   screen-wide copies with `{ wrapX: -W/2, wrapShift: 2*W }` and a negative
@@ -238,9 +249,92 @@ overlap-enter, re-arming after separation. This is independent of
   ceilings (flappy, racing and volley demos all use these).
 - `hitboxScale` shrinks the collision box around the anchor — art rarely
   fills its frame, and slightly small hitboxes feel fairer.
+- `hitboxShape: 'circle'` makes the hitbox a circle (radius = half the
+  smaller drawn side × `hitboxScale`) — for balls and asteroids. Circle
+  sprites also resolve against solids along the contact normal, so a
+  ball bounces off a corner diagonally instead of like a box (the volley
+  ball and the asteroids use it), and their touch area is round.
 - `debug: true` on a sprite (or on the GameView for everything) renders
   the shapes: **green** = collision AABB (with `hitboxScale`), **blue** =
   sprite/touch bounds, **orange dot** = anchor.
+
+### Play sounds
+
+```javascript
+var jump = Game.createSound({ url: 'assets/jump.wav', volume: 0.8 });
+jump.play();   // fire-and-forget; rapid plays overlap
+
+var music = Game.createSound({ url: 'assets/theme.mp3', music: true, loop: true });
+music.play();
+```
+
+Effect mode (the default) is built for low latency: on Android the sample
+lives in a shared `SoundPool`, on iOS in a small pool of preloaded
+players — call `play()` from any event handler (`land`, `collision`,
+`complete`, a button) and repeated plays overlap instead of cutting each
+other off. `music: true` picks the streaming backend
+(`MediaPlayer`/`AVAudioPlayer`) for longer tracks; music pauses when the
+app goes to the background and resumes with it, like the render loop.
+`volume` (0..1) and `loop` are live properties. WAV, MP3 and OGG (Android)
+/ WAV, MP3, M4A (iOS) from app resources or file paths.
+
+The skate demo wires `jump.wav`/`crash.wav` into its jump and wipeout
+handlers and loops a chiptune track on the music backend; the events
+listed under collisions (`land`, `collision`, `drifting`, tween
+`complete`) are natural hook points for more.
+
+### Particles
+
+```javascript
+var smoke = Game.createEmitter({
+    sheet: puffSheet, frame: 0,
+    rate: 30,                          // particles/sec while `emitting`
+    lifetime: 600,                     // ms, like all JS durations
+    speed: 120, angle: 0, spread: 60,  // cone: 0 = up, clockwise degrees
+    gravity: -40, size: 24,
+    startScale: 1, endScale: 2.5,
+    startOpacity: 0.8, endOpacity: 0,
+    tint: '#889', zIndex: 9,
+    target: car                        // follow a sprite — or set x/y
+});
+gameView.add(smoke);
+
+boom.emit(30);                         // one-shot burst (rate can stay 0)
+```
+
+Spawning, integration, fading and drawing all run in the native game
+loop — JS only writes configuration and calls `emit()`. Each particle's
+speed is randomized between 50% and 100% of `speed` so bursts don't form
+perfect rings; scale and opacity interpolate start → end over `lifetime`.
+Particles are pooled (`maxParticles`, default 200, hard cap 1000) and all
+share one sheet frame, so an emitter renders as a single batch run —
+tint your art at runtime by using white particle textures. Emitters sort
+into the scene by `zIndex` (drawing above sprites of the same z). The
+skate demo uses both modes: a dust trail following the board
+(`target` + `emitting`) and a spark burst on crash (`emit(26)`).
+
+### Ropes
+
+```javascript
+var rope = Game.createRope({
+    sheet: ropeSheet,          // one frame, textured along each link
+    segments: 14,
+    segmentLength: 40,         // px
+    thickness: 12,             // drawn width, px
+    gravity: 1500, damping: 0.98, iterations: 3,
+    head: ball,                // pin the head to a sprite — or set x/y
+    zIndex: 5
+});
+gameView.add(rope);
+```
+
+A native Verlet chain: integration and distance constraints run in the
+game loop, segments render as quads oriented along the rope (one sheet
+frame → one batch run). Pin the `head` to a sprite — a draggable ball, a
+character's hand — and the rope follows with zero bridge traffic, or use
+`x`/`y` for a fixed anchor. An optional `tail` sprite pins the other end
+(hanging weights, bridges). `endX`/`endY` read the live position of the
+loose end (grappling-hook tips). See `rope.js` for both variants.
 
 ### Depth in top-down scenes
 
@@ -249,7 +343,7 @@ edge** (feet, trunk base) instead of a fixed order — walk below a tree
 and you draw in front of it, walk above and you vanish behind the canopy.
 Give the player, trees and buildings the same `zIndex` with `ySort`, keep
 ground tiles on a lower `zIndex`, and the Zelda-style depth illusion
-falls out automatically (see `zelda.js`).
+falls out automatically (see `topdown.js`).
 
 ## Learn from the examples
 
@@ -266,9 +360,13 @@ a feature set — find the one closest to your game and start there:
 | `racing.js` | `carMode` drifting, skid marks, pixel art, lap/checkpoint logic |
 | `cards.js` | Fanned hand UI, selection tweens, idle wobble |
 | `asteroids.js` | `thrust`/`angularVelocity`, `wrapAround`, bullet pooling |
-| `zelda.js` | Tile map from a string array, solid tiles/house, `ySort` depth, 8-way d-pad, follower NPC on a decision timer |
+| `topdown.js` | Tile map from a string array, solid tiles/house, `ySort` depth, 8-way d-pad, follower NPC on a decision timer |
 | `skate.js` | Endless runner: pixel-art parallax street, jump-button ollie over pooled obstacles, raised road sections to ride, crash sprite on collision |
 | `pointclick.js` | Adventure scene: tap-to-walk via distance-sized tweens, verb-coin icons on a hotspot, JS hit-testing vs. view taps, `ySort` depth |
+| `particles.js` | Emitter playground: continuous spark fountain, tap-for-fireworks bursts, smoke trail following a dragged sprite |
+| `rhythm.js` | DDR-style note catcher: pooled notes on native velocity, `press`-event pads, timing-based good/bad sounds, tinted hit bursts, miss trigger zone |
+| `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, `tileRepeat` ground |
+| `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
 
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
@@ -280,6 +378,9 @@ Run them with `ti build -p android` from `android/` (executes
 - `createGameView(options)` → GameView
 - `createSpriteSheet(options)` → SpriteSheet
 - `createSprite(options)` → Sprite
+- `createSound(options)` → Sound
+- `createEmitter(options)` → Emitter
+- `createRope(options)` → Rope
 - Easing constants: `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`,
   `EASE_BOUNCE`, `EASE_ELASTIC`
 
@@ -293,8 +394,11 @@ Run them with `ti build -p android` from `android/` (executes
 | `backgroundColor` | GL clear color |
 | `surfaceWidth` / `surfaceHeight` | Surface size in px (read-only) |
 | `cameraX` / `cameraY` | World-space offset of the view (scrolling) |
-| `follow(sprite, { topMargin, bottomMargin, maxY })` | Native vertical dead-zone camera follow — scrolls when the sprite crosses `topMargin`/`bottomMargin` (fractions of the surface height, defaults 0.33/0.7), clamped to `maxY` (default 0) |
+| `cameraScale` | Zoom, anchored on the view center (default 1) |
+| `cameraBounds` | `{ minX, minY, maxX, maxY }` world rect the visible area is clamped into; `null` = unbounded |
+| `follow(sprite, options)` | Native dead-zone camera follow. Vertical: `topMargin`/`bottomMargin` (fractions of the visible height, defaults 0.33/0.7), clamped to `maxY` (default 0). Horizontal: enabled by `leftMargin`/`rightMargin` (defaults 0.35/0.65). `smoothing` (0..1, default 0 = snap) eases by that fraction of the remaining distance per 1/60 s |
 | `stopFollow()` | Stop following; the camera stays where it is |
+| `shake({ strength, duration })` | Camera shake: `strength` px (default 12), `duration` ms (default 400) — offsets only the projection, so follow/bounds/touches are unaffected |
 | `debug` | Draw collision shapes for every sprite |
 
 Events: `press`, `tap`, `release` (any touch; payload `x`, `y`) and
@@ -303,7 +407,8 @@ Events: `press`, `tap`, `release` (any touch; payload `x`, `y`) and
 ### SpriteSheet
 
 Options: `image`, `frameWidth`/`frameHeight` **or** `atlas`,
-`smoothing` (default true).
+`smoothing` (default true), `repeat` (default false — GL_REPEAT wrap for
+`tileRepeat` sprites; needs power-of-two texture dimensions).
 
 | Member | Description |
 |---|---|
@@ -319,11 +424,11 @@ mid-drag or mid-tween. All can be passed at creation.
 | Group | Properties |
 |---|---|
 | Transform | `x`, `y`, `width`, `height` (default: frame size), `scale`, `scaleX`, `scaleY` (negative flips), `rotation`, `anchorX`, `anchorY`, `opacity`, `visible`, `zIndex`, `ySort` |
-| Sheet/animation | `sheet`, `frame`, `animations`, `animation` (read-only) |
-| Touch behaviors | `draggable`, `pinchable`, `rotatable` |
+| Sheet/animation | `sheet`, `frame`, `animations`, `animation` (read-only), `tileRepeat` (`true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture) |
+| Touch behaviors | `draggable`, `pinchable`, `rotatable`, `touchEnabled` (false = touches pass through to sprites underneath) |
 | Physics | `velocityX`, `velocityY`, `gravity`, `maxSpeed` |
 | Solids | `solidWith`, `onGround` (read-only), `restitution` |
-| Collision | `collisionGroup`, `collidesWith`, `hitboxScale`, `debug` |
+| Collision | `collisionGroup`, `collidesWith`, `hitboxScale`, `hitboxShape` (`'rect'`/`'circle'` — circles also bounce off solid corners along the contact normal), `debug` |
 | Car | `carMode`, `throttle`, `steering`, `enginePower`, `turnRate`, `grip`, `drag`, `skidMarks`, `skidThreshold`, `drifting` (read-only) |
 | Flight | `thrust`, `angularVelocity`, `wrapAround` |
 | Wrap/loop | `wrapX`, `wrapShift` |
@@ -348,6 +453,35 @@ Events:
 | `collision` | `group`, `other`, `x`, `y` | Overlap with a `collidesWith` group began |
 | `land` | `x`, `y`, `other` (the solid), `group` | Landed on top of a `solidWith` solid |
 
+### Sound
+
+Options: `url` (required), `volume` (0..1, default 1), `loop`,
+`music` (default false; choose at creation, not changeable later).
+
+| Member | Description |
+|---|---|
+| `play()` | Start playback (effects: overlapping; queued until the sample is loaded) |
+| `pause()` | Pause; `play()` continues where it stopped |
+| `stop()` | Stop and rewind to the beginning |
+| `volume` | Live volume, 0..1 |
+| `loop` | Repeat until `stop()` |
+| `music` | Which backend was chosen (read-only) |
+
+### Emitter
+
+Add/remove via `gameView.add(emitter)` / `remove(emitter)`, like sprites.
+All properties are live.
+
+| Group | Properties |
+|---|---|
+| Placement | `x`, `y`, `target` (sprite to follow, null to detach), `offsetX`, `offsetY`, `zIndex` |
+| Look | `sheet`, `frame`, `size` (base px width; 0 = frame size), `tint`, `startScale`/`endScale`, `startOpacity`/`endOpacity` |
+| Motion | `speed` (px/s, randomized 50–100%), `angle` (0 = up, clockwise), `spread` (degrees), `gravity` (px/s²), `lifetime` (ms) |
+| Emission | `rate` (particles/s), `emitting`, `maxParticles` (default 200, max 1000) |
+
+Methods: `emit(n)` (one-shot burst on top of `rate`), `clear()` (kill all
+live particles).
+
 ## Architecture & source layout
 
 ```
@@ -357,8 +491,14 @@ android/src/ti/game/
 ├── TiGameView.java          TiUIView wrapping GLSurfaceView + lifecycle
 ├── SpriteProxy.java         createSprite() — JS-facing sprite API
 ├── SpriteSheetProxy.java    createSpriteSheet() — grid or atlas
+├── SoundProxy.java          createSound() — SoundPool effect or MediaPlayer music
+├── EmitterProxy.java        createEmitter() — JS-facing particle emitter
+├── RopeProxy.java           createRope() — JS-facing Verlet rope
 └── engine/                  Pure native engine (no per-frame bridge use)
     ├── Scene.java           Scene graph, solids, collisions, wrapping
+    ├── ParticleEmitter.java Pooled particles: spawn, integrate, fade, draw
+    ├── Rope.java            Verlet chain: integrate, constrain, draw
+    ├── SoundEngine.java     Shared SoundPool + audio lifecycle
     ├── Sprite.java          State + physics/animation/tween/idle ticking
     ├── SpriteSheet.java     Texture + UV frame table
     ├── Animation.java       Frame indices + fps + loop

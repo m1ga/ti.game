@@ -149,12 +149,14 @@ public class TiGameView extends TiUIView implements TiLifecycle.OnLifecycleEvent
 	public void onResume(Activity activity)
 	{
 		glView.onResume();
+		ti.game.engine.SoundEngine.notifyActivityResumed();
 	}
 
 	@Override
 	public void onPause(Activity activity)
 	{
 		glView.onPause();
+		ti.game.engine.SoundEngine.notifyActivityPaused();
 	}
 
 	@Override

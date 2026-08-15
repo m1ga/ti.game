@@ -141,6 +141,7 @@ module.exports = function () {
 			height: BALL_SIZE,
 			zIndex: 12,
 			hitboxScale: 0.9,
+			hitboxShape: 'circle',   // round ball: corner bounces off the net
 			restitution: 0.75,
 			solidWith: ['wall', 'net'],
 			collidesWith: ['player', 'floor']

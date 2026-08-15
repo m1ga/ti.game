@@ -3,6 +3,8 @@
 //
 #import <Foundation/Foundation.h>
 
+@class TGParticleEmitter;
+@class TGRope;
 @class TGSkidTrail;
 @class TGSprite;
 
@@ -26,15 +28,45 @@
 @property (atomic, assign) float worldWidth;
 @property (atomic, assign) float worldHeight;
 
-// Camera: world-space offset of the view's top-left corner.
+// Camera: world-space offset of the view's top-left corner (at scale 1).
 @property (atomic, assign) float cameraX;
 @property (atomic, assign) float cameraY;
 
-// Native vertical follow with a dead-zone.
+// Zoom, anchored on the view center.
+@property (atomic, assign) float cameraScale;
+
+// Native dead-zone follow. Vertical is always active while a target is
+// set; horizontal only when followLeftFraction >= 0. followSmoothing
+// 0 = snap, else fraction of remaining distance covered per 1/60 s.
 @property (atomic, strong) TGSprite *followTarget;
 @property (atomic, assign) float followTopFraction;
 @property (atomic, assign) float followBottomFraction;
+@property (atomic, assign) float followLeftFraction;
+@property (atomic, assign) float followRightFraction;
+@property (atomic, assign) float followSmoothing;
 @property (atomic, assign) float cameraMaxY;
+
+// Camera bounds: clamp the visible rect into this world rect.
+@property (atomic, assign) BOOL cameraBoundsEnabled;
+@property (atomic, assign) float boundsMinX;
+@property (atomic, assign) float boundsMinY;
+@property (atomic, assign) float boundsMaxX;
+@property (atomic, assign) float boundsMaxY;
+
+// Shake offsets for the renderer — render thread only.
+@property (nonatomic, assign) float shakeOffsetX;
+@property (nonatomic, assign) float shakeOffsetY;
+
+/** Kicks off (or restarts) a camera shake. strength px, duration s. */
+- (void)shakeWithStrength:(float)strength duration:(float)duration;
+
+/** World position of the visible rect's left/top edge (accounts for zoom). */
+- (float)viewOriginX;
+- (float)viewOriginY;
+
+/** Maps a surface touch position into world space (camera + zoom). */
+- (float)screenToWorldX:(float)sx;
+- (float)screenToWorldY:(float)sy;
 
 @property (atomic, assign) float bgRed;
 @property (atomic, assign) float bgGreen;
@@ -45,6 +77,16 @@
 - (void)remove:(TGSprite *)sprite;
 - (void)clear;
 - (void)markZOrderDirty;
+
+- (void)addEmitter:(TGParticleEmitter *)emitter;
+- (void)removeEmitter:(TGParticleEmitter *)emitter;
+/** Snapshot sorted by zIndex (emitters are few; sorted every call). */
+- (NSArray<TGParticleEmitter *> *)emittersSnapshot;
+
+- (void)addRope:(TGRope *)rope;
+- (void)removeRope:(TGRope *)rope;
+/** Snapshot sorted by zIndex (ropes are few; sorted every call). */
+- (NSArray<TGRope *> *)ropesSnapshot;
 
 /** Re-scan for ySort sprites; while any exist, draw order re-sorts every frame. */
 - (void)recomputeYSort;

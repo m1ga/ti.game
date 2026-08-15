@@ -19,8 +19,9 @@
 - (GLuint)whiteTexture;
 
 /** Uploads an image (premultiplied RGBA) and returns the GL texture id.
- *  smoothing=NO uses GL_NEAREST for crisp pixel-art scaling. */
-- (GLuint)upload:(UIImage *)image smoothing:(BOOL)smoothing;
+ *  smoothing=NO uses GL_NEAREST for crisp pixel-art scaling; repeat=YES
+ *  uses GL_REPEAT wrap (power-of-two dimensions on ES 2.0). */
+- (GLuint)upload:(UIImage *)image smoothing:(BOOL)smoothing repeat:(BOOL)repeat;
 
 - (void)track:(TGSpriteSheet *)sheet;
 

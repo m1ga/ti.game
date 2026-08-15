@@ -44,6 +44,16 @@ public class Sprite
 	public volatile boolean pinchable = false;
 	public volatile boolean rotatable = false;
 
+	// false = invisible to hit-testing: touches pass through to sprites
+	// underneath (falling blocks over a button, decorative overlays)
+	public volatile boolean touchEnabled = true;
+
+	// Tile the sheet frame across the sprite instead of stretching it
+	// (per axis). Needs a sheet with repeat=true whose frame spans the
+	// whole texture.
+	public volatile boolean tileRepeatX = false;
+	public volatile boolean tileRepeatY = false;
+
 	// Physics, integrated natively every frame (px/s, px/s^2)
 	public volatile float velocityX = 0f;
 	public volatile float velocityY = 0f;
@@ -66,6 +76,13 @@ public class Sprite
 	// Shrinks the collision AABB around the anchor (1 = full frame). Sprite
 	// art rarely fills its frame; smaller values make collisions feel fair.
 	public volatile float hitboxScale = 1f;
+
+	// true = the hitbox is a circle (radius = half the smaller drawn side
+	// x hitboxScale, centered on the sprite center) — balls, asteroids.
+	// Collision events test circle-vs-circle/AABB; against solids, the
+	// ball is pushed out along the contact normal, so it bounces off
+	// corners naturally instead of like a box.
+	public volatile boolean circleHitbox = false;
 
 	// Draws debug overlays: collision AABB (green), sprite/touch bounds
 	// (blue), anchor point (orange). Scene.debugAll enables it for everyone.
@@ -363,6 +380,28 @@ public class Sprite
 		skidActive = true;
 	}
 
+	/** Collision radius for circle hitboxes. */
+	public float hitRadius()
+	{
+		float w = drawWidth() * Math.abs(scaleX);
+		float h = drawHeight() * Math.abs(scaleY);
+		return Math.min(w, h) * 0.5f * hitboxScale;
+	}
+
+	/** World position of the sprite's geometric center: out = {x, y}. */
+	public void hitCenter(float[] out)
+	{
+		float w = drawWidth();
+		float h = drawHeight();
+		float lx = (w / 2f - anchorX * w) * scaleX;
+		float ly = (h / 2f - anchorY * h) * scaleY;
+		double rad = Math.toRadians(rotation);
+		float cos = (float) Math.cos(rad);
+		float sin = (float) Math.sin(rad);
+		out[0] = x + lx * cos - ly * sin;
+		out[1] = y + lx * sin + ly * cos;
+	}
+
 	/** World-space axis-aligned bounding box: out = {minX, minY, maxX, maxY}. */
 	public void computeAABB(float[] out)
 	{
@@ -433,7 +472,7 @@ public class Sprite
 	 */
 	public boolean hitTest(float px, float py)
 	{
-		if (!visible || opacity <= 0f) {
+		if (!visible || opacity <= 0f || !touchEnabled) {
 			return false;
 		}
 		float w = drawWidth();
@@ -452,6 +491,12 @@ public class Sprite
 		float sy = (scaleY != 0f) ? scaleY : 1e-6f;
 		float lx = rx / sx + anchorX * w;
 		float ly = ry / sy + anchorY * h;
+		if (circleHitbox) {
+			// ellipse in local space, so touch matches the round art
+			float nx = lx / w - 0.5f;
+			float ny = ly / h - 0.5f;
+			return nx * nx + ny * ny <= 0.25f;
+		}
 		return lx >= 0f && lx <= w && ly >= 0f && ly <= h;
 	}
 }

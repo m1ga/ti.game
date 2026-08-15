@@ -36,17 +36,20 @@ public class TextureManager
 	}
 
 	/** Uploads a bitmap and returns the GL texture id. GL thread only.
-	 *  smoothing=false uses GL_NEAREST for crisp pixel-art scaling. */
-	public int upload(Bitmap bitmap, boolean smoothing)
+	 *  smoothing=false uses GL_NEAREST for crisp pixel-art scaling;
+	 *  repeat=true uses GL_REPEAT wrap (needs power-of-two dimensions
+	 *  on ES 2.0) so tileRepeat sprites can tile the texture. */
+	public int upload(Bitmap bitmap, boolean smoothing, boolean repeat)
 	{
 		int filter = smoothing ? GLES20.GL_LINEAR : GLES20.GL_NEAREST;
+		int wrap = repeat ? GLES20.GL_REPEAT : GLES20.GL_CLAMP_TO_EDGE;
 		int[] ids = new int[1];
 		GLES20.glGenTextures(1, ids, 0);
 		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ids[0]);
 		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter);
 		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter);
-		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
-		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, wrap);
+		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, wrap);
 		GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
 		return ids[0];
 	}

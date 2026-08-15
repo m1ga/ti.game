@@ -36,6 +36,10 @@ public class SpriteSheet
 	/** false = GL_NEAREST filtering — crisp pixels for pixel-art sheets. */
 	public volatile boolean smoothing = true;
 
+	/** true = GL_REPEAT wrap so sprites with tileRepeat tile the texture.
+	 *  ES 2.0 requires power-of-two texture dimensions for this. */
+	public volatile boolean repeat = false;
+
 	private volatile Frame[] frames = new Frame[0];
 	private volatile int textureId = -1;
 	private volatile boolean loadFailed = false;
@@ -113,7 +117,7 @@ public class SpriteSheet
 		if (frames.length == 0 && gridFrameWidth > 0 && gridFrameHeight > 0) {
 			setFrames(buildGridFrames(bitmap.getWidth(), bitmap.getHeight(), gridFrameWidth, gridFrameHeight));
 		}
-		textureId = textures.upload(bitmap, smoothing);
+		textureId = textures.upload(bitmap, smoothing, repeat);
 		bitmap.recycle();
 	}
 
