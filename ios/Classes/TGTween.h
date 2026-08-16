@@ -20,6 +20,8 @@
 @property (nonatomic, strong) NSNumber *toRotation;
 @property (nonatomic, strong) NSNumber *toOpacity;
 @property (nonatomic, strong) NSNumber *toGlowOpacity;
+// Sheet frame to show when the tween finishes; nil = leave unchanged
+@property (nonatomic, strong) NSNumber *endFrame;
 @property (nonatomic, assign) float duration; // seconds
 @property (nonatomic, assign) float delay;
 @property (nonatomic, copy) NSString *easing;

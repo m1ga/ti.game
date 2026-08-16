@@ -80,11 +80,15 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 }
 
-- (void)drawFrame
+- (void)resetClock
 {
-	CFTimeInterval now = CACurrentMediaTime();
-	float dt = (_lastFrameTime == 0) ? 0.0f : (float)(now - _lastFrameTime);
-	_lastFrameTime = now;
+	_lastFrameTime = 0;
+}
+
+- (void)drawFrame:(CFTimeInterval)frameTime
+{
+	float dt = (_lastFrameTime == 0) ? 0.0f : (float)(frameTime - _lastFrameTime);
+	_lastFrameTime = frameTime;
 	// Clamp so a paused/debugged app doesn't fast-forward animations
 	if (dt > 0.1f) {
 		dt = 0.1f;

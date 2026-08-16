@@ -770,6 +770,9 @@ static NSSet<NSString *> *toGroupSet(id value)
 	if (options[@"easing"] != nil) {
 		tween.easing = [TiUtils stringValue:options[@"easing"]];
 	}
+	if (options[@"frame"] != nil) {
+		tween.endFrame = @([TiUtils intValue:options[@"frame"] def:0]);
+	}
 	[self.sprite addTween:tween];
 }
 

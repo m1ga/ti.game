@@ -28,7 +28,17 @@
 /** Drawable resized: viewport, projection, 'resize' event to JS. */
 - (void)surfaceChangedWithWidth:(int)width height:(int)height;
 
-/** One frame: tick + draw. GL context must be current. */
-- (void)drawFrame;
+/**
+ * One frame: tick + draw. GL context must be current.
+ *
+ * frameTime must be the CADisplayLink's targetTimestamp (vsync-aligned),
+ * not the wall clock at callback time — callback dispatch latency jitters
+ * by milliseconds, and a jittery dt on a fixed presentation cadence is
+ * visible as tween/motion stutter.
+ */
+- (void)drawFrame:(CFTimeInterval)frameTime;
+
+/** Forget the last frame time; the next frame ticks with dt = 0 (use after a pause). */
+- (void)resetClock;
 
 @end

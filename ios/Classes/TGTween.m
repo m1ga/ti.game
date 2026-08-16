@@ -63,7 +63,11 @@
 	if (_toGlowOpacity != nil) {
 		s.glowOpacity = _fromGlowOpacity + (_toGlowOpacity.floatValue - _fromGlowOpacity) * e;
 	}
-	return t >= 1.0f;
+	BOOL finished = t >= 1.0f;
+	if (finished && _endFrame != nil) {
+		s.frame = _endFrame.intValue;
+	}
+	return finished;
 }
 
 @end

@@ -20,6 +20,8 @@
 	atomic_bool _running;
 	atomic_bool _paused;
 	atomic_bool _needsLayout;
+
+	BOOL _clockStale; // render thread only — set while paused
 }
 
 + (Class)layerClass
@@ -130,7 +132,13 @@
 - (void)tick:(CADisplayLink *)link
 {
 	if (!atomic_load(&_running) || atomic_load(&_paused)) {
+		_clockStale = YES;
 		return;
+	}
+	if (_clockStale) {
+		// Don't fast-forward the pause gap into the first frame back
+		_clockStale = NO;
+		[_renderer resetClock];
 	}
 	if (atomic_exchange(&_needsLayout, false)) {
 		[self recreateFramebuffer];
@@ -143,7 +151,7 @@
 	// letting snapshot copies from multiple ticks pile up
 	@autoreleasepool {
 		glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
-		[_renderer drawFrame];
+		[_renderer drawFrame:link.targetTimestamp];
 		glBindRenderbuffer(GL_RENDERBUFFER, _colorRenderbuffer);
 		[_context presentRenderbuffer:GL_RENDERBUFFER];
 	}
