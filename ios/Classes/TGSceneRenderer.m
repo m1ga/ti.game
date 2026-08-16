@@ -130,7 +130,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		[self ensureSheetLoaded:rope.sheet];
 	}
 
-	[_batch begin:_projection];
+	[_batch begin:_projection originX:left originY:top screenScale:scale];
 	// Skid marks slot between background (zIndex <= 0, e.g. the track)
 	// and foreground sprites (the car), so they overlay the road but
 	// stay under whatever drives across them. Emitters merge into the

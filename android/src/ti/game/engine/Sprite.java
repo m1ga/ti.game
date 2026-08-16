@@ -32,6 +32,9 @@ public class Sprite
 	public volatile float anchorY = 0.5f;
 	public volatile float opacity = 1f;
 	public volatile boolean visible = true;
+	// Snap only the rendered anchor to the framebuffer pixel grid. Physics,
+	// collisions and the live x/y values remain subpixel floats.
+	public volatile boolean pixelSnap = false;
 	public volatile int zIndex = 0;
 
 	// Tint: multiplies the frame's colors (white = art unchanged) — damage

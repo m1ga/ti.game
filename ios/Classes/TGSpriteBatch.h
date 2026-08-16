@@ -20,7 +20,10 @@
 /** (Re)creates shaders; call once the GL context is current. */
 - (void)createGLResources;
 
-- (void)begin:(const float *)projectionMatrix; // float[16], column-major
+- (void)begin:(const float *)projectionMatrix
+	 originX:(float)originX
+	 originY:(float)originY
+	screenScale:(float)screenScale; // float[16], column-major
 - (void)draw:(TGSprite *)sprite;
 
 /** Axis-aligned textured quad with a straight-alpha tint color —

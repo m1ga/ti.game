@@ -117,6 +117,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("visible")) {
 			sprite.visible = TiConvert.toBoolean(options.get("visible"));
 		}
+		if (options.containsKey("pixelSnap")) {
+			sprite.pixelSnap = TiConvert.toBoolean(options.get("pixelSnap"));
+		}
 		if (options.containsKey("zIndex")) {
 			sprite.zIndex = TiConvert.toInt(options.get("zIndex"));
 		}
@@ -509,6 +512,18 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setVisible(boolean value)
 	{
 		sprite.visible = value;
+	}
+
+	@Kroll.getProperty
+	public boolean getPixelSnap()
+	{
+		return sprite.pixelSnap;
+	}
+
+	@Kroll.setProperty
+	public void setPixelSnap(boolean value)
+	{
+		sprite.pixelSnap = value;
 	}
 
 	@Kroll.getProperty

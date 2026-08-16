@@ -173,6 +173,11 @@ performance for free.
   grids, or `{ image, atlas }` for TexturePacker JSON. `smoothing: false`
   switches to nearest-neighbor filtering for pixel art. Textures load
   lazily on the GL thread and survive EGL context loss automatically.
+- **Pixel snapping**: `pixelSnap: true` rounds only the sprite's rendered
+  anchor to the nearest framebuffer pixel after camera position and zoom are
+  applied. Native physics, collisions and live `x`/`y` remain subpixel floats.
+  It defaults to `false`; combine it with `smoothing: false` when a moving
+  pixel-art sprite must keep a stable texel phase.
 - **Frame animations**: declare named animations on the sprite
   (`{ frames, fps, loop, frame }`), control with `play(name)` / `stop()` / the
   `frame` property. Non-looping animations fire `animationcomplete`; an
@@ -455,7 +460,7 @@ mid-drag or mid-tween. All can be passed at creation.
 
 | Group | Properties |
 |---|---|
-| Transform | `x`, `y`, `width`, `height` (default: frame size), `scale`, `scaleX`, `scaleY` (negative flips), `rotation`, `anchorX`, `anchorY`, `opacity`, `visible`, `zIndex`, `ySort` |
+| Transform | `x`, `y`, `width`, `height` (default: frame size), `scale`, `scaleX`, `scaleY` (negative flips), `rotation`, `anchorX`, `anchorY`, `opacity`, `visible`, `pixelSnap` (render-only framebuffer alignment; default false), `zIndex`, `ySort` |
 | Sheet/animation | `sheet`, `frame`, `animations`, `animation` (read-only), `tileRepeat` (`true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture) |
 | Touch behaviors | `draggable`, `pinchable`, `rotatable`, `touchEnabled` (false = touches pass through to sprites underneath) |
 | Physics | `velocityX`, `velocityY`, `gravity`, `maxSpeed` |

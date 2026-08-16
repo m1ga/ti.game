@@ -94,6 +94,9 @@ public class SpriteBatch
 	private int uProj, uTex;             // main program
 	private int uProjGlow, uTexGlow;     // glow program
 	private float[] projection;
+	private float pixelOriginX;
+	private float pixelOriginY;
+	private float pixelScale = 1f;
 
 	public SpriteBatch()
 	{
@@ -137,9 +140,12 @@ public class SpriteBatch
 		return shader;
 	}
 
-	public void begin(float[] projectionMatrix)
+	public void begin(float[] projectionMatrix, float originX, float originY, float screenScale)
 	{
 		projection = projectionMatrix;
+		pixelOriginX = originX;
+		pixelOriginY = originY;
+		pixelScale = Math.max(0.0001f, screenScale);
 		quadCount = 0;
 		currentTexture = -1;
 		activeProgram = 0;
@@ -195,6 +201,12 @@ public class SpriteBatch
 		float sx = s.scaleX;
 		float sy = s.scaleY;
 		float alpha = Math.max(0f, Math.min(1f, s.opacity));
+		float x = s.x;
+		float y = s.y;
+		if (s.pixelSnap) {
+			x = snapToPixel(x, pixelOriginX);
+			y = snapToPixel(y, pixelOriginY);
+		}
 
 		// tileRepeat: run the UVs past 1 so GL_REPEAT tiles the texture at
 		// its native pixel size instead of stretching it across the sprite
@@ -213,10 +225,10 @@ public class SpriteBatch
 		float lx2 = -ax * sx, ly2 = (h - ay) * sy;        // bottom-left
 		float lx3 = (w - ax) * sx, ly3 = (h - ay) * sy;   // bottom-right
 
-		float x0 = s.x + lx0 * cos - ly0 * sin, y0 = s.y + lx0 * sin + ly0 * cos;
-		float x1 = s.x + lx1 * cos - ly1 * sin, y1 = s.y + lx1 * sin + ly1 * cos;
-		float x2 = s.x + lx2 * cos - ly2 * sin, y2 = s.y + lx2 * sin + ly2 * cos;
-		float x3 = s.x + lx3 * cos - ly3 * sin, y3 = s.y + lx3 * sin + ly3 * cos;
+		float x0 = x + lx0 * cos - ly0 * sin, y0 = y + lx0 * sin + ly0 * cos;
+		float x1 = x + lx1 * cos - ly1 * sin, y1 = y + lx1 * sin + ly1 * cos;
+		float x2 = x + lx2 * cos - ly2 * sin, y2 = y + lx2 * sin + ly2 * cos;
+		float x3 = x + lx3 * cos - ly3 * sin, y3 = y + lx3 * sin + ly3 * cos;
 
 		float blur = s.glowBlur;
 		float glow = Math.max(0f, Math.min(1f, s.glowOpacity)) * alpha;
@@ -246,6 +258,12 @@ public class SpriteBatch
 			x2, y2, f.u0, v1,
 			x3, y3, u1, v1,
 			s.tintR * alpha, s.tintG * alpha, s.tintB * alpha, alpha);
+	}
+
+	private float snapToPixel(float value, float origin)
+	{
+		float screenCoordinate = (value - origin) * pixelScale;
+		return origin + (float) Math.floor(screenCoordinate + 0.5f) / pixelScale;
 	}
 
 	/**

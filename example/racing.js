@@ -125,6 +125,7 @@ module.exports = function () {
 			y: laneY,
 			width: CAR_SIZE,
 			height: CAR_SIZE,
+			pixelSnap: true,
 			rotation: 90,            // facing right along the bottom straight
 			zIndex: 10,
 			hitboxScale: 0.75,
