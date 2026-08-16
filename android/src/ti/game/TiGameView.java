@@ -22,7 +22,7 @@ import ti.game.engine.TouchController;
  * interaction on the UI thread. Hooks Titanium's activity lifecycle into
  * GLSurfaceView.onPause/onResume.
  */
-public class TiGameView extends TiUIView implements TiLifecycle.OnLifecycleEvent
+public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycleEvent
 {
 	private final GLSurfaceView glView;
 	private final SceneRenderer renderer;
