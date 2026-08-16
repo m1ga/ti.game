@@ -1,11 +1,18 @@
 #import "TGSpriteSheet.h"
 #import "TGTextureManager.h"
+#import <stdatomic.h>
+#import <stdint.h>
 
 @implementation TGSpriteSheet {
 	__weak id<TGSpriteSheetLoader> _loader;
-	NSData *_frameData;        // TGFrame[] — atomic swap via @synchronized
-	volatile GLint _textureId;
-	volatile BOOL _loadFailed;
+	// Frame tables are immutable after publication. Old versions stay retained
+	// for the sheet lifetime, so a concurrent reader can never observe freed
+	// bytes while an atlas is being replaced.
+	NSMutableArray<NSData *> *_frameDataHistory;
+	atomic_uintptr_t _publishedFrames;
+	atomic_size_t _publishedFrameCount;
+	atomic_int _textureId;
+	atomic_bool _loadFailed;
 }
 
 - (instancetype)initWithLoader:(id<TGSpriteSheetLoader>)loader
@@ -17,41 +24,46 @@
 		_gridFrameWidth = gridFrameWidth;
 		_gridFrameHeight = gridFrameHeight;
 		_smoothing = YES;
-		_textureId = -1;
+		_frameDataHistory = [NSMutableArray array];
+		atomic_init(&_publishedFrames, (uintptr_t)NULL);
+		atomic_init(&_publishedFrameCount, 0);
+		atomic_init(&_textureId, -1);
+		atomic_init(&_loadFailed, false);
 	}
 	return self;
 }
 
 - (void)setFrameData:(NSData *)frameData
 {
+	NSData *published = [frameData copy] ?: [NSData data];
 	@synchronized (self) {
-		_frameData = frameData;
-	}
-}
-
-- (NSData *)frameData
-{
-	@synchronized (self) {
-		return _frameData;
+		[_frameDataHistory addObject:published];
+		atomic_store_explicit(&_publishedFrames, (uintptr_t)published.bytes, memory_order_relaxed);
+		atomic_store_explicit(&_publishedFrameCount,
+			published.length / sizeof(TGFrame), memory_order_release);
 	}
 }
 
 - (NSUInteger)frameCount
 {
-	return [self frameData].length / sizeof(TGFrame);
+	return atomic_load_explicit(&_publishedFrameCount, memory_order_acquire);
 }
 
 - (BOOL)frame:(NSInteger)index into:(TGFrame *)out
 {
-	NSData *data = [self frameData];
-	NSUInteger count = data.length / sizeof(TGFrame);
+	NSUInteger count = atomic_load_explicit(&_publishedFrameCount, memory_order_acquire);
 	if (count == 0) {
 		return NO;
 	}
 	if (index < 0 || (NSUInteger)index >= count) {
 		index = 0;
 	}
-	*out = ((const TGFrame *)data.bytes)[index];
+	const TGFrame *frames = (const TGFrame *)atomic_load_explicit(
+		&_publishedFrames, memory_order_acquire);
+	if (frames == NULL) {
+		return NO;
+	}
+	*out = frames[index];
 	return YES;
 }
 
@@ -69,23 +81,25 @@
 
 - (GLint)textureId
 {
-	return _textureId;
+	return atomic_load_explicit(&_textureId, memory_order_acquire);
 }
 
 - (BOOL)isReady
 {
-	return _textureId >= 0 && [self frameCount] > 0;
+	return atomic_load_explicit(&_textureId, memory_order_acquire) >= 0
+		&& atomic_load_explicit(&_publishedFrameCount, memory_order_acquire) > 0;
 }
 
 - (void)ensureLoaded:(TGTextureManager *)textures
 {
-	if (_textureId >= 0 || _loadFailed) {
+	if (atomic_load_explicit(&_textureId, memory_order_acquire) >= 0
+		|| atomic_load_explicit(&_loadFailed, memory_order_acquire)) {
 		return;
 	}
 	id<TGSpriteSheetLoader> loader = _loader;
 	UIImage *image = (loader != nil) ? [loader loadSpriteSheet:self] : nil;
 	if (image == nil || image.CGImage == NULL) {
-		_loadFailed = YES;
+		atomic_store_explicit(&_loadFailed, true, memory_order_release);
 		return;
 	}
 	int imageWidth = (int)CGImageGetWidth(image.CGImage);
@@ -96,13 +110,15 @@
 															 frameWidth:_gridFrameWidth
 															frameHeight:_gridFrameHeight]];
 	}
-	_textureId = (GLint)[textures upload:image smoothing:self.smoothing repeat:self.repeat];
+	atomic_store_explicit(&_textureId,
+		(GLint)[textures upload:image smoothing:self.smoothing repeat:self.repeat],
+		memory_order_release);
 }
 
 - (void)invalidateTexture
 {
-	_textureId = -1;
-	_loadFailed = NO;
+	atomic_store_explicit(&_textureId, -1, memory_order_release);
+	atomic_store_explicit(&_loadFailed, false, memory_order_release);
 }
 
 + (NSData *)buildGridFramesWithImageWidth:(int)imageWidth
