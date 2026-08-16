@@ -15,6 +15,7 @@
 	GLuint _colorRenderbuffer;
 	GLint _drawableWidth;
 	GLint _drawableHeight;
+	NSCondition *_threadCondition;
 
 	// Cross-thread flags (main writes, render thread reads)
 	atomic_bool _running;
@@ -50,7 +51,10 @@
 		// touch controller), never by this surface
 		self.userInteractionEnabled = NO;
 
-		atomic_store(&_needsLayout, true);
+		_threadCondition = [[NSCondition alloc] init];
+		atomic_init(&_running, false);
+		atomic_init(&_paused, false);
+		atomic_init(&_needsLayout, true);
 
 		// GL in the background kills the app — stop the loop the moment the
 		// app resigns active, resume when it becomes active again
@@ -77,21 +81,39 @@
 
 - (void)startRendering
 {
+	[_threadCondition lock];
 	if (_renderThread != nil) {
+		[_threadCondition unlock];
 		return;
 	}
 	atomic_store(&_running, true);
-	_renderThread = [[NSThread alloc] initWithTarget:self
+	NSThread *thread = [[NSThread alloc] initWithTarget:self
 											selector:@selector(renderThreadMain)
 											  object:nil];
-	_renderThread.name = @"ti.game.render";
-	[_renderThread start];
+	thread.name = @"ti.game.render";
+	thread.qualityOfService = NSQualityOfServiceUserInteractive;
+	_renderThread = thread;
+	[_threadCondition unlock];
+	[thread start];
 }
 
 - (void)stopRendering
 {
 	atomic_store(&_running, false);
-	_renderThread = nil;
+	[_threadCondition lock];
+	NSThread *thread = _renderThread;
+	[_threadCondition unlock];
+	if (thread == nil || thread == [NSThread currentThread]) {
+		return;
+	}
+
+	// NSThread has no join API. The condition is signalled only after the
+	// display link, framebuffer and EAGL context have all been released.
+	[_threadCondition lock];
+	while (_renderThread == thread) {
+		[_threadCondition wait];
+	}
+	[_threadCondition unlock];
 }
 
 - (void)pauseRendering
@@ -136,6 +158,13 @@
 		[EAGLContext setCurrentContext:nil];
 		_context = nil;
 	}
+
+	[_threadCondition lock];
+	if (_renderThread == [NSThread currentThread]) {
+		_renderThread = nil;
+	}
+	[_threadCondition broadcast];
+	[_threadCondition unlock];
 }
 
 - (void)tick:(CADisplayLink *)link
