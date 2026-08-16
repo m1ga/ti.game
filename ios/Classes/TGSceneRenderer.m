@@ -37,6 +37,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	CFTimeInterval _lastFrameTime;
 	float _effectTime; // drives the glitch animation
 	float _debugAabb[4];
+	NSMutableSet<TGSpriteSheet *> *_preparedSheets;
 }
 
 - (instancetype)initWithScene:(TGScene *)scene viewProxy:(TiProxy *)viewProxy
@@ -47,6 +48,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		_batch = [[TGSpriteBatch alloc] init];
 		_textures = [[TGTextureManager alloc] init];
 		_postEffect = [[TGPostEffect alloc] init];
+		_preparedSheets = [NSMutableSet set];
 	}
 	return self;
 }
@@ -94,7 +96,9 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		dt = 0.1f;
 	}
 
-	[_scene update:dt];
+	NSArray<TGParticleEmitter *> *emitters;
+	NSArray<TGRope *> *ropes;
+	NSArray<TGSprite *> *sprites = [_scene prepareFrame:dt emitters:&emitters ropes:&ropes];
 	_effectTime += dt;
 
 	// Camera effect: render the whole scene into an offscreen texture,
@@ -115,19 +119,17 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	glClearColor(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	NSArray<TGSprite *> *sprites = [_scene snapshot];
-	NSArray<TGParticleEmitter *> *emitters = [_scene emittersSnapshot];
-	NSArray<TGRope *> *ropes = [_scene ropesSnapshot];
-
-	// Lazy texture upload happens here, on the render thread
+	// Lazy texture upload happens here, on the render thread. A shared sheet
+	// is prepared once per frame even when many sprites reference it.
+	[_preparedSheets removeAllObjects];
 	for (TGSprite *s in sprites) {
-		[self ensureSheetLoaded:s.sheet];
+		[self ensureSheetLoadedOnce:s.sheet];
 	}
 	for (TGParticleEmitter *e in emitters) {
-		[self ensureSheetLoaded:e.sheet];
+		[self ensureSheetLoadedOnce:e.sheet];
 	}
 	for (TGRope *rope in ropes) {
-		[self ensureSheetLoaded:rope.sheet];
+		[self ensureSheetLoadedOnce:rope.sheet];
 	}
 
 	[_batch begin:_projection];
@@ -177,9 +179,13 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 }
 
-- (void)ensureSheetLoaded:(TGSpriteSheet *)sheet
+- (void)ensureSheetLoadedOnce:(TGSpriteSheet *)sheet
 {
-	if (sheet != nil && ![sheet isReady]) {
+	if (sheet == nil || [_preparedSheets containsObject:sheet]) {
+		return;
+	}
+	[_preparedSheets addObject:sheet];
+	if (![sheet isReady]) {
 		[sheet ensureLoaded:_textures];
 		if ([sheet isReady]) {
 			[_textures track:sheet];

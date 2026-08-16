@@ -222,17 +222,62 @@ static float bottomEdge(TGSprite *s)
 	}
 }
 
-- (void)update:(float)dt
+- (NSArray<TGSprite *> *)prepareFrame:(float)dt
+							 emitters:(NSArray<TGParticleEmitter *> **)emitters
+								ropes:(NSArray<TGRope *> **)ropes
 {
-	NSArray<TGSprite *> *list = [self snapshot];
+	__block NSArray<TGSprite *> *list;
+	__block NSArray<TGParticleEmitter *> *emitterList;
+	__block NSArray<TGRope *> *ropeList;
+	__block BOOL hasYSort;
+
+	// Capture all scene collections under the same lock. The renderer reuses
+	// these exact arrays for update, collision and draw, so no second set of
+	// snapshots is allocated later in the frame.
+	@synchronized (_sprites) {
+		if (_zOrderDirty) {
+			[_sprites sortWithOptions:NSSortStable
+					  usingComparator:^NSComparisonResult(TGSprite *a, TGSprite *b) {
+				if (a.zIndex != b.zIndex) {
+					return (a.zIndex < b.zIndex) ? NSOrderedAscending : NSOrderedDescending;
+				}
+				if (a.ySort && b.ySort) {
+					float ba = bottomEdge(a);
+					float bb = bottomEdge(b);
+					if (ba != bb) {
+						return (ba < bb) ? NSOrderedAscending : NSOrderedDescending;
+					}
+				}
+				return NSOrderedSame;
+			}];
+			_zOrderDirty = NO;
+		}
+		list = [_sprites copy];
+		emitterList = [_emitters sortedArrayWithOptions:NSSortStable
+										 usingComparator:^NSComparisonResult(TGParticleEmitter *a, TGParticleEmitter *b) {
+			if (a.zIndex != b.zIndex) {
+				return (a.zIndex < b.zIndex) ? NSOrderedAscending : NSOrderedDescending;
+			}
+			return NSOrderedSame;
+		}];
+		ropeList = [_ropes sortedArrayWithOptions:NSSortStable
+								  usingComparator:^NSComparisonResult(TGRope *a, TGRope *b) {
+			if (a.zIndex != b.zIndex) {
+				return (a.zIndex < b.zIndex) ? NSOrderedAscending : NSOrderedDescending;
+			}
+			return NSOrderedSame;
+		}];
+		hasYSort = _hasYSort;
+	}
+
 	for (TGSprite *s in list) {
 		[s update:dt];
 	}
-	for (TGParticleEmitter *e in [self emittersSnapshot]) {
+	for (TGParticleEmitter *e in emitterList) {
 		[e update:dt];
 	}
 	// Ropes after sprites, so a dragged/physics-moved head is current
-	for (TGRope *rope in [self ropesSnapshot]) {
+	for (TGRope *rope in ropeList) {
 		[rope update:dt];
 	}
 	[self.skidTrail update:dt];
@@ -242,6 +287,37 @@ static float bottomEdge(TGSprite *s)
 	[self updateFollow:dt];
 	[self applyCameraBounds];
 	[self updateShake:dt];
+
+	// ySort depends on positions advanced above. Sort the frame-local array,
+	// leaving the synchronized backing store untouched until a real z change.
+	if (hasYSort) {
+		list = [list sortedArrayWithOptions:NSSortStable
+						 usingComparator:^NSComparisonResult(TGSprite *a, TGSprite *b) {
+			if (a.zIndex != b.zIndex) {
+				return (a.zIndex < b.zIndex) ? NSOrderedAscending : NSOrderedDescending;
+			}
+			if (a.ySort && b.ySort) {
+				float ba = bottomEdge(a);
+				float bb = bottomEdge(b);
+				if (ba != bb) {
+					return (ba < bb) ? NSOrderedAscending : NSOrderedDescending;
+				}
+			}
+			return NSOrderedSame;
+		}];
+	}
+	if (emitters != NULL) {
+		*emitters = emitterList;
+	}
+	if (ropes != NULL) {
+		*ropes = ropeList;
+	}
+	return list;
+}
+
+- (void)update:(float)dt
+{
+	[self prepareFrame:dt emitters:NULL ropes:NULL];
 }
 
 - (void)shakeWithStrength:(float)strength duration:(float)duration

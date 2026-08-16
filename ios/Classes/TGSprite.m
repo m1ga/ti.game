@@ -28,6 +28,7 @@ static _Atomic int TGIdleSequence = 0;
 	TGAnimation *_currentAnimation;
 	float _animationTime;
 	BOOL _playing;
+	atomic_bool _animationActive;
 
 	// Active tweens, guarded by @synchronized(_tweens)
 	NSMutableArray<TGTween *> *_tweens;
@@ -63,6 +64,7 @@ static _Atomic int TGIdleSequence = 0;
 		_colliding = [NSMutableSet set];
 		_animations = [NSMutableDictionary dictionary];
 		_tweens = [NSMutableArray array];
+		atomic_init(&_animationActive, false);
 	}
 	return self;
 }
@@ -105,6 +107,7 @@ static _Atomic int TGIdleSequence = 0;
 		_animationTime = 0.0f;
 		_playing = YES;
 		self.frame = a.frames[0];
+		atomic_store_explicit(&_animationActive, true, memory_order_release);
 		return YES;
 	}
 }
@@ -113,6 +116,7 @@ static _Atomic int TGIdleSequence = 0;
 {
 	@synchronized (self) {
 		_playing = NO;
+		atomic_store_explicit(&_animationActive, false, memory_order_release);
 	}
 }
 
@@ -356,9 +360,13 @@ static _Atomic int TGIdleSequence = 0;
 
 - (void)updateAnimation:(float)dt
 {
+	if (!atomic_load_explicit(&_animationActive, memory_order_acquire)) {
+		return;
+	}
 	TGAnimation *finished = nil;
 	@synchronized (self) {
 		if (!_playing || _currentAnimation == nil) {
+			atomic_store_explicit(&_animationActive, false, memory_order_release);
 			return;
 		}
 		_animationTime += dt;
@@ -370,6 +378,7 @@ static _Atomic int TGIdleSequence = 0;
 			} else {
 				self.frame = a.frames[a.frameCount - 1];
 				_playing = NO;
+				atomic_store_explicit(&_animationActive, false, memory_order_release);
 				finished = a;
 			}
 		}
