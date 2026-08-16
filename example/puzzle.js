@@ -1,6 +1,8 @@
 // ti.game puzzle demo — drag the pieces from the right side into the grid.
 //
 // - press-and-hold a piece: it scales up so you see you're holding it
+// - multi-touch: each finger grabs its own piece, so several pieces can
+//   be dragged at the same time (all handlers here are per-sprite)
 // - drop it near a free grid cell: it snaps into place
 // - drop it anywhere else: it tweens back to its starting position
 // - fill all four cells to solve the puzzle

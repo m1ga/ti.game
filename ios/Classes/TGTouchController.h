@@ -13,6 +13,11 @@
  * high-level events (tap, dragstart, throttled drag, dragend, pinch,
  * rotate) — never per-frame move traffic.
  *
+ * Multi-touch: every touch runs its own gesture, so several sprites can
+ * be pressed/tapped/dragged simultaneously. A second finger that lands on
+ * empty space (or on the sprite already held) instead modifies the held
+ * sprite: pinch-to-scale and two-finger rotation.
+ *
  * Touch positions are converted from view points to surface pixels
  * (x contentScale), so they map 1:1 onto the scene's coordinate system —
  * exactly like Android, where both are in the same pixel space.

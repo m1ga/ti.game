@@ -8,6 +8,22 @@
 static const NSTimeInterval kDragEventInterval = 0.1; // ~10 Hz 'drag' events
 static const NSTimeInterval kTapTimeout = 0.3;
 
+/** One finger's interaction with one sprite (Gesture on Android). */
+@interface TGGesture : NSObject
+@property (nonatomic, strong) UITouch *touch;
+@property (nonatomic, strong) TGSprite *sprite;
+@property (nonatomic, assign) float downX;
+@property (nonatomic, assign) float downY;
+@property (nonatomic, assign) NSTimeInterval downTime;
+@property (nonatomic, assign) float grabOffsetX;
+@property (nonatomic, assign) float grabOffsetY;
+@property (nonatomic, assign) BOOL dragging;
+@property (nonatomic, assign) NSTimeInterval lastDragEventTime;
+@end
+
+@implementation TGGesture
+@end
+
 @implementation TGTouchController {
 	TGScene *_scene;
 	__weak TiProxy *_viewProxy; // game view proxy — receives view-level press/tap/release
@@ -15,15 +31,14 @@ static const NSTimeInterval kTapTimeout = 0.3;
 	float _touchSlop;
 
 	NSMutableArray<UITouch *> *_activeTouches; // ordered by begin
-	UITouch *_primaryTouch;
-	TGSprite *_activeSprite;
-	float _grabOffsetX, _grabOffsetY;
+	NSMutableArray<TGGesture *> *_gestures;    // one per sprite-holding touch
+
+	// View-level (first finger) state for the view tap
 	float _downX, _downY;
 	NSTimeInterval _downTime;
-	BOOL _dragging;
-	NSTimeInterval _lastDragEventTime;
 
-	// Two-finger gesture state
+	// Two-finger pinch/rotate state: set while a modifier finger is down
+	TGSprite *_modifierTarget;
 	BOOL _rotating;
 	float _lastAngle;
 	float _lastPinchDistance;
@@ -39,6 +54,7 @@ static const NSTimeInterval kTapTimeout = 0.3;
 		_contentScale = contentScale;
 		_touchSlop = 8.0f * (float)contentScale; // ~Android's scaled touch slop
 		_activeTouches = [NSMutableArray array];
+		_gestures = [NSMutableArray array];
 	}
 	return self;
 }
@@ -72,6 +88,34 @@ static float distanceBetween(float x0, float y0, float x1, float y1)
 	CGPoint a = [_activeTouches[0] locationInView:view];
 	CGPoint b = [_activeTouches[1] locationInView:view];
 	return distanceBetween((float)a.x, (float)a.y, (float)b.x, (float)b.y);
+}
+
+// --- Gesture bookkeeping ------------------------------------------------
+
+- (TGGesture *)gestureForTouch:(UITouch *)touch
+{
+	for (TGGesture *g in _gestures) {
+		if (g.touch == touch) {
+			return g;
+		}
+	}
+	return nil;
+}
+
+- (TGGesture *)gestureForSprite:(TGSprite *)sprite
+{
+	for (TGGesture *g in _gestures) {
+		if (g.sprite == sprite) {
+			return g;
+		}
+	}
+	return nil;
+}
+
+/** The sprite held by the earliest still-active finger, if any. */
+- (TGSprite *)heldSprite
+{
+	return _gestures.firstObject.sprite;
 }
 
 // --- Event firing -------------------------------------------------------
@@ -108,156 +152,171 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 {
 	for (UITouch *touch in touches) {
 		[_activeTouches addObject:touch];
+		CGPoint p = [self worldPoint:touch inView:view];
+		float wx = (float)p.x;
+		float wy = (float)p.y;
 
 		if (_activeTouches.count == 1) {
 			// ACTION_DOWN — world space: hit-testing and drags track the camera
-			CGPoint p = [self worldPoint:touch inView:view];
-			_downX = (float)p.x;
-			_downY = (float)p.y;
+			[self resetAll];
+			_downX = wx;
+			_downY = wy;
 			_downTime = touch.timestamp;
-			_primaryTouch = touch;
-			_dragging = NO;
-			_rotating = NO;
-			_lastPinchDistance = 0.0f;
-			_activeSprite = [_scene hitTestX:_downX y:_downY];
-			if (_activeSprite != nil) {
-				_grabOffsetX = _downX - _activeSprite.x;
-				_grabOffsetY = _downY - _activeSprite.y;
-				NSMutableDictionary *data = [self positionData:_activeSprite];
-				data[@"touchX"] = @(_downX);
-				data[@"touchY"] = @(_downY);
-				fireOnSprite(_activeSprite, @"press", data);
-			}
-			[self fireOnView:@"press" x:_downX y:_downY];
-		} else if (_activeTouches.count == 2) {
+			[self pointerDown:touch x:wx y:wy];
+			[self fireOnView:@"press" x:wx y:wy];
+		} else {
 			// ACTION_POINTER_DOWN
-			if (_activeSprite != nil && _activeSprite.rotatable) {
-				_rotating = YES;
-				_lastAngle = [self angleBetweenFirstTwoTouches:view];
+			BOOL claimed = [self pointerDown:touch x:wx y:wy];
+			if (!claimed && _activeTouches.count == 2) {
+				// second finger on empty space (or the held sprite
+				// itself) modifies the held sprite: pinch / rotate
+				_modifierTarget = [self heldSprite];
+				if (_modifierTarget != nil && _modifierTarget.rotatable) {
+					_rotating = YES;
+					_lastAngle = [self angleBetweenFirstTwoTouches:view];
+				}
+				_lastPinchDistance = [self distanceBetweenFirstTwoTouches:view];
 			}
-			_lastPinchDistance = [self distanceBetweenFirstTwoTouches:view];
 		}
 	}
 }
 
+/** Hit-tests a new finger and claims the sprite (a new TGGesture) if no
+ *  other finger holds it yet. Returns whether a sprite was claimed. */
+- (BOOL)pointerDown:(UITouch *)touch x:(float)wx y:(float)wy
+{
+	TGSprite *hit = [_scene hitTestX:wx y:wy];
+	if (hit == nil || [self gestureForSprite:hit] != nil) {
+		return NO;
+	}
+	TGGesture *g = [TGGesture new];
+	g.touch = touch;
+	g.sprite = hit;
+	g.downX = wx;
+	g.downY = wy;
+	g.downTime = touch.timestamp;
+	g.grabOffsetX = wx - hit.x;
+	g.grabOffsetY = wy - hit.y;
+	[_gestures addObject:g];
+	NSMutableDictionary *data = [self positionData:hit];
+	data[@"touchX"] = @(wx);
+	data[@"touchY"] = @(wy);
+	fireOnSprite(hit, @"press", data);
+	return YES;
+}
+
 - (void)touchesMoved:(NSSet<UITouch *> *)touches inView:(UIView *)view
 {
-	TGSprite *s = _activeSprite;
+	TGSprite *target = _modifierTarget;
 
-	if (_activeTouches.count >= 2 && s != nil) {
+	if (_activeTouches.count >= 2 && target != nil) {
 		if (_rotating) {
 			float angle = [self angleBetweenFirstTwoTouches:view];
-			s.rotation += angle - _lastAngle;
+			target.rotation += angle - _lastAngle;
 			_lastAngle = angle;
-			fireOnSprite(s, @"rotate", @{ @"rotation": @(s.rotation) });
+			fireOnSprite(target, @"rotate", @{ @"rotation": @(target.rotation) });
 		}
 		// Pinch-to-scale (the ScaleGestureDetector equivalent): incremental
 		// factor from the change in finger distance
-		if (s.pinchable) {
+		if (target.pinchable) {
 			float dist = [self distanceBetweenFirstTwoTouches:view];
 			if (_lastPinchDistance > 0.0f && dist > 0.0f) {
 				float factor = dist / _lastPinchDistance;
-				s.scaleX *= factor;
-				s.scaleY *= factor;
-				fireOnSprite(s, @"pinch", @{
-					@"scaleX": @(s.scaleX),
-					@"scaleY": @(s.scaleY)
+				target.scaleX *= factor;
+				target.scaleY *= factor;
+				fireOnSprite(target, @"pinch", @{
+					@"scaleX": @(target.scaleX),
+					@"scaleY": @(target.scaleY)
 				});
 			}
 			_lastPinchDistance = dist;
 		}
 	}
 
-	// Single-finger drag
-	if (s != nil && s.draggable && _activeTouches.count == 1
-			&& _primaryTouch != nil && [_activeTouches containsObject:_primaryTouch]) {
-		CGPoint p = [self worldPoint:_primaryTouch inView:view];
-		float tx = (float)p.x;
-		float ty = (float)p.y;
+	for (UITouch *touch in touches) {
+		TGGesture *g = [self gestureForTouch:touch];
+		if (g == nil || !g.sprite.draggable) {
+			continue;
+		}
+		if (g.sprite == target) {
+			continue; // two-finger gesture owns this sprite
+		}
+		CGPoint p = [self worldPoint:touch inView:view];
+		[self drag:g toX:(float)p.x y:(float)p.y time:touch.timestamp];
+	}
+}
 
-		if (!_dragging && distanceBetween(tx, ty, _downX, _downY) > _touchSlop) {
-			_dragging = YES;
-			s.dragged = YES;
-			[s clearPositionTweens];
-			fireOnSprite(s, @"dragstart", [self positionData:s]);
-		}
-		if (_dragging) {
-			float nx = tx - _grabOffsetX;
-			float ny = ty - _grabOffsetY;
-			// Clamp against any fixed-anchor rope tethering this sprite
-			// here at the source — the rope's own per-frame clamp would
-			// only pull it back a frame later, which renders as a
-			// visible jump past the rope end. Sprite-headed ropes are
-			// skipped: those tow the head sprite behind the drag instead.
-			for (TGRope *r in [_scene ropesSnapshot]) {
-				if (r.tail == s && r.maxLength > 0.0f && r.head == nil) {
-					float ax = r.x;
-					float ay = r.y;
-					float dx = nx - ax;
-					float dy = ny - ay;
-					float d = sqrtf(dx * dx + dy * dy);
-					if (d > r.maxLength && d > 1e-5f) {
-						nx = ax + dx / d * r.maxLength;
-						ny = ay + dy / d * r.maxLength;
-					}
-				}
-			}
-			s.x = nx;
-			s.y = ny;
-			// The finger owns the sprite: keep physics from
-			// accumulating velocity underneath the drag.
-			s.velocityX = 0.0f;
-			s.velocityY = 0.0f;
-			NSTimeInterval now = _primaryTouch.timestamp;
-			if (now - _lastDragEventTime >= kDragEventInterval) {
-				_lastDragEventTime = now;
-				fireOnSprite(s, @"drag", [self positionData:s]);
+- (void)drag:(TGGesture *)g toX:(float)tx y:(float)ty time:(NSTimeInterval)now
+{
+	TGSprite *s = g.sprite;
+	if (!g.dragging && distanceBetween(tx, ty, g.downX, g.downY) > _touchSlop) {
+		g.dragging = YES;
+		s.dragged = YES;
+		[s clearPositionTweens];
+		fireOnSprite(s, @"dragstart", [self positionData:s]);
+	}
+	if (!g.dragging) {
+		return;
+	}
+	float nx = tx - g.grabOffsetX;
+	float ny = ty - g.grabOffsetY;
+	// Clamp against any fixed-anchor rope tethering this sprite
+	// here at the source — the rope's own per-frame clamp would
+	// only pull it back a frame later, which renders as a
+	// visible jump past the rope end. Sprite-headed ropes are
+	// skipped: those tow the head sprite behind the drag instead.
+	for (TGRope *r in [_scene ropesSnapshot]) {
+		if (r.tail == s && r.maxLength > 0.0f && r.head == nil) {
+			float ax = r.x;
+			float ay = r.y;
+			float dx = nx - ax;
+			float dy = ny - ay;
+			float d = sqrtf(dx * dx + dy * dy);
+			if (d > r.maxLength && d > 1e-5f) {
+				nx = ax + dx / d * r.maxLength;
+				ny = ay + dy / d * r.maxLength;
 			}
 		}
+	}
+	s.x = nx;
+	s.y = ny;
+	// The finger owns the sprite: keep physics from
+	// accumulating velocity underneath the drag.
+	s.velocityX = 0.0f;
+	s.velocityY = 0.0f;
+	if (now - g.lastDragEventTime >= kDragEventInterval) {
+		g.lastDragEventTime = now;
+		fireOnSprite(s, @"drag", [self positionData:s]);
 	}
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches inView:(UIView *)view
 {
 	for (UITouch *touch in touches) {
-		NSUInteger countBefore = _activeTouches.count;
+		CGPoint p = [self worldPoint:touch inView:view];
+		float upX = (float)p.x;
+		float upY = (float)p.y;
 		[_activeTouches removeObjectIdenticalTo:touch];
 
 		if (_activeTouches.count > 0) {
 			// ACTION_POINTER_UP
-			if (countBefore <= 2) {
-				_rotating = NO;
-			}
+			[self finishGestureForTouch:touch x:upX y:upY time:touch.timestamp allowTap:YES];
 			if (_activeTouches.count < 2) {
+				_rotating = NO;
+				_modifierTarget = nil;
 				_lastPinchDistance = 0.0f;
 			}
 			continue;
 		}
 
 		// ACTION_UP — last finger left the screen
-		CGPoint p = [self worldPoint:touch inView:view];
-		float upX = (float)p.x;
-		float upY = (float)p.y;
-		BOOL isTap = !_rotating
-			&& touch.timestamp - _downTime < kTapTimeout
-			&& distanceBetween(upX, upY, _downX, _downY) <= _touchSlop;
-		if (isTap) {
+		if (touch.timestamp - _downTime < kTapTimeout
+				&& distanceBetween(upX, upY, _downX, _downY) <= _touchSlop) {
 			[self fireOnView:@"tap" x:upX y:upY];
 		}
 		[self fireOnView:@"release" x:upX y:upY];
-		TGSprite *s = _activeSprite;
-		if (s != nil) {
-			if (_dragging) {
-				fireOnSprite(s, @"dragend", [self positionData:s]);
-			} else if (isTap) {
-				NSMutableDictionary *data = [self positionData:s];
-				data[@"touchX"] = @(upX);
-				data[@"touchY"] = @(upY);
-				fireOnSprite(s, @"tap", data);
-			}
-			fireOnSprite(s, @"release", [self positionData:s]);
-		}
-		[self resetGesture];
+		[self finishGestureForTouch:touch x:upX y:upY time:touch.timestamp allowTap:YES];
+		[self resetAll];
 	}
 }
 
@@ -266,29 +325,56 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	for (UITouch *touch in touches) {
 		[_activeTouches removeObjectIdenticalTo:touch];
 	}
-	if (_activeTouches.count > 0) {
-		return;
+	if (_activeTouches.count == 0) {
+		// ACTION_CANCEL
+		UITouch *touch = touches.anyObject;
+		CGPoint p = [self worldPoint:touch inView:view];
+		[self fireOnView:@"release" x:(float)p.x y:(float)p.y];
 	}
-	// ACTION_CANCEL
-	UITouch *touch = touches.anyObject;
-	CGPoint p = [self worldPoint:touch inView:view];
-	[self fireOnView:@"release" x:(float)p.x y:(float)p.y];
-	TGSprite *s = _activeSprite;
-	if (s != nil) {
-		if (_dragging) {
-			fireOnSprite(s, @"dragend", [self positionData:s]);
-		}
-		fireOnSprite(s, @"release", [self positionData:s]);
+	for (UITouch *touch in touches) {
+		[self finishGestureForTouch:touch x:0 y:0 time:0 allowTap:NO];
 	}
-	[self resetGesture];
+	if (_activeTouches.count == 0) {
+		[self resetAll];
+	} else if (_activeTouches.count < 2) {
+		_rotating = NO;
+		_modifierTarget = nil;
+		_lastPinchDistance = 0.0f;
+	}
 }
 
-- (void)resetGesture
+- (void)finishGestureForTouch:(UITouch *)touch
+							x:(float)upX
+							y:(float)upY
+						 time:(NSTimeInterval)time
+					 allowTap:(BOOL)allowTap
 {
-	_activeSprite.dragged = NO;
-	_activeSprite = nil;
-	_primaryTouch = nil;
-	_dragging = NO;
+	TGGesture *g = [self gestureForTouch:touch];
+	if (g == nil) {
+		return;
+	}
+	[_gestures removeObjectIdenticalTo:g];
+	TGSprite *s = g.sprite;
+	s.dragged = NO;
+	if (g.dragging) {
+		fireOnSprite(s, @"dragend", [self positionData:s]);
+	} else if (allowTap && time - g.downTime < kTapTimeout
+			&& distanceBetween(upX, upY, g.downX, g.downY) <= _touchSlop) {
+		NSMutableDictionary *data = [self positionData:s];
+		data[@"touchX"] = @(upX);
+		data[@"touchY"] = @(upY);
+		fireOnSprite(s, @"tap", data);
+	}
+	fireOnSprite(s, @"release", [self positionData:s]);
+}
+
+- (void)resetAll
+{
+	for (TGGesture *g in _gestures) {
+		g.sprite.dragged = NO;
+	}
+	[_gestures removeAllObjects];
+	_modifierTarget = nil;
 	_rotating = NO;
 	_lastPinchDistance = 0.0f;
 }

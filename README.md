@@ -196,6 +196,12 @@ and scale included, topmost first) and fires `press`, `tap`, `dragstart`,
 `drag` (~10 Hz), `dragend`, `release`, `pinch`, `rotate`. The drag itself
 happens natively — JS only hears the milestones.
 
+Sprite touches are multi-touch: every finger runs its own gesture, so
+several sprites can be pressed, tapped or dragged at the same time (each
+sprite belongs to at most one finger). A second finger that lands on
+empty space — or on the sprite already held — instead pinches/rotates
+the held sprite (per its `pinchable`/`rotatable` flags).
+
 The GameView also fires `press` / `tap` / `release` for *every* touch
 (tap-anywhere controls, flappy-style). Standard Titanium touch events are
 not available on the game view — but ordinary Titanium buttons/views
@@ -372,7 +378,7 @@ a feature set — find the one closest to your game and start there:
 | Demo | Shows |
 |---|---|
 | `basic.js` | Sheets, animations, drag/pinch/rotate, tween chaining |
-| `puzzle.js` | Drag & drop with snapping, press-to-lift, tween-back-home |
+| `puzzle.js` | Drag & drop with snapping, press-to-lift, tween-back-home, multi-touch (one piece per finger) |
 | `flappy.js` | Gravity + tap impulse, trigger zones, parallax wrapping |
 | `platformer.js` | `solidWith`, `onGround`/`land` (trampolines via the landed-on solid), camera `follow`, multitouch d-pad buttons |
 | `volley.js` | `restitution` ball, JS-driven hit response, simple AI timer |
