@@ -387,20 +387,28 @@ static _Atomic int TGIdleSequence = 0;
 
 - (void)updateTweens:(float)dt
 {
-	NSArray<TGTween *> *active;
+	// Ticked in place under the lock — copying the array here would
+	// allocate every frame for every animating sprite (the Android twin
+	// iterates its COW list without copying). Tween updates only write
+	// sprite properties, never back into _tweens.
+	NSUInteger finishedCount = 0;
 	@synchronized (_tweens) {
 		if (_tweens.count == 0) {
 			return;
 		}
-		active = [_tweens copy];
-	}
-	for (TGTween *t in active) {
-		if ([t update:self delta:dt]) {
-			@synchronized (_tweens) {
-				[_tweens removeObjectIdenticalTo:t];
+		for (NSUInteger i = 0; i < _tweens.count; ) {
+			if ([_tweens[i] update:self delta:dt]) {
+				[_tweens removeObjectAtIndex:i];
+				finishedCount++;
+			} else {
+				i++;
 			}
-			id<TGSpriteEventListener> listener = self.eventListener;
-			if (listener != nil) {
+		}
+	}
+	if (finishedCount > 0) {
+		id<TGSpriteEventListener> listener = self.eventListener;
+		if (listener != nil) {
+			for (NSUInteger i = 0; i < finishedCount; i++) {
 				[listener spriteTweenComplete:self];
 			}
 		}

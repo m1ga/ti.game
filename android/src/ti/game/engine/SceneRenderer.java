@@ -30,6 +30,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	private float effectTime = 0f; // drives the glitch animation
 	private volatile int surfaceWidth = 0;
 	private volatile int surfaceHeight = 0;
+	private volatile int maxFps = 0; // 0 = display refresh rate
 
 	public SceneRenderer(Scene scene, org.appcelerator.kroll.KrollProxy viewProxy)
 	{
@@ -45,6 +46,12 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	public int surfaceHeight()
 	{
 		return surfaceHeight;
+	}
+
+	/** Frame rate cap (e.g. 60 on a 120 Hz display); 0 = display refresh rate. */
+	public void setMaxFps(int fps)
+	{
+		maxFps = Math.max(0, fps);
 	}
 
 	@Override
@@ -80,6 +87,21 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	@Override
 	public void onDrawFrame(GL10 unused)
 	{
+		// GLSurfaceView has no frame rate API — delaying the swap makes the
+		// next frame land on a later vsync slot (~fps on faster displays).
+		// The 1 ms margin leaves the final alignment to vsync.
+		int fps = maxFps;
+		if (fps > 0 && lastFrameNanos != 0) {
+			long sleepNanos = 1_000_000_000L / fps - (System.nanoTime() - lastFrameNanos) - 1_000_000L;
+			if (sleepNanos > 0) {
+				try {
+					Thread.sleep(sleepNanos / 1_000_000L, (int) (sleepNanos % 1_000_000L));
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+			}
+		}
+
 		long now = System.nanoTime();
 		float dt = (lastFrameNanos == 0) ? 0f : (now - lastFrameNanos) / 1_000_000_000f;
 		lastFrameNanos = now;

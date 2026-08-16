@@ -21,4 +21,8 @@
 - (void)pauseRendering;
 - (void)resumeRendering;
 
+/** Frame rate cap (e.g. 60 on a 120 Hz ProMotion display); 0 = display
+ *  default. Safe to call from any thread; applied on the render thread. */
+- (void)setMaxFps:(int)maxFps;
+
 @end

@@ -22,6 +22,7 @@ public class GameViewProxy extends TiViewProxy
 {
 	private final Scene scene = new Scene();
 	private TiGameView gameView;
+	private int maxFps = 0;
 
 	@Override
 	public TiUIView createView(Activity activity)
@@ -29,6 +30,7 @@ public class GameViewProxy extends TiViewProxy
 		gameView = new TiGameView(this, scene);
 		gameView.getLayoutParams().autoFillsWidth = true;
 		gameView.getLayoutParams().autoFillsHeight = true;
+		gameView.getRenderer().setMaxFps(maxFps);
 		return gameView;
 	}
 
@@ -53,6 +55,25 @@ public class GameViewProxy extends TiViewProxy
 		if (options.containsKey("cameraEffectIntensity")) {
 			scene.effectIntensity = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("cameraEffectIntensity"));
 		}
+		if (options.containsKey("maxFps")) {
+			setMaxFps(org.appcelerator.titanium.util.TiConvert.toInt(options.get("maxFps")));
+		}
+	}
+
+	/** Frame rate cap (e.g. 60 on a 120 Hz display); 0 = display refresh rate. */
+	@Kroll.setProperty
+	public void setMaxFps(int value)
+	{
+		maxFps = Math.max(0, value);
+		if (gameView != null) {
+			gameView.getRenderer().setMaxFps(maxFps);
+		}
+	}
+
+	@Kroll.getProperty
+	public int getMaxFps()
+	{
+		return maxFps;
 	}
 
 	// --- Fullscreen camera effects ---------------------------------------

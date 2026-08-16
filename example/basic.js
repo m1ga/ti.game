@@ -14,7 +14,8 @@ module.exports = function () {
 	});
 
 	var gameView = Game.createGameView({
-		backgroundColor: '#202030'
+		backgroundColor: '#202030',
+		maxFps: 60 // cap 120 Hz (ProMotion) displays; 0 = display refresh rate
 	});
 
 	var sheet = Game.createSpriteSheet({

@@ -8,6 +8,7 @@
 @implementation TiGameGameView {
 	TGGLView *_glView;
 	TGTouchController *_touchController;
+	int _maxFps; // held until the GL view exists
 }
 
 - (TGGLView *)glView
@@ -21,6 +22,7 @@
 				viewProxy:self.proxy
 			 contentScale:[UIScreen mainScreen].scale];
 		self.multipleTouchEnabled = YES;
+		[_glView setMaxFps:_maxFps];
 		[self addSubview:_glView];
 		[_glView startRendering];
 	}
@@ -64,6 +66,13 @@
 	scene.bgGreen = (float)g;
 	scene.bgBlue = (float)b;
 	scene.bgAlpha = (float)a;
+}
+
+/** Frame rate cap (e.g. 60 on a 120 Hz ProMotion display); 0 = display default. */
+- (void)setMaxFps_:(id)value
+{
+	_maxFps = [TiUtils intValue:value def:0];
+	[_glView setMaxFps:_maxFps];
 }
 
 #pragma mark Touch handling

@@ -419,6 +419,7 @@ Run them with `ti build -p android` from `android/` (executes
 | `add(sprite)` / `remove(sprite)` | Manage sprites in the scene |
 | `removeAllSprites()` | Clear the scene |
 | `pause()` / `resume()` | Render loop control (activity lifecycle is automatic) |
+| `maxFps` | Frame rate cap, e.g. `60` to keep 120 Hz (ProMotion) displays from doubling the render work; `0` (default) = display refresh rate |
 | `backgroundColor` | GL clear color |
 | `surfaceWidth` / `surfaceHeight` | Surface size in px (read-only) |
 | `cameraX` / `cameraY` | World-space offset of the view (scrolling) |

@@ -20,8 +20,10 @@
 	atomic_bool _running;
 	atomic_bool _paused;
 	atomic_bool _needsLayout;
+	atomic_int _maxFps; // 0 = display default
 
-	BOOL _clockStale; // render thread only — set while paused
+	BOOL _clockStale;   // render thread only — set while paused
+	int _appliedMaxFps; // render thread only — last value applied to the link
 }
 
 + (Class)layerClass
@@ -102,6 +104,11 @@
 	atomic_store(&_paused, false);
 }
 
+- (void)setMaxFps:(int)maxFps
+{
+	atomic_store(&_maxFps, MAX(0, maxFps));
+}
+
 // --- Render thread ------------------------------------------------------
 
 - (void)renderThreadMain
@@ -112,6 +119,8 @@
 		[_renderer surfaceCreated];
 
 		_displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];
+		_appliedMaxFps = atomic_load(&_maxFps);
+		[self applyMaxFps:_appliedMaxFps];
 		[_displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
 
 		while (atomic_load(&_running)) {
@@ -135,6 +144,11 @@
 		_clockStale = YES;
 		return;
 	}
+	int maxFps = atomic_load(&_maxFps);
+	if (maxFps != _appliedMaxFps) {
+		_appliedMaxFps = maxFps;
+		[self applyMaxFps:maxFps];
+	}
 	if (_clockStale) {
 		// Don't fast-forward the pause gap into the first frame back
 		_clockStale = NO;
@@ -154,6 +168,22 @@
 		[_renderer drawFrame:link.targetTimestamp];
 		glBindRenderbuffer(GL_RENDERBUFFER, _colorRenderbuffer);
 		[_context presentRenderbuffer:GL_RENDERBUFFER];
+	}
+}
+
+- (void)applyMaxFps:(int)maxFps
+{
+	if (@available(iOS 15.0, *)) {
+		// Low minimum keeps the range valid on displays that can't hit the
+		// requested rate exactly; preferred pins the cap.
+		_displayLink.preferredFrameRateRange = (maxFps > 0)
+			? CAFrameRateRangeMake(10.0f, (float)maxFps, (float)maxFps)
+			: CAFrameRateRangeDefault;
+	} else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+		_displayLink.preferredFramesPerSecond = maxFps;
+#pragma clang diagnostic pop
 	}
 }
 
