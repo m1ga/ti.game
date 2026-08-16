@@ -165,6 +165,10 @@ negligible.
 engine; if JS only reacts to events and sets properties, you get native
 performance for free.
 
+**iOS Simulator.** The simulator renders at a 1x logical drawable, because its
+translated OpenGL path is disproportionately expensive at a 3x Retina backing
+size. Real iPhone and iPad builds keep the device's native screen scale.
+
 ## Building blocks
 
 ### Show and animate things
