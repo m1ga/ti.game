@@ -4,7 +4,7 @@
 //   Flappy: flying pig — tap to flap, gravity, gates, parallax background
 //   Platformer: run & jump onto platforms with on-screen controls
 //   Volley: Blobby Volley style — you vs. a simple computer player
-//   Racing: pixel top-down racer with drifting, checkpoints and laps
+//   Racing: pixel top-down racer with pixel snapping, drifting, checkpoints and laps
 //   Cards: select three cards from your hand and play them to the middle
 //   Asteroids: turn/thrust/shoot — Newtonian flight with screen wrapping
 //   Zelda: top-down tile level — solid house/water, depth-sorted trees

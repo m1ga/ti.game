@@ -45,6 +45,8 @@
 @property (atomic, assign) float anchorY;
 @property (atomic, assign) float opacity;
 @property (atomic, assign) BOOL visible;
+/** Snap only the rendered anchor to the framebuffer pixel grid. */
+@property (atomic, assign) BOOL pixelSnap;
 @property (atomic, assign) int zIndex;
 
 // Tint: multiplies the frame's colors (white = art unchanged) — damage

@@ -89,6 +89,12 @@ static GLuint buildProgram(const char *fragmentSource)
 	return p;
 }
 
+static inline float snapToPixel(float value, float origin, float screenScale)
+{
+	float screenCoordinate = (value - origin) * screenScale;
+	return origin + floorf(screenCoordinate + 0.5f) / screenScale;
+}
+
 @implementation TGSpriteBatch {
 	float *_vertices;
 	int _quadCount;
@@ -101,6 +107,9 @@ static GLuint buildProgram(const char *fragmentSource)
 	GLint _uProj, _uTex;         // main program
 	GLint _uProjGlow, _uTexGlow; // glow program
 	const float *_projection;
+	float _pixelOriginX;
+	float _pixelOriginY;
+	float _pixelScale;
 }
 
 - (instancetype)init
@@ -108,6 +117,7 @@ static GLuint buildProgram(const char *fragmentSource)
 	if (self = [super init]) {
 		_vertices = malloc(sizeof(float) * kMaxQuads * kVerticesPerQuad * kFloatsPerVertex);
 		_currentTexture = -1;
+		_pixelScale = 1.0f;
 	}
 	return self;
 }
@@ -131,8 +141,14 @@ static GLuint buildProgram(const char *fragmentSource)
 }
 
 - (void)begin:(const float *)projectionMatrix
+	 originX:(float)originX
+	 originY:(float)originY
+	screenScale:(float)screenScale
 {
 	_projection = projectionMatrix;
+	_pixelOriginX = originX;
+	_pixelOriginY = originY;
+	_pixelScale = MAX(0.0001f, screenScale);
 	_quadCount = 0;
 	_currentTexture = -1;
 	_activeProgram = 0;
@@ -190,6 +206,10 @@ static GLuint buildProgram(const char *fragmentSource)
 	float alpha = MAX(0.0f, MIN(1.0f, s.opacity));
 	float x = s.x;
 	float y = s.y;
+	if (s.pixelSnap) {
+		x = snapToPixel(x, _pixelOriginX, _pixelScale);
+		y = snapToPixel(y, _pixelOriginY, _pixelScale);
+	}
 
 	// tileRepeat: run the UVs past 1 so GL_REPEAT tiles the texture at
 	// its native pixel size instead of stretching it across the sprite

@@ -146,7 +146,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			ensureSheetLoaded(rope.sheet);
 		}
 
-		batch.begin(projection);
+		batch.begin(projection, left, top, scale);
 		// Skid marks slot between background (zIndex <= 0, e.g. the track)
 		// and foreground sprites (the car), so they overlay the road but
 		// stay under whatever drives across them. Emitters merge into the

@@ -253,6 +253,16 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.visible);
 }
 
+- (void)setPixelSnap:(id)value
+{
+	self.sprite.pixelSnap = [TiUtils boolValue:value def:NO];
+}
+
+- (NSNumber *)pixelSnap
+{
+	return @(self.sprite.pixelSnap);
+}
+
 - (void)setZIndex:(id)value
 {
 	self.sprite.zIndex = [TiUtils intValue:value def:0];
