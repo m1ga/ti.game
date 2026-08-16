@@ -34,6 +34,12 @@ public class Sprite
 	public volatile boolean visible = true;
 	public volatile int zIndex = 0;
 
+	// Tint: multiplies the frame's colors (white = art unchanged) — damage
+	// flashes, team colors, day/night shading. Parsed 0..1 channels.
+	public volatile float tintR = 1f;
+	public volatile float tintG = 1f;
+	public volatile float tintB = 1f;
+
 	// Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
 	// frame draws behind the sprite (selection highlights, power-ups).
 	// glowBlur is the blur radius in px; color as parsed 0..1 channels.

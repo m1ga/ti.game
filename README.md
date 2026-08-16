@@ -23,7 +23,7 @@ identical on both platforms.
   natively (chains, capes, bridges, grappling hooks)
 - Fullscreen camera effects (`cameraEffect`) — tint and glitch shader
   passes over the whole rendered scene; sprite glow highlights
-  (`glowColor`/`glowBlur`)
+  (`glowColor`/`glowBlur`) and per-sprite color tinting (`tintColor`)
 - 15 example games in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
@@ -461,6 +461,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | Flight | `thrust`, `angularVelocity`, `wrapAround` |
 | Wrap/loop | `wrapX`, `wrapShift` |
 | Idle wobble | `idleAnimation`, `idleRotation`, `idleMovement`, `idleSpeed` |
+| Tint | `tintColor` (e.g. `'#ff5252'`) — multiplies the frame's colors (damage flashes, team colors, day/night shading); `null` or `'#fff'` = art unchanged |
 | Glow | `glowColor` (e.g. `'#ffc94d'`), `glowBlur` (blur radius in px; `0` = off), `glowOpacity` (halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur) — a tinted, blurred silhouette of the current frame drawn behind the sprite by a shader pass (selection highlights, power-ups); follows the sprite's shape, rotation and opacity |
 
 Methods: `play(name)`, `stop()`, `animate(options)`, `clearTweens()`.

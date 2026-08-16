@@ -238,7 +238,7 @@ static GLuint buildProgram(const char *fragmentSource)
 				 x1:x1 y1:y1 u1:u1 v1:f.v0
 				 x2:x2 y2:y2 u2:f.u0 v2:v1
 				 x3:x3 y3:y3 u3:u1 v3:v1
-				  r:alpha g:alpha b:alpha a:alpha];
+				  r:s.tintR * alpha g:s.tintG * alpha b:s.tintB * alpha a:alpha];
 }
 
 - (void)drawFrame:(GLuint)texture frame:(TGFrame)f

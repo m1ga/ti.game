@@ -42,6 +42,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	private final Sprite sprite = new Sprite();
 	private SpriteSheetProxy sheetProxy;
 	private String glowColor;
+	private String tintColor;
 
 	public SpriteProxy()
 	{
@@ -100,6 +101,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("opacity")) {
 			sprite.opacity = TiConvert.toFloat(options.get("opacity"));
+		}
+		if (options.containsKey("tintColor")) {
+			setTintColor(TiConvert.toString(options.get("tintColor")));
 		}
 		if (options.containsKey("glowColor")) {
 			setGlowColor(TiConvert.toString(options.get("glowColor")));
@@ -398,6 +402,33 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setOpacity(float value)
 	{
 		sprite.opacity = value;
+	}
+
+	/** Multiplies the frame's colors, e.g. '#ff5252'; null/white = unchanged. */
+	@Kroll.setProperty
+	public void setTintColor(String value)
+	{
+		tintColor = value;
+		if (value == null) {
+			sprite.tintR = 1f;
+			sprite.tintG = 1f;
+			sprite.tintB = 1f;
+			return;
+		}
+		try {
+			int color = Color.parseColor(expandShortHex(value));
+			sprite.tintR = Color.red(color) / 255f;
+			sprite.tintG = Color.green(color) / 255f;
+			sprite.tintB = Color.blue(color) / 255f;
+		} catch (IllegalArgumentException e) {
+			// keep previous color
+		}
+	}
+
+	@Kroll.getProperty
+	public String getTintColor()
+	{
+		return tintColor;
 	}
 
 	/** Glow tint, e.g. '#ffd54a'; visible once glowBlur > 0. */

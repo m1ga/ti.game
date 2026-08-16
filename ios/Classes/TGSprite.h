@@ -47,6 +47,12 @@
 @property (atomic, assign) BOOL visible;
 @property (atomic, assign) int zIndex;
 
+// Tint: multiplies the frame's colors (white = art unchanged) — damage
+// flashes, team colors, day/night shading. Parsed 0..1 channels.
+@property (atomic, assign) float tintR;
+@property (atomic, assign) float tintG;
+@property (atomic, assign) float tintB;
+
 // Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
 // frame draws behind the sprite (selection highlights, power-ups).
 // glowBlur is the blur radius in px; color as parsed 0..1 channels.

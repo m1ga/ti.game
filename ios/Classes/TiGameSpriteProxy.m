@@ -7,6 +7,7 @@
 @implementation TiGameSpriteProxy {
 	TiGameSpriteSheetProxy *_sheetProxy;
 	NSString *_glowColor;
+	NSString *_tintColor;
 }
 
 - (instancetype)init
@@ -172,6 +173,29 @@ static NSSet<NSString *> *toGroupSet(id value)
 - (NSNumber *)opacity
 {
 	return @(self.sprite.opacity);
+}
+
+/** Multiplies the frame's colors, e.g. '#ff5252'; nil/white = unchanged. */
+- (void)setTintColor:(id)value
+{
+	_tintColor = [TiUtils stringValue:value];
+	TiColor *tiColor = [TiUtils colorValue:value];
+	if (tiColor == nil) {
+		self.sprite.tintR = 1.0f;
+		self.sprite.tintG = 1.0f;
+		self.sprite.tintB = 1.0f;
+		return;
+	}
+	CGFloat r = 1, g = 1, b = 1, a = 1;
+	[[tiColor color] getRed:&r green:&g blue:&b alpha:&a];
+	self.sprite.tintR = (float)r;
+	self.sprite.tintG = (float)g;
+	self.sprite.tintB = (float)b;
+}
+
+- (NSString *)tintColor
+{
+	return _tintColor;
 }
 
 /** Glow tint, e.g. '#ffd54a'; visible once glowBlur > 0. */

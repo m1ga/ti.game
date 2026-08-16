@@ -245,7 +245,7 @@ public class SpriteBatch
 			x1, y1, u1, f.v0,
 			x2, y2, f.u0, v1,
 			x3, y3, u1, v1,
-			alpha, alpha, alpha, alpha);
+			s.tintR * alpha, s.tintG * alpha, s.tintB * alpha, alpha);
 	}
 
 	/**

@@ -18,8 +18,9 @@ traffic in the loop.
 
 ## 2. Sprite color & blending
 
-- [ ] `tint` on sprites (the batcher already has vertex color — nearly
-      free) and a `flash(color, duration)` helper for damage/invincibility.
+- [x] `tint` on sprites (the batcher already has vertex color — nearly
+      free)
+- [ ] a `flash(color, duration)` helper for damage/invincibility.
 - [ ] `blend: 'add'` per sprite/emitter for glows, fire, lasers (one
       batch flush on blend change).
 - [x] `tileRepeat`: GL_REPEAT so a small texture tiles across a wide
