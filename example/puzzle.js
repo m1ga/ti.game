@@ -18,6 +18,16 @@
 
 var Game = require('ti.game');
 
+// Toast on Android; Ti.UI.createNotification does not exist on iOS,
+// so show an alert dialog there instead.
+function notify(message) {
+	if (Ti.Platform.osname === 'android') {
+		Ti.UI.createNotification({ message: message }).show();
+	} else {
+		Ti.UI.createAlertDialog({ message: message, ok: 'OK' }).show();
+	}
+}
+
 module.exports = function () {
 
 	var win = Ti.UI.createWindow({
@@ -177,7 +187,7 @@ module.exports = function () {
 					easing: Game.EASE_IN_OUT
 				});
 			});
-			Ti.UI.createNotification({ message: 'Solved!' }).show();
+			notify('Solved!');
 		}
 	}
 

@@ -139,10 +139,14 @@
 		atomic_store(&_needsLayout, true); // zero-sized — try again next tick
 		return;
 	}
-	glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
-	[_renderer drawFrame];
-	glBindRenderbuffer(GL_RENDERBUFFER, _colorRenderbuffer);
-	[_context presentRenderbuffer:GL_RENDERBUFFER];
+	// Per-frame pool: the outer runloop pool only drains every few frames,
+	// letting snapshot copies from multiple ticks pile up
+	@autoreleasepool {
+		glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
+		[_renderer drawFrame];
+		glBindRenderbuffer(GL_RENDERBUFFER, _colorRenderbuffer);
+		[_context presentRenderbuffer:GL_RENDERBUFFER];
+	}
 }
 
 - (void)recreateFramebuffer

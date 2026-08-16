@@ -13,6 +13,16 @@
 
 var Game = require('ti.game');
 
+// Toast on Android; Ti.UI.createNotification does not exist on iOS,
+// so show an alert dialog there instead.
+function notify(message) {
+	if (Ti.Platform.osname === 'android') {
+		Ti.UI.createNotification({ message: message }).show();
+	} else {
+		Ti.UI.createAlertDialog({ message: message, ok: 'OK' }).show();
+	}
+}
+
 module.exports = function () {
 
 	var win = Ti.UI.createWindow({
@@ -132,7 +142,7 @@ module.exports = function () {
 
 		ship.addEventListener('collision', function (e) {
 			if (e.group === 'asteroid') {
-				Ti.UI.createNotification({ message: 'Crashed!' }).show();
+				notify('Crashed!');
 				resetShip();
 				spawnWave();
 			}
@@ -165,7 +175,7 @@ module.exports = function () {
 					destroyed++;
 					statusLabel.text = 'Rocks ' + destroyed + ' / ' + ROCK_COUNT;
 					if (destroyed >= ROCK_COUNT) {
-						Ti.UI.createNotification({ message: 'Wave cleared!' }).show();
+						notify('Wave cleared!');
 						setTimeout(spawnWave, 1200);
 					}
 				});

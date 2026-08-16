@@ -97,6 +97,7 @@ static GLuint buildProgram(const char *fragmentSource)
 	GLuint _program;
 	GLuint _glowProgram;
 	GLuint _activeProgram;
+	GLuint _vbo; // vertex upload buffer; client-side arrays stall the driver
 	GLint _uProj, _uTex;         // main program
 	GLint _uProjGlow, _uTexGlow; // glow program
 	const float *_projection;
@@ -126,6 +127,7 @@ static GLuint buildProgram(const char *fragmentSource)
 	_glowProgram = buildProgram(kGlowFragmentShader);
 	_uProjGlow = glGetUniformLocation(_glowProgram, "uProj");
 	_uTexGlow = glGetUniformLocation(_glowProgram, "uTex");
+	glGenBuffers(1, &_vbo);
 }
 
 - (void)begin:(const float *)projectionMatrix
@@ -300,6 +302,20 @@ static GLuint buildProgram(const char *fragmentSource)
 				  r:r * a g:g * a b:b * a a:a];
 }
 
+static inline float *putVertex(float *v, float x, float y, float u, float uv,
+							   float r, float g, float b, float a)
+{
+	v[0] = x;
+	v[1] = y;
+	v[2] = u;
+	v[3] = uv;
+	v[4] = r;
+	v[5] = g;
+	v[6] = b;
+	v[7] = a;
+	return v + 8;
+}
+
 /** Corners: top-left, top-right, bottom-left, bottom-right. */
 - (void)putQuadX0:(float)x0 y0:(float)y0 u0:(float)u0 v0:(float)v0
 			   x1:(float)x1 y1:(float)y1 u1:(float)u1 v1:(float)v1
@@ -307,28 +323,14 @@ static GLuint buildProgram(const char *fragmentSource)
 			   x3:(float)x3 y3:(float)y3 u3:(float)u3 v3:(float)v3
 				r:(float)r g:(float)g b:(float)b a:(float)a
 {
-	int i = _quadCount * kVerticesPerQuad * kFloatsPerVertex;
-	i = [self putVertex:i x:x0 y:y0 u:u0 v:v0 r:r g:g b:b a:a];
-	i = [self putVertex:i x:x1 y:y1 u:u1 v:v1 r:r g:g b:b a:a];
-	i = [self putVertex:i x:x2 y:y2 u:u2 v:v2 r:r g:g b:b a:a];
-	i = [self putVertex:i x:x1 y:y1 u:u1 v:v1 r:r g:g b:b a:a];
-	i = [self putVertex:i x:x3 y:y3 u:u3 v:v3 r:r g:g b:b a:a];
-	[self putVertex:i x:x2 y:y2 u:u2 v:v2 r:r g:g b:b a:a];
+	float *v = _vertices + _quadCount * kVerticesPerQuad * kFloatsPerVertex;
+	v = putVertex(v, x0, y0, u0, v0, r, g, b, a);
+	v = putVertex(v, x1, y1, u1, v1, r, g, b, a);
+	v = putVertex(v, x2, y2, u2, v2, r, g, b, a);
+	v = putVertex(v, x1, y1, u1, v1, r, g, b, a);
+	v = putVertex(v, x3, y3, u3, v3, r, g, b, a);
+	putVertex(v, x2, y2, u2, v2, r, g, b, a);
 	_quadCount++;
-}
-
-- (int)putVertex:(int)i x:(float)x y:(float)y u:(float)u v:(float)v
-			   r:(float)r g:(float)g b:(float)b a:(float)a
-{
-	_vertices[i++] = x;
-	_vertices[i++] = y;
-	_vertices[i++] = u;
-	_vertices[i++] = v;
-	_vertices[i++] = r;
-	_vertices[i++] = g;
-	_vertices[i++] = b;
-	_vertices[i++] = a;
-	return i;
 }
 
 - (void)end
@@ -347,14 +349,20 @@ static GLuint buildProgram(const char *fragmentSource)
 	glBindTexture(GL_TEXTURE_2D, (GLuint)_currentTexture);
 
 	GLsizei stride = kFloatsPerVertex * sizeof(float);
-	glVertexAttribPointer(kAttrPos, 2, GL_FLOAT, GL_FALSE, stride, _vertices);
+	// Fresh glBufferData each flush orphans the old storage, so the GPU can
+	// keep reading the previous frame while we upload the next one
+	glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+	glBufferData(GL_ARRAY_BUFFER, vertexCount * stride, _vertices, GL_STREAM_DRAW);
+	glVertexAttribPointer(kAttrPos, 2, GL_FLOAT, GL_FALSE, stride, (const void *)0);
 	glEnableVertexAttribArray(kAttrPos);
-	glVertexAttribPointer(kAttrUV, 2, GL_FLOAT, GL_FALSE, stride, _vertices + 2);
+	glVertexAttribPointer(kAttrUV, 2, GL_FLOAT, GL_FALSE, stride, (const void *)(2 * sizeof(float)));
 	glEnableVertexAttribArray(kAttrUV);
-	glVertexAttribPointer(kAttrColor, 4, GL_FLOAT, GL_FALSE, stride, _vertices + 4);
+	glVertexAttribPointer(kAttrColor, 4, GL_FLOAT, GL_FALSE, stride, (const void *)(4 * sizeof(float)));
 	glEnableVertexAttribArray(kAttrColor);
 
 	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+	// TGPostEffect draws with client-side pointers — leave no buffer bound
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	_quadCount = 0;
 }
 

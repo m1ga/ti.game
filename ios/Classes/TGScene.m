@@ -21,6 +21,7 @@ static float bottomEdge(TGSprite *s)
 	float _shakeStrength, _shakeDuration, _shakeRemaining, _shakeTime;
 	BOOL _zOrderDirty;   // guarded by @synchronized(_sprites)
 	BOOL _hasYSort;      // guarded by @synchronized(_sprites)
+	NSArray<TGSprite *> *_snapshotCache; // guarded by @synchronized(_sprites)
 	float _aabbA[4];
 	float _aabbB[4];
 	float _centerA[2];
@@ -72,6 +73,7 @@ static float bottomEdge(TGSprite *s)
 			[_sprites addObject:sprite];
 			sprite.scene = self;
 			_zOrderDirty = YES;
+			_snapshotCache = nil;
 			if (sprite.ySort) {
 				_hasYSort = YES;
 			}
@@ -88,6 +90,7 @@ static float bottomEdge(TGSprite *s)
 		if ([_sprites containsObject:sprite]) {
 			[_sprites removeObjectIdenticalTo:sprite];
 			sprite.scene = nil;
+			_snapshotCache = nil;
 		}
 	}
 }
@@ -99,6 +102,7 @@ static float bottomEdge(TGSprite *s)
 			s.scene = nil;
 		}
 		[_sprites removeAllObjects];
+		_snapshotCache = nil;
 	}
 }
 
@@ -106,6 +110,7 @@ static float bottomEdge(TGSprite *s)
 {
 	@synchronized (_sprites) {
 		_zOrderDirty = YES;
+		_snapshotCache = nil;
 	}
 }
 
@@ -134,6 +139,9 @@ static float bottomEdge(TGSprite *s)
 - (NSArray<TGParticleEmitter *> *)emittersSnapshot
 {
 	@synchronized (_sprites) {
+		if (_emitters.count == 0) {
+			return @[];
+		}
 		return [_emitters sortedArrayWithOptions:NSSortStable
 								 usingComparator:^NSComparisonResult(TGParticleEmitter *a, TGParticleEmitter *b) {
 			if (a.zIndex != b.zIndex) {
@@ -169,6 +177,9 @@ static float bottomEdge(TGSprite *s)
 - (NSArray<TGRope *> *)ropesSnapshot
 {
 	@synchronized (_sprites) {
+		if (_ropes.count == 0) {
+			return @[];
+		}
 		return [_ropes sortedArrayWithOptions:NSSortStable
 							  usingComparator:^NSComparisonResult(TGRope *a, TGRope *b) {
 			if (a.zIndex != b.zIndex) {
@@ -182,6 +193,11 @@ static float bottomEdge(TGSprite *s)
 - (NSArray<TGSprite *> *)snapshot
 {
 	@synchronized (_sprites) {
+		// ySort scenes re-sort every frame (bottom edges move); everything
+		// else reuses the copy until the list or z-order changes
+		if (_snapshotCache != nil && !_zOrderDirty && !_hasYSort) {
+			return _snapshotCache;
+		}
 		if (_zOrderDirty || _hasYSort) {
 			// Stable sort — sprites with equal keys keep insertion order,
 			// like Collections.sort on Android
@@ -201,7 +217,8 @@ static float bottomEdge(TGSprite *s)
 			}];
 			_zOrderDirty = NO;
 		}
-		return [_sprites copy];
+		_snapshotCache = [_sprites copy];
+		return _snapshotCache;
 	}
 }
 
