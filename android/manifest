@@ -2,13 +2,13 @@
 # this is your module manifest and used by Titanium
 # during compilation, packaging, distribution, etc.
 #
-version: 0.1.0
+version: 0.2.0
 apiversion: 4
 architectures: arm64-v8a armeabi-v7a x86 x86_64
 description: ti.game
-author: Your Name
-license: Specify your license
-copyright: Copyright (c) 2026 by Your Company
+author: Michael Gangolf
+license: Apache License 2.0
+copyright: Copyright (c) 2026 by Michael Gangolf
 
 # these should not be edited
 name: ti.game
