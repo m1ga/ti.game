@@ -105,7 +105,7 @@ public class EmitterProxy extends KrollProxy
 			setTint(TiConvert.toString(options.get("tint")));
 		}
 		if (options.containsKey("emitting")) {
-			emitter.emitting = TiConvert.toBoolean(options.get("emitting"));
+			emitter.emitting = TiConvert.toBoolean(options.get("emitting"), true);
 		}
 		if (options.containsKey("maxParticles")) {
 			emitter.setMaxParticles(TiConvert.toInt(options.get("maxParticles")));

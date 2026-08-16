@@ -44,7 +44,7 @@ public class GameViewProxy extends TiViewProxy
 	{
 		super.handleCreationDict(options);
 		if (options.containsKey("debug")) {
-			scene.debugAll = org.appcelerator.titanium.util.TiConvert.toBoolean(options.get("debug"));
+			scene.debugAll = org.appcelerator.titanium.util.TiConvert.toBoolean(options.get("debug"), false);
 		}
 		if (options.containsKey("cameraEffect")) {
 			setCameraEffect(org.appcelerator.titanium.util.TiConvert.toString(options.get("cameraEffect")));

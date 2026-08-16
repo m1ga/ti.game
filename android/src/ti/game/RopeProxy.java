@@ -80,7 +80,7 @@ public class RopeProxy extends KrollProxy
 			rope.zIndex = TiConvert.toInt(options.get("zIndex"));
 		}
 		if (options.containsKey("visible")) {
-			rope.visible = TiConvert.toBoolean(options.get("visible"));
+			rope.visible = TiConvert.toBoolean(options.get("visible"), true);
 		}
 		if (options.containsKey("x")) {
 			rope.x = TiConvert.toFloat(options.get("x"));
