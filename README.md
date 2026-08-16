@@ -167,7 +167,10 @@ performance for free.
 
 **iOS Simulator.** The simulator renders at a 1x logical drawable, because its
 translated OpenGL path is disproportionately expensive at a 3x Retina backing
-size. Real iPhone and iPad builds keep the device's native screen scale.
+size. Real iPhone and iPad builds keep the device's native screen scale. Even
+so, expect the simulator to render the game noticeably slower due to its
+OpenGL translation layer — on a real phone the game runs a lot smoother, so
+judge performance on device, not in the simulator.
 
 ## Building blocks
 
