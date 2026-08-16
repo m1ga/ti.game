@@ -17,10 +17,12 @@
 		TGScene *scene = ((TiGameGameViewProxy *)self.proxy).scene;
 		_renderer = [[TGSceneRenderer alloc] initWithScene:scene viewProxy:self.proxy];
 		_glView = [[TGGLView alloc] initWithFrame:self.bounds renderer:_renderer];
+		// Touches must be scaled by the drawable's actual scale, not the
+		// screen's — the GL view renders at 1x in the simulator
 		_touchController = [[TGTouchController alloc]
 			initWithScene:scene
 				viewProxy:self.proxy
-			 contentScale:[UIScreen mainScreen].scale];
+			 contentScale:_glView.contentScaleFactor];
 		self.multipleTouchEnabled = YES;
 		[_glView setMaxFps:_maxFps];
 		[self addSubview:_glView];
