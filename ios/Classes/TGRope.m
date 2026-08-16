@@ -53,15 +53,18 @@ static const int kMaxSegments = 200;
 		float tdx = t.x - headX;
 		float tdy = t.y - headY;
 		float td = sqrtf(tdx * tdx + tdy * tdy);
-		if (td > limit && td > 1e-5f) {
-			// The tether yields at the end no finger owns: drag either
-			// sprite past the limit and the other is towed behind.
-			// With both ends free the correction splits evenly.
+		BOOL headDragged = (h != nil) && h.dragged;
+		// The tether yields at the end no finger owns: drag either
+		// sprite past the limit and the other is towed behind.
+		// With both ends free the correction splits evenly. With a
+		// finger on BOTH ends (multi-touch) neither yields — the
+		// drag itself clamps at the source (TGTouchController), and
+		// correcting here would fight the fingers every frame.
+		if (td > limit && td > 1e-5f && !(headDragged && t.dragged)) {
 			float nx = tdx / td;
 			float ny = tdy / td;
 			float excess = td - limit;
-			BOOL headYields = (h != nil) && !h.dragged;
-			float headShare = !headYields ? 0.0f : (t.dragged ? 1.0f : 0.5f);
+			float headShare = !headDragged && h != nil ? (t.dragged ? 1.0f : 0.5f) : 0.0f;
 			if (headShare > 0.0f) {
 				h.x += nx * excess * headShare;
 				h.y += ny * excess * headShare;

@@ -220,23 +220,36 @@ public class TouchController implements View.OnTouchListener
 		}
 		float nx = tx - g.grabOffsetX;
 		float ny = ty - g.grabOffsetY;
-		// Clamp against any fixed-anchor rope tethering this
-		// sprite here at the source — the rope's own
-		// per-frame clamp would only pull it back a frame
-		// later, which renders as a visible jump past the
-		// rope end. Sprite-headed ropes are skipped: those
-		// tow the head sprite behind the drag instead.
+		// Clamp against any rope tethering this sprite here at the
+		// source — the rope's own per-frame clamp would only pull it
+		// back a frame later, which renders as a visible jump past the
+		// rope end. The anchor is the fixed x/y, or the sprite at the
+		// other end when a finger owns that one too (multi-touch: both
+		// ends held, neither yields — see Rope.update). A free other
+		// end is skipped: the rope tows it behind the drag instead.
 		for (Rope r : scene.ropesSnapshot()) {
-			if (r.tail == s && r.maxLength > 0f && r.head == null) {
-				float ax = r.x;
-				float ay = r.y;
-				float dx = nx - ax;
-				float dy = ny - ay;
-				float d = (float) Math.sqrt(dx * dx + dy * dy);
-				if (d > r.maxLength && d > 1e-5f) {
-					nx = ax + dx / d * r.maxLength;
-					ny = ay + dy / d * r.maxLength;
-				}
+			if (r.maxLength <= 0f) {
+				continue;
+			}
+			float ax, ay;
+			if (r.tail == s && r.head == null) {
+				ax = r.x;
+				ay = r.y;
+			} else if (r.tail == s && r.head != null && r.head.dragged) {
+				ax = r.head.x;
+				ay = r.head.y;
+			} else if (r.head == s && r.tail != null && r.tail.dragged) {
+				ax = r.tail.x;
+				ay = r.tail.y;
+			} else {
+				continue;
+			}
+			float dx = nx - ax;
+			float dy = ny - ay;
+			float d = (float) Math.sqrt(dx * dx + dy * dy);
+			if (d > r.maxLength && d > 1e-5f) {
+				nx = ax + dx / d * r.maxLength;
+				ny = ay + dy / d * r.maxLength;
 			}
 		}
 		s.x = nx;

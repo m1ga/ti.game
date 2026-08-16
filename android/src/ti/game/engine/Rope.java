@@ -64,15 +64,18 @@ public class Rope
 			float tdx = t.x - headX;
 			float tdy = t.y - headY;
 			float td = (float) Math.sqrt(tdx * tdx + tdy * tdy);
-			if (td > limit && td > 1e-5f) {
-				// The tether yields at the end no finger owns: drag either
-				// sprite past the limit and the other is towed behind.
-				// With both ends free the correction splits evenly.
+			boolean headDragged = (h != null) && h.dragged;
+			// The tether yields at the end no finger owns: drag either
+			// sprite past the limit and the other is towed behind.
+			// With both ends free the correction splits evenly. With a
+			// finger on BOTH ends (multi-touch) neither yields — the
+			// drag itself clamps at the source (TouchController), and
+			// correcting here would fight the fingers every frame.
+			if (td > limit && td > 1e-5f && !(headDragged && t.dragged)) {
 				float nx = tdx / td;
 				float ny = tdy / td;
 				float excess = td - limit;
-				boolean headYields = (h != null) && !h.dragged;
-				float headShare = !headYields ? 0f : (t.dragged ? 1f : 0.5f);
+				float headShare = !headDragged && h != null ? (t.dragged ? 1f : 0.5f) : 0f;
 				if (headShare > 0f) {
 					h.x += nx * excess * headShare;
 					h.y += ny * excess * headShare;
