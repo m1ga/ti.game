@@ -104,6 +104,15 @@
 /** Snapshot in draw order (back to front). Caller holds no lock. */
 - (NSArray<TGSprite *> *)snapshot;
 
+/**
+ * Captures the three scene collections once, advances the native simulation,
+ * and returns the same snapshots the renderer must draw. ySort is applied
+ * after positions advance so draw order reflects the current frame.
+ */
+- (NSArray<TGSprite *> *)prepareFrame:(float)dt
+							 emitters:(NSArray<TGParticleEmitter *> **)emitters
+								ropes:(NSArray<TGRope *> **)ropes;
+
 /** Ticks physics, animations and tweens, then checks collisions. Render thread. */
 - (void)update:(float)dt;
 
