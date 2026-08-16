@@ -14,6 +14,7 @@
 //   Rhythm: DDR-style — catch falling gems on the beat pads
 //   Camera: dead-zone follow, bounds, zoom buttons and screen shake
 //   Rope: native Verlet ropes — drag the balls they hang from
+//   Flip: flipX/flipY from movement — patrols turn around, tap flips gravity
 
 var demos = [
 	{ title: 'Basic demo', start: require('/basic') },
@@ -30,7 +31,8 @@ var demos = [
 	{ title: 'Particles', start: require('/particles') },
 	{ title: 'Rhythm', start: require('/rhythm') },
 	{ title: 'Camera', start: require('/camera') },
-	{ title: 'Rope', start: require('/rope') }
+	{ title: 'Rope', start: require('/rope') },
+	{ title: 'Flip', start: require('/flip') }
 ];
 
 var win = Ti.UI.createWindow({

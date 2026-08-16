@@ -141,6 +141,12 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("tileRepeat")) {
 			setTileRepeat(options.get("tileRepeat"));
 		}
+		if (options.containsKey("flipX")) {
+			sprite.flipX = TiConvert.toBoolean(options.get("flipX"), false);
+		}
+		if (options.containsKey("flipY")) {
+			sprite.flipY = TiConvert.toBoolean(options.get("flipY"), false);
+		}
 		if (options.containsKey("animations")) {
 			parseAnimations(options.get("animations"));
 		}
@@ -637,6 +643,33 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.tileRepeatX = both;
 			sprite.tileRepeatY = both;
 		}
+	}
+
+	/** Mirror the frame horizontally (face left/right) — render-only, the
+	 *  transform, physics and hit testing are unaffected. */
+	@Kroll.getProperty
+	public boolean getFlipX()
+	{
+		return sprite.flipX;
+	}
+
+	@Kroll.setProperty
+	public void setFlipX(boolean value)
+	{
+		sprite.flipX = value;
+	}
+
+	/** Mirror the frame vertically (upside down) — render-only. */
+	@Kroll.getProperty
+	public boolean getFlipY()
+	{
+		return sprite.flipY;
+	}
+
+	@Kroll.setProperty
+	public void setFlipY(boolean value)
+	{
+		sprite.flipY = value;
 	}
 
 	@Kroll.getProperty

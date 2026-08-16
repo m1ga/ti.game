@@ -407,6 +407,7 @@ a feature set — find the one closest to your game and start there:
 | `rhythm.js` | DDR-style note catcher: pooled notes on native velocity, `press`-event pads, timing-based good/bad sounds, tinted hit bursts, miss trigger zone |
 | `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground |
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
+| `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
 
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
@@ -467,7 +468,7 @@ mid-drag or mid-tween. All can be passed at creation.
 
 | Group | Properties |
 |---|---|
-| Transform | `x`, `y`, `width`, `height` (default: frame size), `scale`, `scaleX`, `scaleY` (negative flips), `rotation`, `anchorX`, `anchorY`, `opacity`, `visible`, `pixelSnap` (render-only framebuffer alignment; default false), `zIndex`, `ySort` |
+| Transform | `x`, `y`, `width`, `height` (default: frame size), `scale`, `scaleX`, `scaleY` (negative flips), `rotation`, `anchorX`, `anchorY`, `opacity`, `visible`, `pixelSnap` (render-only framebuffer alignment; default false), `zIndex`, `ySort`, `flipX`, `flipY` (mirror the drawn frame only — position, anchor, physics and hit testing are unaffected, unlike negative scale) |
 | Sheet/animation | `sheet`, `frame`, `animations`, `animation` (read-only), `tileRepeat` (`true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture) |
 | Touch behaviors | `draggable`, `pinchable`, `rotatable`, `touchEnabled` (false = touches pass through to sprites underneath) |
 | Physics | `velocityX`, `velocityY`, `gravity`, `maxSpeed` |

@@ -87,6 +87,12 @@
 @property (atomic, assign) BOOL tileRepeatX;
 @property (atomic, assign) BOOL tileRepeatY;
 
+// Mirror the frame's texture (facing left/right, upside down) without
+// touching the transform: position, anchor, physics and hit testing are
+// unaffected, unlike a negative scale.
+@property (atomic, assign) BOOL flipX;
+@property (atomic, assign) BOOL flipY;
+
 // Physics, integrated natively every frame (px/s, px/s^2)
 @property (atomic, assign) float velocityX;
 @property (atomic, assign) float velocityY;

@@ -210,6 +210,8 @@ public class SpriteBatch
 
 		// tileRepeat: run the UVs past 1 so GL_REPEAT tiles the texture at
 		// its native pixel size instead of stretching it across the sprite
+		float u0 = f.u0;
+		float v0 = f.v0;
 		float u1 = f.u1;
 		float v1 = f.v1;
 		if (s.tileRepeatX && f.width > 0f) {
@@ -217,6 +219,18 @@ public class SpriteBatch
 		}
 		if (s.tileRepeatY && f.height > 0f) {
 			v1 = f.v0 + (f.v1 - f.v0) * (h / f.height);
+		}
+
+		// flip: mirror the texture by swapping the UV range end-for-end
+		if (s.flipX) {
+			float t = u0;
+			u0 = u1;
+			u1 = t;
+		}
+		if (s.flipY) {
+			float t = v0;
+			v0 = v1;
+			v1 = t;
 		}
 
 		// Corners in local space relative to the anchor, scaled then rotated
@@ -243,9 +257,9 @@ public class SpriteBatch
 				float oy = GLOW_RING[k + 1] * blur;
 				float ga = GLOW_RING[k + 2] * glow;
 				ensureCapacity(texture);
-				putQuad(x0 + ox, y0 + oy, f.u0, f.v0,
-					x1 + ox, y1 + oy, u1, f.v0,
-					x2 + ox, y2 + oy, f.u0, v1,
+				putQuad(x0 + ox, y0 + oy, u0, v0,
+					x1 + ox, y1 + oy, u1, v0,
+					x2 + ox, y2 + oy, u0, v1,
 					x3 + ox, y3 + oy, u1, v1,
 					gr * ga, gg * ga, gb * ga, ga);
 			}
@@ -253,9 +267,9 @@ public class SpriteBatch
 			ensureCapacity(texture);
 		}
 
-		putQuad(x0, y0, f.u0, f.v0,
-			x1, y1, u1, f.v0,
-			x2, y2, f.u0, v1,
+		putQuad(x0, y0, u0, v0,
+			x1, y1, u1, v0,
+			x2, y2, u0, v1,
 			x3, y3, u1, v1,
 			s.tintR * alpha, s.tintG * alpha, s.tintB * alpha, alpha);
 	}

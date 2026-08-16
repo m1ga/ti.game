@@ -339,6 +339,29 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.touchEnabled);
 }
 
+/** Mirror the frame horizontally (face left/right) — render-only, the
+ *  transform, physics and hit testing are unaffected. */
+- (void)setFlipX:(id)value
+{
+	self.sprite.flipX = [TiUtils boolValue:value def:NO];
+}
+
+- (NSNumber *)flipX
+{
+	return @(self.sprite.flipX);
+}
+
+/** Mirror the frame vertically (upside down) — render-only. */
+- (void)setFlipY:(id)value
+{
+	self.sprite.flipY = [TiUtils boolValue:value def:NO];
+}
+
+- (NSNumber *)flipY
+{
+	return @(self.sprite.flipY);
+}
+
 /** Tile the frame instead of stretching: true = both axes, 'x'/'y' = one. */
 - (void)setTileRepeat:(id)value
 {

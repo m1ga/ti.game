@@ -77,6 +77,12 @@ public class Sprite
 	public volatile boolean tileRepeatX = false;
 	public volatile boolean tileRepeatY = false;
 
+	// Mirror the frame's texture (facing left/right, upside down) without
+	// touching the transform: position, anchor, physics and hit testing are
+	// unaffected, unlike a negative scale.
+	public volatile boolean flipX = false;
+	public volatile boolean flipY = false;
+
 	// Physics, integrated natively every frame (px/s, px/s^2)
 	public volatile float velocityX = 0f;
 	public volatile float velocityY = 0f;
