@@ -26,7 +26,7 @@ import ti.game.engine.Tween;
  *       sheet: sheet, x: 100, y: 200, draggable: true,
  *       animations: {
  *           walk: { frames: [0,1,2,3], fps: 12, loop: true },
- *           jump: { frames: [4,5,6], fps: 10 }
+ *           jump: { frames: [4,5,6], fps: 10, frame: 0 }
  *       }
  *   });
  *   hero.play('walk');
@@ -250,7 +250,8 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			}
 			float fps = def.containsKey("fps") ? TiConvert.toFloat(def.get("fps")) : 12f;
 			boolean loop = def.containsKey("loop") && TiConvert.toBoolean(def.get("loop"));
-			sprite.addAnimation(entry.getKey(), new Animation(entry.getKey(), frames, fps, loop));
+			int endFrame = def.containsKey("frame") ? TiConvert.toInt(def.get("frame")) : -1;
+			sprite.addAnimation(entry.getKey(), new Animation(entry.getKey(), frames, fps, loop, endFrame));
 		}
 	}
 
@@ -1060,6 +1061,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	/**
 	 * Native tween: sprite.animate({ x: 300, rotation: 90, duration: 500,
 	 * easing: 'easeOut' }). Fires 'complete' when done. Duration/delay in ms.
+	 * Optional 'frame' sets that sheet frame once the tween finishes.
 	 */
 	@Kroll.method
 	public void animate(KrollDict options)
@@ -1102,6 +1104,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("easing")) {
 			tween.easing = TiConvert.toString(options.get("easing"));
+		}
+		if (options.containsKey("frame")) {
+			tween.endFrame = TiConvert.toInt(options.get("frame"));
 		}
 		sprite.addTween(tween);
 	}

@@ -61,7 +61,7 @@ step by step — sprite, animation, tap-to-move.
        draggable: true,
        animations: {
            walk: { frames: [0, 1, 2, 3], fps: 12, loop: true },
-           jump: { frames: [4, 5, 6], fps: 10 }
+           jump: { frames: [4, 5, 6], fps: 10, frame: 0 }
        }
    });
    hero.play('walk');
@@ -174,11 +174,14 @@ performance for free.
   switches to nearest-neighbor filtering for pixel art. Textures load
   lazily on the GL thread and survive EGL context loss automatically.
 - **Frame animations**: declare named animations on the sprite
-  (`{ frames, fps, loop }`), control with `play(name)` / `stop()` / the
-  `frame` property. Non-looping animations fire `animationcomplete`.
+  (`{ frames, fps, loop, frame }`), control with `play(name)` / `stop()` / the
+  `frame` property. Non-looping animations fire `animationcomplete`; an
+  optional `frame` in the definition is the sheet frame shown once the
+  animation finishes (default: hold the last animation frame).
 - **Tweens**: `sprite.animate({ x, y, scale, rotation, opacity, glowOpacity,
-  duration, delay, easing })` (ms; easing from the `EASE_*` constants) animates
-  natively and fires `complete`. Chain moves by re-calling `animate` from
+  duration, delay, easing, frame })` (ms; easing from the `EASE_*` constants)
+  animates natively and fires `complete`; an optional `frame` is the sheet
+  frame set once the tween finishes. Chain moves by re-calling `animate` from
   the `complete` handler.
 - **Idle wobble**: `idleAnimation: true` adds a gentle organic sway —
   up to `idleRotation` degrees and `idleMovement` px around the base

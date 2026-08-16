@@ -9,6 +9,8 @@ public class Tween
 {
 	// Target values; null = property not animated
 	public Float toX, toY, toScaleX, toScaleY, toRotation, toOpacity, toGlowOpacity;
+	// Sheet frame to show when the tween finishes; null = leave unchanged
+	public Integer endFrame;
 	public float duration = 0.3f; // seconds
 	public float delay = 0f;
 	public String easing = Easing.LINEAR;
@@ -64,6 +66,10 @@ public class Tween
 		if (toGlowOpacity != null) {
 			s.glowOpacity = fromGlowOpacity + (toGlowOpacity - fromGlowOpacity) * e;
 		}
-		return t >= 1f;
+		boolean finished = t >= 1f;
+		if (finished && endFrame != null) {
+			s.frame = endFrame;
+		}
+		return finished;
 	}
 }

@@ -460,7 +460,7 @@ public class Sprite
 			if (a.loop) {
 				frameIndex = frameIndex % a.frames.length;
 			} else {
-				frame = a.frames[a.frames.length - 1];
+				frame = (a.endFrame >= 0) ? a.endFrame : a.frames[a.frames.length - 1];
 				playing = false;
 				SpriteEventListener listener = eventListener;
 				if (listener != null) {
