@@ -4,6 +4,7 @@
 #import <OpenGLES/EAGLDrawable.h>
 #import <OpenGLES/ES2/gl.h>
 #import <QuartzCore/QuartzCore.h>
+#import <TargetConditionals.h>
 #import <stdatomic.h>
 
 @implementation TGGLView {
@@ -43,9 +44,18 @@
 			kEAGLDrawablePropertyRetainedBacking: @NO,
 			kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8
 		};
-		// Scene units are surface pixels, like Android — render at native scale
-		self.contentScaleFactor = [UIScreen mainScreen].scale;
-		layer.contentsScale = [UIScreen mainScreen].scale;
+		// Real devices keep their native Retina drawable. CoreSimulator's
+		// translated OpenGL path otherwise rasterizes 3x more pixels per axis
+		// than its visible window; use the logical surface there and let Core
+		// Animation enlarge pixel art with nearest-neighbour filtering.
+#if TARGET_OS_SIMULATOR
+		CGFloat renderScale = 1.0f;
+#else
+		CGFloat renderScale = [UIScreen mainScreen].scale;
+#endif
+		self.contentScaleFactor = renderScale;
+		layer.contentsScale = renderScale;
+		layer.magnificationFilter = kCAFilterNearest;
 
 		// Touches are handled by the containing TiUIView (the engine's
 		// touch controller), never by this surface
