@@ -40,7 +40,12 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var density = Ti.Platform.displayCaps.logicalDensityFactor;
+		// Scene units per dp: measure the real surface scale instead of
+		// trusting logicalDensityFactor — the iOS simulator renders at 1x
+		// while the density factor still reports the device scale
+		var density = Ti.Platform.osname === 'android'
+			? Ti.Platform.displayCaps.logicalDensityFactor
+			: H / Ti.Platform.displayCaps.platformHeight;
 		var buttonZone = Math.round(130 * density);
 
 		// Tile map: G grass, F flowers, P path, W water (solid border)

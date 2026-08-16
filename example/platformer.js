@@ -49,7 +49,12 @@ module.exports = function () {
 		var JUMP = H * 0.95;               // takeoff speed, px/s (height ~ JUMP^2 / 2*GRAVITY ≈ 0.2*H)
 
 		// Keep the floor above the on-screen controls (80dp buttons + margins)
-		var density = Ti.Platform.displayCaps.logicalDensityFactor;
+		// Scene units per dp: measure the real surface scale instead of
+		// trusting logicalDensityFactor — the iOS simulator renders at 1x
+		// while the density factor still reports the device scale
+		var density = Ti.Platform.osname === 'android'
+			? Ti.Platform.displayCaps.logicalDensityFactor
+			: H / Ti.Platform.displayCaps.platformHeight;
 		var buttonZone = Math.round(130 * density);
 		var groundTop = H - buttonZone;
 

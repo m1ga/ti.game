@@ -88,7 +88,12 @@ module.exports = function () {
 		var RAISE = Math.round(H * 0.1);   // raised road height (jump apex is ~0.17*H)
 
 		// Keep the street surface above the jump button (64dp + margins)
-		var density = Ti.Platform.displayCaps.logicalDensityFactor;
+		// Scene units per dp: measure the real surface scale instead of
+		// trusting logicalDensityFactor — the iOS simulator renders at 1x
+		// while the density factor still reports the device scale
+		var density = Ti.Platform.osname === 'android'
+			? Ti.Platform.displayCaps.logicalDensityFactor
+			: H / Ti.Platform.displayCaps.platformHeight;
 		var buttonZone = Math.round(120 * density);
 		var groundTop = H - buttonZone;
 
