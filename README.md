@@ -247,6 +247,9 @@ Notes:
   with `velocityX/Y` or a tween — whoever stands on one inherits its
   per-frame movement natively: carried sideways, glued on the way down,
   no re-landing jitter (the platformer demo's patrolling platform).
+  `carryRiders: false` on the solid opts out — for world-scroll terrain
+  that moves while the player is meant to stay put (the skate demo's
+  raised road scrolls left under a skater with a fixed x).
 - **Drift is emergent** in `carMode`: lateral grip is finite, so hard
   cornering at speed keeps sideways momentum. Lower `grip` = more drift.
   `skidMarks: true` leaves fading rubber trails while drifting
@@ -481,7 +484,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | Sheet/animation | `sheet`, `frame`, `animations`, `animation` (read-only), `tileRepeat` (`true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture) |
 | Touch behaviors | `draggable`, `pinchable`, `rotatable`, `touchEnabled` (false = touches pass through to sprites underneath) |
 | Physics | `velocityX`, `velocityY`, `gravity`, `maxSpeed` |
-| Solids | `solidWith`, `onGround` (read-only), `restitution`, `oneWay` (as a solid: landings on the top edge only — pass-through from below/sideways); moving solids carry their riders automatically |
+| Solids | `solidWith`, `onGround` (read-only), `restitution`, `oneWay` (as a solid: landings on the top edge only — pass-through from below/sideways); moving solids carry their riders automatically, `carryRiders: false` opts a solid out (world-scroll terrain) |
 | Collision | `collisionGroup`, `collidesWith`, `hitboxScale`, `hitboxShape` (`'rect'`/`'circle'` — circles also bounce off solid corners along the contact normal), `debug` |
 | Car | `carMode`, `throttle`, `steering`, `enginePower`, `turnRate`, `grip`, `drag`, `skidMarks`, `skidThreshold`, `drifting` (read-only) |
 | Flight | `thrust`, `angularVelocity`, `wrapAround` |

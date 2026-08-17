@@ -562,6 +562,9 @@ public class Scene
 			s.groundSprite = null; // platform vanished under the rider
 			return;
 		}
+		if (!ground.carryRiders) {
+			return; // world-scroll terrain: the rider stays put
+		}
 		s.x += ground.frameDeltaX;
 		s.y += ground.frameDeltaY;
 	}

@@ -54,6 +54,7 @@ static _Atomic int TGIdleSequence = 0;
 		_glowB = 1.0f;
 		_visible = YES;
 		_touchEnabled = YES;
+		_carryRiders = YES;
 		_hitboxScale = 1.0f;
 		_enginePower = 600.0f;
 		_maxSpeed = 500.0f;

@@ -678,6 +678,19 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.oneWay);
 }
 
+/** As a solid: whether riders inherit this sprite's movement (moving
+ *  platforms; default YES). Set false for world-scroll terrain that
+ *  moves under a player who's meant to stay put (endless runners). */
+- (void)setCarryRiders:(id)value
+{
+	self.sprite.carryRiders = [TiUtils boolValue:value def:YES];
+}
+
+- (NSNumber *)carryRiders
+{
+	return @(self.sprite.carryRiders);
+}
+
 - (void)setRestitution:(id)value
 {
 	self.sprite.restitution = [TiUtils floatValue:value def:0];

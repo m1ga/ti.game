@@ -202,7 +202,10 @@ module.exports = function () {
 				height: H - raisedTop,
 				zIndex: 9,
 				tileRepeat: 'x',   // segment length varies — keep the texture density
-				collisionGroup: 'platform'
+				collisionGroup: 'platform',
+				// world-scroll terrain: the road moves, the skater stays put —
+				// without this the moving-platform carry drags the rider left
+				carryRiders: false
 			});
 			var face = Game.createSprite({
 				x: W * 2,

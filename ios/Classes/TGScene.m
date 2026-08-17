@@ -525,6 +525,9 @@ static float bottomEdge(TGSprite *s)
 		s.groundSprite = nil; // platform vanished under the rider
 		return;
 	}
+	if (!ground.carryRiders) {
+		return; // world-scroll terrain: the rider stays put
+	}
 	s.x += ground.frameDeltaX;
 	s.y += ground.frameDeltaY;
 }

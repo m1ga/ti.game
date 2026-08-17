@@ -189,6 +189,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("oneWay")) {
 			sprite.oneWay = TiConvert.toBoolean(options.get("oneWay"), false);
 		}
+		if (options.containsKey("carryRiders")) {
+			sprite.carryRiders = TiConvert.toBoolean(options.get("carryRiders"), true);
+		}
 		if (options.containsKey("restitution")) {
 			sprite.restitution = TiConvert.toFloat(options.get("restitution"));
 		}
@@ -1079,6 +1082,21 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setOneWay(boolean value)
 	{
 		sprite.oneWay = value;
+	}
+
+	/** As a solid: whether riders inherit this sprite's movement (moving
+	 *  platforms; default true). Set false for world-scroll terrain that
+	 *  moves under a player who's meant to stay put (endless runners). */
+	@Kroll.getProperty
+	public boolean getCarryRiders()
+	{
+		return sprite.carryRiders;
+	}
+
+	@Kroll.setProperty
+	public void setCarryRiders(boolean value)
+	{
+		sprite.carryRiders = value;
 	}
 
 	@Kroll.getProperty

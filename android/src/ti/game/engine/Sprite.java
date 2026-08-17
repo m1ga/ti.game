@@ -147,6 +147,12 @@ public class Sprite
 	// blocked sideways or from below (pass-through floors).
 	public volatile boolean oneWay = false;
 
+	// As a solid: whether riders inherit this sprite's per-frame movement
+	// (moving platforms). Turn off for world-scroll terrain that moves
+	// while the player is meant to stay put (endless runners — the skate
+	// demo's raised road).
+	public volatile boolean carryRiders = true;
+
 	// How far update() moved this sprite this frame (velocity, tweens,
 	// idle wobble — wrap teleports excluded). The solid resolver applies
 	// the ground's delta to its rider, so moving platforms carry.
