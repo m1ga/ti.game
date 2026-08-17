@@ -150,11 +150,10 @@ busy app thread can't cause stutter.
   bridge cost). Continuous gestures are throttled (`drag` at ~10 Hz);
   nothing fires per frame by design.
 
-When building a level, collect its sprites and call `gameView.add(sprites)`
-once. The array crosses the bridge once and is committed to the native scene
-under one lock. Sprite-heavy level construction therefore avoids presenting
-partially assembled terrain frames. `gameView.add(sprite)` remains available
-for individual objects.
+When building a level, collect its sprites, emitters and ropes and call
+`gameView.add(objects)` once. The array crosses the bridge once and is committed
+to the native scene under one lock. `gameView.add(object)` remains available for
+individual objects.
 
 **Rendering.** Sprites are drawn by an ES 2.0 batcher that accumulates
 quads and issues one draw call per texture switch (up to 1000 quads per
