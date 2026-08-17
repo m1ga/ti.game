@@ -55,6 +55,9 @@ public class GameViewProxy extends TiViewProxy
 		if (options.containsKey("cameraEffectIntensity")) {
 			scene.effectIntensity = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("cameraEffectIntensity"));
 		}
+		if (options.containsKey("timeScale")) {
+			setTimeScale(org.appcelerator.titanium.util.TiConvert.toFloat(options.get("timeScale"), 1f));
+		}
 		if (options.containsKey("maxFps")) {
 			setMaxFps(org.appcelerator.titanium.util.TiConvert.toInt(options.get("maxFps")));
 		}
@@ -275,6 +278,21 @@ public class GameViewProxy extends TiViewProxy
 			}
 		}
 		scene.shake(strength, duration / 1000f);
+	}
+
+	/** Global time multiplier: 1 = normal, 0.5 = slow motion, 0 freezes
+	 *  the whole scene while rendering and touch keep running (pause
+	 *  menus, hit-stop). Negative values clamp to 0. */
+	@Kroll.getProperty
+	public float getTimeScale()
+	{
+		return scene.timeScale;
+	}
+
+	@Kroll.setProperty
+	public void setTimeScale(float value)
+	{
+		scene.timeScale = Math.max(0f, value);
 	}
 
 	/** Zoom, anchored on the view center (1 = no zoom, 2 = 2x). */

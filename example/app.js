@@ -33,7 +33,8 @@ var demos = [
 	{ title: 'Camera', start: require('/camera') },
 	{ title: 'Rope', start: require('/rope') },
 	{ title: 'Flip', start: require('/flip') },
-	{ title: 'Blend & flash', start: require('/blend') }
+	{ title: 'Blend & flash', start: require('/blend') },
+	{ title: 'Time scale', start: require('/timescale') }
 ];
 
 var win = Ti.UI.createWindow({

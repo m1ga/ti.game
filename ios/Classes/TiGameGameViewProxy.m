@@ -148,6 +148,19 @@
 	return @(self.scene.cameraScale);
 }
 
+/** Global time multiplier: 1 = normal, 0.5 = slow motion, 0 freezes
+ *  the whole scene while rendering and touch keep running (pause
+ *  menus, hit-stop). Negative values clamp to 0. */
+- (void)setTimeScale:(id)value
+{
+	self.scene.timeScale = MAX(0.0f, [TiUtils floatValue:value def:1]);
+}
+
+- (NSNumber *)timeScale
+{
+	return @(self.scene.timeScale);
+}
+
 /** Clamps the visible rect into a world rect; null removes the bounds. */
 - (void)setCameraBounds:(id)value
 {

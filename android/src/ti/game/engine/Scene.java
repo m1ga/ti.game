@@ -43,6 +43,12 @@ public class Scene
 	// surface/cameraScale around the center of the scale-1 view rect.
 	public volatile float cameraScale = 1f;
 
+	// Global time multiplier: 1 = normal, 0.5 = slow motion, 0 = frozen.
+	// Scales the dt fed to sprites, emitters, ropes, camera and shake —
+	// rendering and touch input keep running, so 0 works as a pause that
+	// still draws (menus, hit-stop juice).
+	public volatile float timeScale = 1f;
+
 	// Native dead-zone follow. Vertical is always active while a target is
 	// set (topFraction/bottomFraction of the visible height); horizontal
 	// only when followLeftFraction >= 0. cameraMaxY = legacy vertical
@@ -302,6 +308,7 @@ public class Scene
 	/** Ticks physics, animations and tweens, then checks collisions. GL thread. */
 	public void update(float dt)
 	{
+		dt *= Math.max(0f, timeScale);
 		List<Sprite> list = snapshot();
 		for (Sprite s : list) {
 			s.update(dt);
