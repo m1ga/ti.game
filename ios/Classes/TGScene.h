@@ -35,6 +35,12 @@
 // Zoom, anchored on the view center.
 @property (atomic, assign) float cameraScale;
 
+// Global time multiplier: 1 = normal, 0.5 = slow motion, 0 = frozen.
+// Scales the dt fed to sprites, emitters, ropes, camera and shake —
+// rendering and touch input keep running, so 0 works as a pause that
+// still draws (menus, hit-stop juice).
+@property (atomic, assign) float timeScale;
+
 // Native dead-zone follow. Vertical is always active while a target is
 // set; horizontal only when followLeftFraction >= 0. followSmoothing
 // 0 = snap, else fraction of remaining distance covered per 1/60 s.

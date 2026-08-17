@@ -40,6 +40,7 @@ static float bottomEdge(TGSprite *s)
 		_effectTintB = 1.0f;
 		_effectIntensity = 1.0f;
 		_cameraScale = 1.0f;
+		_timeScale = 1.0f;
 		_followTopFraction = 0.33f;
 		_followBottomFraction = 0.7f;
 		_followLeftFraction = -1.0f;
@@ -226,6 +227,7 @@ static float bottomEdge(TGSprite *s)
 							 emitters:(NSArray<TGParticleEmitter *> **)emitters
 								ropes:(NSArray<TGRope *> **)ropes
 {
+	dt *= MAX(0.0f, self.timeScale);
 	__block NSArray<TGSprite *> *list;
 	__block NSArray<TGParticleEmitter *> *emitterList;
 	__block NSArray<TGRope *> *ropeList;

@@ -4,6 +4,7 @@ import android.app.Activity;
 
 import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.proxy.TiViewProxy;
+import org.appcelerator.titanium.util.TiConvert;
 import org.appcelerator.titanium.view.TiUIView;
 
 import android.graphics.Color;
@@ -44,19 +45,22 @@ public class GameViewProxy extends TiViewProxy
 	{
 		super.handleCreationDict(options);
 		if (options.containsKey("debug")) {
-			scene.debugAll = org.appcelerator.titanium.util.TiConvert.toBoolean(options.get("debug"), false);
+			scene.debugAll = TiConvert.toBoolean(options.get("debug"), false);
 		}
 		if (options.containsKey("cameraEffect")) {
-			setCameraEffect(org.appcelerator.titanium.util.TiConvert.toString(options.get("cameraEffect")));
+			setCameraEffect(TiConvert.toString(options.get("cameraEffect")));
 		}
 		if (options.containsKey("cameraTint")) {
-			setCameraTint(org.appcelerator.titanium.util.TiConvert.toString(options.get("cameraTint")));
+			setCameraTint(TiConvert.toString(options.get("cameraTint")));
 		}
 		if (options.containsKey("cameraEffectIntensity")) {
-			scene.effectIntensity = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("cameraEffectIntensity"));
+			scene.effectIntensity = TiConvert.toFloat(options.get("cameraEffectIntensity"));
+		}
+		if (options.containsKey("timeScale")) {
+			setTimeScale(TiConvert.toFloat(options.get("timeScale"), 1f));
 		}
 		if (options.containsKey("maxFps")) {
-			setMaxFps(org.appcelerator.titanium.util.TiConvert.toInt(options.get("maxFps")));
+			setMaxFps(TiConvert.toInt(options.get("maxFps")));
 		}
 	}
 
@@ -229,28 +233,28 @@ public class GameViewProxy extends TiViewProxy
 		scene.cameraMaxY = 0f;
 		if (options != null) {
 			if (options.containsKey("topMargin")) {
-				scene.followTopFraction = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("topMargin"));
+				scene.followTopFraction = TiConvert.toFloat(options.get("topMargin"));
 			}
 			if (options.containsKey("bottomMargin")) {
-				scene.followBottomFraction = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("bottomMargin"));
+				scene.followBottomFraction = TiConvert.toFloat(options.get("bottomMargin"));
 			}
 			boolean horizontal = false;
 			if (options.containsKey("leftMargin")) {
-				scene.followLeftFraction = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("leftMargin"));
+				scene.followLeftFraction = TiConvert.toFloat(options.get("leftMargin"));
 				horizontal = true;
 			}
 			if (options.containsKey("rightMargin")) {
-				scene.followRightFraction = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("rightMargin"));
+				scene.followRightFraction = TiConvert.toFloat(options.get("rightMargin"));
 				horizontal = true;
 			}
 			if (horizontal && scene.followLeftFraction < 0f) {
 				scene.followLeftFraction = 0.35f;
 			}
 			if (options.containsKey("smoothing")) {
-				scene.followSmoothing = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("smoothing"));
+				scene.followSmoothing = TiConvert.toFloat(options.get("smoothing"));
 			}
 			if (options.containsKey("maxY")) {
-				scene.cameraMaxY = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("maxY"));
+				scene.cameraMaxY = TiConvert.toFloat(options.get("maxY"));
 			}
 		}
 		scene.followTarget = spriteProxy.getSprite();
@@ -268,13 +272,28 @@ public class GameViewProxy extends TiViewProxy
 		float duration = 400f;
 		if (options != null) {
 			if (options.containsKey("strength")) {
-				strength = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("strength"));
+				strength = TiConvert.toFloat(options.get("strength"));
 			}
 			if (options.containsKey("duration")) {
-				duration = org.appcelerator.titanium.util.TiConvert.toFloat(options.get("duration"));
+				duration = TiConvert.toFloat(options.get("duration"));
 			}
 		}
 		scene.shake(strength, duration / 1000f);
+	}
+
+	/** Global time multiplier: 1 = normal, 0.5 = slow motion, 0 freezes
+	 *  the whole scene while rendering and touch keep running (pause
+	 *  menus, hit-stop). Negative values clamp to 0. */
+	@Kroll.getProperty
+	public float getTimeScale()
+	{
+		return scene.timeScale;
+	}
+
+	@Kroll.setProperty
+	public void setTimeScale(float value)
+	{
+		scene.timeScale = Math.max(0f, value);
 	}
 
 	/** Zoom, anchored on the view center (1 = no zoom, 2 = 2x). */
@@ -304,13 +323,13 @@ public class GameViewProxy extends TiViewProxy
 			return;
 		}
 		scene.boundsMinX = bounds.containsKey("minX")
-			? org.appcelerator.titanium.util.TiConvert.toFloat(bounds.get("minX")) : -Float.MAX_VALUE;
+			? TiConvert.toFloat(bounds.get("minX")) : -Float.MAX_VALUE;
 		scene.boundsMinY = bounds.containsKey("minY")
-			? org.appcelerator.titanium.util.TiConvert.toFloat(bounds.get("minY")) : -Float.MAX_VALUE;
+			? TiConvert.toFloat(bounds.get("minY")) : -Float.MAX_VALUE;
 		scene.boundsMaxX = bounds.containsKey("maxX")
-			? org.appcelerator.titanium.util.TiConvert.toFloat(bounds.get("maxX")) : Float.MAX_VALUE;
+			? TiConvert.toFloat(bounds.get("maxX")) : Float.MAX_VALUE;
 		scene.boundsMaxY = bounds.containsKey("maxY")
-			? org.appcelerator.titanium.util.TiConvert.toFloat(bounds.get("maxY")) : Float.MAX_VALUE;
+			? TiConvert.toFloat(bounds.get("maxY")) : Float.MAX_VALUE;
 		scene.cameraBoundsEnabled = true;
 	}
 

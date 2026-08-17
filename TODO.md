@@ -29,6 +29,9 @@ traffic in the loop.
       sprite instead of stretching — `repeat: true` on the sheet,
       `tileRepeat: true|'x'|'y'` on the sprite (skate street/skyline and
       raised road use it). Power-of-two textures only on ES 2.0.
+- [ ] More blend modes: `blend: 'multiply'` (shadows, darkening) and
+      `'screen'` (soft light) — more glBlendFunc cases behind the
+      existing per-sprite/emitter blend switching.
 
 ## 3. Collision staples
 
@@ -98,6 +101,10 @@ traffic in the loop.
 - [ ] Per-frame animation events (footsteps on frames 1 and 3).
 - [ ] Chaining: `play('attack', { then: 'idle' })` instead of juggling
       `animationcomplete` handlers in JS.
+- [ ] Path following: `sprite.followPath([points], { speed, loop,
+      rotate })` with optional corner smoothing — enemy patrol routes
+      and bullet arcs run natively, no per-frame bridge traffic
+      (Godot Path2D / Phaser PathFollower equivalent).
 
 ## Developer experience (sprinkle in between)
 

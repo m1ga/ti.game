@@ -1,5 +1,9 @@
 # ti.game
 
+<p align="center">
+  <img src="assets/intro.jpg" width="100%" alt="intro image"/>
+</p>
+
 A 2D sprite game engine module for Titanium SDK (Android and iOS),
 rendered with OpenGL ES 2.0. You describe your scene and react to events
 from JavaScript; everything that runs every frame — rendering, animation,
@@ -25,7 +29,7 @@ identical on both platforms.
   passes over the whole rendered scene; sprite glow highlights
   (`glowColor`/`glowBlur`), per-sprite color tinting (`tintColor`),
   damage flashes (`flash()`) and additive blending (`blend: 'add'`)
-- 17 example games in `example/` covering every feature
+- 18 example games in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -420,6 +424,7 @@ a feature set — find the one closest to your game and start there:
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
 | `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
 | `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` (overlaps bloom, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
+| `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going |
 
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
@@ -445,6 +450,7 @@ Run them with `ti build -p android` from `android/` (executes
 | `removeAllSprites()` | Clear the scene |
 | `pause()` / `resume()` | Render loop control (activity lifecycle is automatic) |
 | `maxFps` | Frame rate cap, e.g. `60` to keep 120 Hz (ProMotion) displays from doubling the render work; `0` (default) = display refresh rate |
+| `timeScale` | Global time multiplier for everything the engine ticks (physics, animations, tweens, particles, camera): `1` normal, `0.5` slow motion, `0` freezes the scene while rendering and touch keep running — a pause that still draws (menus, hit-stop) |
 | `backgroundColor` | GL clear color |
 | `surfaceWidth` / `surfaceHeight` | Surface size in px (read-only) |
 | `cameraX` / `cameraY` | World-space offset of the view (scrolling) |
