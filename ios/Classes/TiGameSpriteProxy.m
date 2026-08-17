@@ -666,6 +666,18 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.onGround);
 }
 
+/** As a solid: riders only land on the top edge — they jump up
+ *  through it and are never blocked sideways (pass-through floors). */
+- (void)setOneWay:(id)value
+{
+	self.sprite.oneWay = [TiUtils boolValue:value def:NO];
+}
+
+- (NSNumber *)oneWay
+{
+	return @(self.sprite.oneWay);
+}
+
 - (void)setRestitution:(id)value
 {
 	self.sprite.restitution = [TiUtils floatValue:value def:0];

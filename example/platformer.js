@@ -3,6 +3,11 @@
 // - hold ◀ / ▶ to run, press ⬆ to jump (only while standing on something)
 // - jumping onto the platforms works: the engine's `solidWith` collision
 //   resolution pushes the player out of solids and tracks `onGround`
+// - the staircase platforms are one-way (oneWay: true): jump up through
+//   them from below and land on top — no head bumps
+// - a hazard-striped steel platform patrols sideways on a ping-pong
+//   tween; stand on it and the engine carries you along natively — it's
+//   a regular two-way solid, so it also blocks you from below
 // - the buttons are separate Titanium views, so multitouch works:
 //   hold right and press jump at the same time
 //
@@ -11,7 +16,7 @@
 // system bars and would push bottom-anchored sprites off screen.
 //
 // Uses player.png (4 frames 64x64: idle, walk1, walk2, jump — flipped via
-// scaleX for facing), platform.png and ground.png.
+// scaleX for facing), platform.png, moverplatform.png and ground.png.
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -30,6 +35,7 @@ module.exports = function () {
 
 	var playerSheet = Game.createSpriteSheet({ image: 'assets/player.png', frameWidth: 64, frameHeight: 64 });
 	var platformSheet = Game.createSpriteSheet({ image: 'assets/platform.png', frameWidth: 256, frameHeight: 32 });
+	var moverSheet = Game.createSpriteSheet({ image: 'assets/moverplatform.png', frameWidth: 256, frameHeight: 32 });
 	var trampolineSheet = Game.createSpriteSheet({ image: 'assets/trampoline.png', frameWidth: 128, frameHeight: 32 });
 	var groundSheet = Game.createSpriteSheet({ image: 'assets/ground.png', frameWidth: 64, frameHeight: 64 });
 
@@ -91,9 +97,34 @@ module.exports = function () {
 				y: p.y,
 				width: p.w,
 				height: PLAT_H,
-				collisionGroup: 'solid'
+				collisionGroup: 'solid',
+				oneWay: true // jump up through, land on top
 			}));
 		});
+
+		// Moving platform: patrols on a ping-pong tween at step 2 — the
+		// solid resolver applies its per-frame movement to whoever stands
+		// on it, so the rider is carried without any JS in the loop.
+		// Unlike the staircase it is a normal two-way solid: no oneWay,
+		// so it also bumps your head from below.
+		var mover = Game.createSprite({
+			sheet: moverSheet,
+			x: W * 0.18,
+			y: groundTop - STEP * 2,
+			width: W * 0.26,
+			height: PLAT_H,
+			collisionGroup: 'solid'
+		});
+		gameView.add(mover);
+		function patrol() {
+			mover.animate({
+				x: (mover.x < W * 0.35) ? W * 0.5 : W * 0.18,
+				duration: 2600,
+				easing: Game.EASE_IN_OUT
+			});
+		}
+		mover.addEventListener('complete', patrol);
+		patrol();
 
 		// Trampolines replace the platforms at steps 2 and 8 — landing on
 		// one bounces the player automatically (see the 'land' handler)
@@ -160,7 +191,7 @@ module.exports = function () {
 		player.addEventListener('land', function (e) {
 			if (e.group === 'trampoline') {
 				// bounce right back up, higher than a normal jump
-				player.velocityY = -JUMP * 1.15;
+				player.velocityY = -JUMP * 1.1;
 				player.stop();
 				player.frame = 3;
 				var trampoline = e.other; // the one we landed on

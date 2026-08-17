@@ -141,6 +141,21 @@
 @property (atomic, copy) NSSet<NSString *> *solidWith;
 @property (atomic, assign) BOOL onGround;
 
+// One-way platform: as a solid, this sprite only catches riders
+// falling onto its top edge — they jump up through it and are never
+// blocked sideways or from below (pass-through floors).
+@property (atomic, assign) BOOL oneWay;
+
+// How far update: moved this sprite this frame (velocity, tweens,
+// idle wobble — wrap teleports excluded). The solid resolver applies
+// the ground's delta to its rider, so moving platforms carry.
+// Render thread only.
+@property (atomic, assign) float frameDeltaX;
+@property (atomic, assign) float frameDeltaY;
+
+// The solid this sprite stood on last frame (render thread only).
+@property (atomic, weak) TGSprite *groundSprite;
+
 // Bounciness against solids: 0 = stop dead, 0..1 = reflect with damping
 @property (atomic, assign) float restitution;
 

@@ -158,6 +158,8 @@ static _Atomic int TGIdleSequence = 0;
 
 - (void)update:(float)dt
 {
+	float startX = self.x;
+	float startY = self.y;
 	if (self.carMode) {
 		[self updateCar:dt];
 	}
@@ -195,8 +197,10 @@ static _Atomic int TGIdleSequence = 0;
 	float wrapShift = self.wrapShift;
 	if (wrapShift > 0.0f && self.x < self.wrapX) {
 		self.x += wrapShift;
+		startX += wrapShift; // teleport, not movement — keep it out of frameDelta
 	} else if (wrapShift < 0.0f && self.x > self.wrapX) {
 		self.x += wrapShift;
+		startX += wrapShift;
 	}
 	float flashLeft = self.flashRemaining;
 	if (flashLeft > 0.0f) {
@@ -205,6 +209,8 @@ static _Atomic int TGIdleSequence = 0;
 	[self updateAnimation:dt];
 	[self updateTweens:dt];
 	[self updateIdle:dt];
+	self.frameDeltaX = self.x - startX;
+	self.frameDeltaY = self.y - startY;
 }
 
 /**

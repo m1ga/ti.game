@@ -240,6 +240,13 @@ Notes:
   those groups — the engine pushes the sprite out along the axis of least
   penetration. Landing sets read-only `onGround` (gate jumps on it) and
   fires `land`; sides act as walls; below stops upward motion.
+- **One-way platforms**: `oneWay: true` on a solid makes it pass-through
+  except for landings on its top edge — riders jump up through it and
+  are never blocked sideways or from below (classic platformer floors).
+- **Moving platforms carry**: solids are ordinary sprites, so move them
+  with `velocityX/Y` or a tween — whoever stands on one inherits its
+  per-frame movement natively: carried sideways, glued on the way down,
+  no re-landing jitter (the platformer demo's patrolling platform).
 - **Drift is emergent** in `carMode`: lateral grip is finite, so hard
   cornering at speed keeps sideways momentum. Lower `grip` = more drift.
   `skidMarks: true` leaves fading rubber trails while drifting
@@ -396,7 +403,7 @@ a feature set — find the one closest to your game and start there:
 | `basic.js` | Sheets, animations, drag/pinch/rotate, tween chaining |
 | `puzzle.js` | Drag & drop with snapping, press-to-lift, tween-back-home, multi-touch (one piece per finger) |
 | `flappy.js` | Gravity + tap impulse, trigger zones, parallax wrapping |
-| `platformer.js` | `solidWith`, `onGround`/`land` (trampolines via the landed-on solid), camera `follow`, multitouch d-pad buttons |
+| `platformer.js` | `solidWith`, `onGround`/`land` (trampolines via the landed-on solid), one-way staircase (`oneWay`), tween-driven moving platform that carries the player, camera `follow`, multitouch d-pad buttons |
 | `volley.js` | `restitution` ball, JS-driven hit response, simple AI timer |
 | `racing.js` | `carMode` drifting, skid marks, pixel art, lap/checkpoint logic |
 | `cards.js` | Deck dealing, fanned hand UI, selection tweens, idle wobble |
@@ -474,7 +481,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | Sheet/animation | `sheet`, `frame`, `animations`, `animation` (read-only), `tileRepeat` (`true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture) |
 | Touch behaviors | `draggable`, `pinchable`, `rotatable`, `touchEnabled` (false = touches pass through to sprites underneath) |
 | Physics | `velocityX`, `velocityY`, `gravity`, `maxSpeed` |
-| Solids | `solidWith`, `onGround` (read-only), `restitution` |
+| Solids | `solidWith`, `onGround` (read-only), `restitution`, `oneWay` (as a solid: landings on the top edge only — pass-through from below/sideways); moving solids carry their riders automatically |
 | Collision | `collisionGroup`, `collidesWith`, `hitboxScale`, `hitboxShape` (`'rect'`/`'circle'` — circles also bounce off solid corners along the contact normal), `debug` |
 | Car | `carMode`, `throttle`, `steering`, `enginePower`, `turnRate`, `grip`, `drag`, `skidMarks`, `skidThreshold`, `drifting` (read-only) |
 | Flight | `thrust`, `angularVelocity`, `wrapAround` |

@@ -507,6 +507,28 @@ static float bottomEdge(TGSprite *s)
 		&& _aabbA[1] < _aabbB[3] && _aabbA[3] > _aabbB[1];
 }
 
+/**
+ * Moving platforms carry: before resolving, the rider inherits the
+ * per-frame movement of the solid it stood on last frame, so it is
+ * carried sideways and stays glued on the way down instead of
+ * re-landing every frame. frameDelta excludes wrap teleports, and
+ * direct JS position writes never enter it, so a teleporting
+ * platform leaves its rider behind (as it should).
+ */
+- (void)carryByGround:(TGSprite *)s
+{
+	TGSprite *ground = s.groundSprite;
+	if (ground == nil || s.dragged) { // a held finger outranks the platform
+		return;
+	}
+	if (!ground.visible || ground.scene != self) {
+		s.groundSprite = nil; // platform vanished under the rider
+		return;
+	}
+	s.x += ground.frameDeltaX;
+	s.y += ground.frameDeltaY;
+}
+
 - (void)resolveSolids:(NSArray<TGSprite *> *)list
 {
 	for (TGSprite *s in list) {
@@ -514,6 +536,7 @@ static float bottomEdge(TGSprite *s)
 		if (groups.count == 0 || !s.visible) {
 			continue;
 		}
+		[self carryByGround:s];
 		if (s.circleHitbox) {
 			[self resolveCircleSolids:s inList:list groups:groups];
 			continue;
@@ -533,9 +556,18 @@ static float bottomEdge(TGSprite *s)
 			if (overlapX <= 0.0f || overlapY <= 0.0f) {
 				continue;
 			}
-			if (overlapY <= overlapX) {
+			BOOL fromAbove = _aabbA[1] + _aabbA[3] < _aabbB[1] + _aabbB[3];
+			if (solid.oneWay) {
+				// pass-through except when falling onto the top edge:
+				// the rider's bottom was above it last frame
+				if (s.velocityY < 0.0f || _aabbA[3] - s.frameDeltaY > _aabbB[1] + 2.0f) {
+					continue;
+				}
+				fromAbove = YES; // one-way only ever resolves as a landing
+			}
+			if (overlapY <= overlapX || solid.oneWay) {
 				// vertical resolution (compare AABB centers, *2 avoids the division)
-				if (_aabbA[1] + _aabbA[3] < _aabbB[1] + _aabbB[3]) {
+				if (fromAbove) {
 					s.y -= overlapY; // hit the solid from above
 					float bounce = (s.restitution > 0.0f && s.velocityY > 0.0f)
 						? s.velocityY * s.restitution : 0.0f;
@@ -573,6 +605,7 @@ static float bottomEdge(TGSprite *s)
 			[s computeAABB:_aabbA]; // position changed — refresh for the next solid
 		}
 		s.onGround = grounded;
+		s.groundSprite = grounded ? groundedOn : nil;
 		if (grounded && !wasOnGround) {
 			id<TGSpriteEventListener> listener = s.eventListener;
 			if (listener != nil) {
@@ -628,6 +661,9 @@ static float bottomEdge(TGSprite *s)
 			ny = (nx != 0.0f) ? 0.0f : (minFace == toTop) ? -1.0f : 1.0f;
 			penetration = minFace + r;
 		}
+		if (solid.oneWay && (ny > -0.7f || s.velocityY < 0.0f)) {
+			continue; // one-way: balls only land on the top face
+		}
 		s.x += nx * penetration;
 		s.y += ny * penetration;
 		float vn = s.velocityX * nx + s.velocityY * ny;
@@ -647,6 +683,7 @@ static float bottomEdge(TGSprite *s)
 		}
 	}
 	s.onGround = grounded;
+	s.groundSprite = grounded ? groundedOn : nil;
 	if (grounded && !wasOnGround) {
 		id<TGSpriteEventListener> listener = s.eventListener;
 		if (listener != nil) {
