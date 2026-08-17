@@ -150,6 +150,11 @@ busy app thread can't cause stutter.
   bridge cost). Continuous gestures are throttled (`drag` at ~10 Hz);
   nothing fires per frame by design.
 
+When building a level, collect its sprites, emitters and ropes and call
+`gameView.add(objects)` once. The array crosses the bridge once and is committed
+to the native scene under one lock. `gameView.add(object)` remains available for
+individual objects.
+
 **Rendering.** Sprites are drawn by an ES 2.0 batcher that accumulates
 quads and issues one draw call per texture switch (up to 1000 quads per
 batch). Practical consequence: pack your art into as few sheets as
@@ -446,7 +451,7 @@ Run them with `ti build -p android` from `android/` (executes
 
 | Member | Description |
 |---|---|
-| `add(sprite)` / `remove(sprite)` | Manage sprites in the scene |
+| `add(object)` / `add([objects])` / `remove(object)` | Manage sprites, emitters and ropes; an array is committed in one native scene update |
 | `removeAllSprites()` | Clear the scene |
 | `pause()` / `resume()` | Render loop control (activity lifecycle is automatic) |
 | `maxFps` | Frame rate cap, e.g. `60` to keep 120 Hz (ProMotion) displays from doubling the render work; `0` (default) = display refresh rate |

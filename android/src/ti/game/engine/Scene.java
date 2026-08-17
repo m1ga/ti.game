@@ -167,6 +167,37 @@ public class Scene
 		}
 	}
 
+	/** Adds a group in one protected scene mutation. */
+	public void addAll(List<Sprite> newSprites, List<ParticleEmitter> newEmitters, List<Rope> newRopes)
+	{
+		synchronized (lock) {
+			boolean spritesAdded = false;
+			for (Sprite sprite : newSprites) {
+				if (sprite != null && !sprites.contains(sprite)) {
+					sprites.add(sprite);
+					sprite.scene = this;
+					spritesAdded = true;
+					if (sprite.ySort) {
+						hasYSort = true;
+					}
+				}
+			}
+			for (ParticleEmitter emitter : newEmitters) {
+				if (emitter != null && !emitters.contains(emitter)) {
+					emitters.add(emitter);
+				}
+			}
+			for (Rope rope : newRopes) {
+				if (rope != null && !ropes.contains(rope)) {
+					ropes.add(rope);
+				}
+			}
+			if (spritesAdded) {
+				zOrderDirty = true;
+			}
+		}
+	}
+
 	public void remove(Sprite sprite)
 	{
 		synchronized (lock) {

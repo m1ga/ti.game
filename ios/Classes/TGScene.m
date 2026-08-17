@@ -82,6 +82,39 @@ static float bottomEdge(TGSprite *s)
 	}
 }
 
+- (void)addSprites:(NSArray<TGSprite *> *)sprites
+		  emitters:(NSArray<TGParticleEmitter *> *)emitters
+			 ropes:(NSArray<TGRope *> *)ropes
+{
+	@synchronized (_sprites) {
+		BOOL spritesAdded = NO;
+		for (TGSprite *sprite in sprites) {
+			if (sprite != nil && ![_sprites containsObject:sprite]) {
+				[_sprites addObject:sprite];
+				sprite.scene = self;
+				spritesAdded = YES;
+				if (sprite.ySort) {
+					_hasYSort = YES;
+				}
+			}
+		}
+		for (TGParticleEmitter *emitter in emitters) {
+			if (emitter != nil && ![_emitters containsObject:emitter]) {
+				[_emitters addObject:emitter];
+			}
+		}
+		for (TGRope *rope in ropes) {
+			if (rope != nil && ![_ropes containsObject:rope]) {
+				[_ropes addObject:rope];
+			}
+		}
+		if (spritesAdded) {
+			_zOrderDirty = YES;
+			_snapshotCache = nil;
+		}
+	}
+}
+
 - (void)remove:(TGSprite *)sprite
 {
 	if (sprite == nil) {
