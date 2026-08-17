@@ -44,6 +44,7 @@ var win = Ti.UI.createWindow({
 win.add(Ti.UI.createLabel({
 	text: 'ti.game examples',
 	color: '#fff',
+	extendSafeArea: false,
 	font: { fontSize: 24, fontWeight: 'bold' },
 	top: 20
 }));
