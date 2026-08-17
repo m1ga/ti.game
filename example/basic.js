@@ -56,8 +56,6 @@ module.exports = function () {
 		Ti.API.info('hero dropped at ' + e.x + ', ' + e.y);
 	});
 
-	gameView.add(hero);
-
 	// A second, non-interactive sprite driven by native tweens
 	var ghost = Game.createSprite({
 		sheet: sheet,
@@ -78,7 +76,8 @@ module.exports = function () {
 		});
 	});
 
-	gameView.add(ghost);
+	// Arrays cross the bridge once and enter the native scene together.
+	gameView.add([hero, ghost]);
 	ghost.animate({ x: 300, rotation: 360, duration: 1500, easing: Game.EASE_IN_OUT });
 
 	win.add(gameView);

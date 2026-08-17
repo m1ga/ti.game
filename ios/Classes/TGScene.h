@@ -90,6 +90,10 @@
 @property (atomic, assign) float bgAlpha;
 
 - (void)add:(TGSprite *)sprite;
+/** Adds a group in one protected scene mutation. */
+- (void)addSprites:(NSArray<TGSprite *> *)sprites
+		  emitters:(NSArray<TGParticleEmitter *> *)emitters
+			 ropes:(NSArray<TGRope *> *)ropes;
 - (void)remove:(TGSprite *)sprite;
 - (void)clear;
 - (void)markZOrderDirty;

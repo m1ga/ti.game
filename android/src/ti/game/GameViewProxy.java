@@ -2,6 +2,9 @@ package ti.game;
 
 import android.app.Activity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.TiConvert;
@@ -10,7 +13,10 @@ import org.appcelerator.titanium.view.TiUIView;
 import android.graphics.Color;
 
 import ti.game.engine.PostEffect;
+import ti.game.engine.ParticleEmitter;
+import ti.game.engine.Rope;
 import ti.game.engine.Scene;
+import ti.game.engine.Sprite;
 
 /**
  * The game canvas: createGameView({ backgroundColor: '#202030' }).
@@ -180,6 +186,10 @@ public class GameViewProxy extends TiViewProxy
 	@Kroll.method
 	public void add(Object proxy)
 	{
+		if (proxy instanceof Object[]) {
+			addAll((Object[]) proxy);
+			return;
+		}
 		if (proxy instanceof SpriteProxy) {
 			scene.add(((SpriteProxy) proxy).getSprite());
 		} else if (proxy instanceof EmitterProxy) {
@@ -187,6 +197,23 @@ public class GameViewProxy extends TiViewProxy
 		} else if (proxy instanceof RopeProxy) {
 			scene.addRope(((RopeProxy) proxy).getRope());
 		}
+	}
+
+	private void addAll(Object[] proxies)
+	{
+		List<Sprite> sprites = new ArrayList<>();
+		List<ParticleEmitter> emitters = new ArrayList<>();
+		List<Rope> ropes = new ArrayList<>();
+		for (Object proxy : proxies) {
+			if (proxy instanceof SpriteProxy) {
+				sprites.add(((SpriteProxy) proxy).getSprite());
+			} else if (proxy instanceof EmitterProxy) {
+				emitters.add(((EmitterProxy) proxy).getEmitter());
+			} else if (proxy instanceof RopeProxy) {
+				ropes.add(((RopeProxy) proxy).getRope());
+			}
+		}
+		scene.addAll(sprites, emitters, ropes);
 	}
 
 	@Kroll.method

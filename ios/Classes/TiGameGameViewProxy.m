@@ -202,26 +202,44 @@
 
 #pragma mark Methods
 
+- (void)collectGameObjects:(id)value
+				 proxies:(NSMutableArray *)proxies
+				 sprites:(NSMutableArray *)sprites
+			 emitters:(NSMutableArray *)emitters
+				ropes:(NSMutableArray *)ropes
+{
+	if ([value isKindOfClass:[NSArray class]]) {
+		for (id item in value) {
+			[self collectGameObjects:item proxies:proxies sprites:sprites emitters:emitters ropes:ropes];
+		}
+		return;
+	}
+	if ([value isKindOfClass:[TiGameSpriteProxy class]]) {
+		[proxies addObject:value];
+		[sprites addObject:((TiGameSpriteProxy *)value).sprite];
+	} else if ([value isKindOfClass:[TiGameEmitterProxy class]]) {
+		[proxies addObject:value];
+		[emitters addObject:((TiGameEmitterProxy *)value).emitter];
+	} else if ([value isKindOfClass:[TiGameRopeProxy class]]) {
+		[proxies addObject:value];
+		[ropes addObject:((TiGameRopeProxy *)value).rope];
+	}
+}
+
 - (void)add:(id)arg
 {
-	id value = [arg isKindOfClass:[NSArray class]] ? [arg firstObject] : arg;
-	if ([value isKindOfClass:[TiGameSpriteProxy class]]) {
-		TiGameSpriteProxy *spriteProxy = value;
-		// keep the sprite proxy alive on the JS side while it's in the scene
-		[self rememberProxy:spriteProxy];
-		[self.scene add:spriteProxy.sprite];
-		return;
-	}
-	if ([value isKindOfClass:[TiGameEmitterProxy class]]) {
-		TiGameEmitterProxy *emitterProxy = value;
-		[self rememberProxy:emitterProxy];
-		[self.scene addEmitter:emitterProxy.emitter];
-		return;
-	}
-	if ([value isKindOfClass:[TiGameRopeProxy class]]) {
-		TiGameRopeProxy *ropeProxy = value;
-		[self rememberProxy:ropeProxy];
-		[self.scene addRope:ropeProxy.rope];
+	NSMutableArray *proxies = [NSMutableArray array];
+	NSMutableArray *sprites = [NSMutableArray array];
+	NSMutableArray *emitters = [NSMutableArray array];
+	NSMutableArray *ropes = [NSMutableArray array];
+	[self collectGameObjects:arg proxies:proxies sprites:sprites emitters:emitters ropes:ropes];
+
+	if (proxies.count > 0) {
+		// Keep every proxy alive on the JS side while its native object is in the scene.
+		for (id proxy in proxies) {
+			[self rememberProxy:proxy];
+		}
+		[self.scene addSprites:sprites emitters:emitters ropes:ropes];
 		return;
 	}
 	[super add:arg];
