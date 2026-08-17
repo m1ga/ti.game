@@ -104,6 +104,9 @@ public class EmitterProxy extends KrollProxy
 		if (options.containsKey("tint")) {
 			setTint(TiConvert.toString(options.get("tint")));
 		}
+		if (options.containsKey("blend")) {
+			setBlend(TiConvert.toString(options.get("blend")));
+		}
 		if (options.containsKey("emitting")) {
 			emitter.emitting = TiConvert.toBoolean(options.get("emitting"), true);
 		}
@@ -380,6 +383,20 @@ public class EmitterProxy extends KrollProxy
 		} catch (IllegalArgumentException e) {
 			// keep previous tint
 		}
+	}
+
+	/** 'add' = additive blending — particles brighten instead of cover
+	 *  (fire, sparks, magic); anything else = normal alpha blending. */
+	@Kroll.setProperty
+	public void setBlend(String value)
+	{
+		emitter.additiveBlend = "add".equals(value);
+	}
+
+	@Kroll.getProperty
+	public String getBlend()
+	{
+		return emitter.additiveBlend ? "add" : "normal";
 	}
 
 	/** Color.parseColor can't handle Titanium's '#rgb' shorthand. */

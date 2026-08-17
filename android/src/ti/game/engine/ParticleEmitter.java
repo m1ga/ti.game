@@ -46,6 +46,9 @@ public class ParticleEmitter
 	public volatile float tintR = 1f;
 	public volatile float tintG = 1f;
 	public volatile float tintB = 1f;
+	// Additive blending: particles brighten the backdrop instead of
+	// covering it (fire, sparks, magic). One batch flush per mode change.
+	public volatile boolean additiveBlend = false;
 	public volatile boolean emitting = true;
 	public volatile Sprite target;            // follow this sprite instead of x/y
 	private volatile int maxParticles = 200;
@@ -184,6 +187,7 @@ public class ParticleEmitter
 		if (f == null || f.width <= 0f) {
 			return;
 		}
+		batch.setAdditiveBlend(additiveBlend);
 		float baseWidth = (size > 0f) ? size : f.width;
 		float aspect = f.height / f.width;
 		float r = tintR;

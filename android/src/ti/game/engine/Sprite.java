@@ -43,6 +43,20 @@ public class Sprite
 	public volatile float tintG = 1f;
 	public volatile float tintB = 1f;
 
+	// Flash: a solid-color overlay on the sprite's silhouette that fades
+	// out over flashDuration (damage hits, invincibility blinks). Set via
+	// flash(); flashRemaining counts down natively each frame, 0 = off.
+	public volatile float flashR = 1f;
+	public volatile float flashG = 1f;
+	public volatile float flashB = 1f;
+	public volatile float flashDuration = 0f;  // seconds
+	public volatile float flashRemaining = 0f; // seconds
+
+	// Additive blending (glows, fire, lasers): the sprite's colors add
+	// onto the backdrop instead of covering it. The batcher flushes once
+	// per blend-mode change, so group additive sprites by zIndex.
+	public volatile boolean additiveBlend = false;
+
 	// Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
 	// frame draws behind the sprite (selection highlights, power-ups).
 	// glowBlur is the blur radius in px; color as parsed 0..1 channels.
@@ -296,6 +310,10 @@ public class Sprite
 			x += wrapShift;
 		} else if (wrapShift < 0f && x > wrapX) {
 			x += wrapShift;
+		}
+		float flashLeft = flashRemaining;
+		if (flashLeft > 0f) {
+			flashRemaining = Math.max(0f, flashLeft - dt);
 		}
 		updateAnimation(dt);
 		updateTweens(dt);

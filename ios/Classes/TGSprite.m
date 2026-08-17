@@ -45,6 +45,9 @@ static _Atomic int TGIdleSequence = 0;
 		_tintR = 1.0f;
 		_tintG = 1.0f;
 		_tintB = 1.0f;
+		_flashR = 1.0f;
+		_flashG = 1.0f;
+		_flashB = 1.0f;
 		_glowOpacity = 1.0f;
 		_glowR = 1.0f;
 		_glowG = 1.0f;
@@ -194,6 +197,10 @@ static _Atomic int TGIdleSequence = 0;
 		self.x += wrapShift;
 	} else if (wrapShift < 0.0f && self.x > self.wrapX) {
 		self.x += wrapShift;
+	}
+	float flashLeft = self.flashRemaining;
+	if (flashLeft > 0.0f) {
+		self.flashRemaining = MAX(0.0f, flashLeft - dt);
 	}
 	[self updateAnimation:dt];
 	[self updateTweens:dt];

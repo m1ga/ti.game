@@ -20,9 +20,11 @@ traffic in the loop.
 
 - [x] `tint` on sprites (the batcher already has vertex color — nearly
       free)
-- [ ] a `flash(color, duration)` helper for damage/invincibility.
-- [ ] `blend: 'add'` per sprite/emitter for glows, fire, lasers (one
-      batch flush on blend change).
+- [x] a `flash(color, duration)` helper for damage/invincibility —
+      solid-color silhouette overlay (glow shader) that fades out
+      natively; asteroids flashes the ship on crash.
+- [x] `blend: 'add'` per sprite/emitter for glows, fire, lasers (one
+      batch flush on blend change); asteroids uses it on the bolts.
 - [x] `tileRepeat`: GL_REPEAT so a small texture tiles across a wide
       sprite instead of stretching — `repeat: true` on the sheet,
       `tileRepeat: true|'x'|'y'` on the sprite (skate street/skyline and

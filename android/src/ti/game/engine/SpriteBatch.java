@@ -87,6 +87,7 @@ public class SpriteBatch
 	private final FloatBuffer buffer;
 	private int quadCount = 0;
 	private int currentTexture = -1;
+	private boolean additiveBlend = false;
 
 	private int program = 0;
 	private int glowProgram = 0;
@@ -149,10 +150,27 @@ public class SpriteBatch
 		quadCount = 0;
 		currentTexture = -1;
 		activeProgram = 0;
+		additiveBlend = false;
 		useProgram(program);
 		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
 		GLES20.glEnable(GLES20.GL_BLEND);
 		GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+	}
+
+	/**
+	 * Additive = (ONE, ONE) on premultiplied colors: quads brighten the
+	 * backdrop instead of covering it (glows, fire, lasers). Flushes the
+	 * pending batch on change, so mode switches cost one draw call.
+	 */
+	public void setAdditiveBlend(boolean additive)
+	{
+		if (additive == additiveBlend) {
+			return;
+		}
+		flush();
+		GLES20.glBlendFunc(GLES20.GL_ONE,
+			additive ? GLES20.GL_ONE : GLES20.GL_ONE_MINUS_SRC_ALPHA);
+		additiveBlend = additive;
 	}
 
 	/** Flush and switch programs; both share attribute locations. */
@@ -189,6 +207,7 @@ public class SpriteBatch
 		if (f == null) {
 			return;
 		}
+		setAdditiveBlend(s.additiveBlend);
 		ensureCapacity(sheet.textureId());
 
 		float w = s.drawWidth();
@@ -272,6 +291,24 @@ public class SpriteBatch
 			x2, y2, u0, v1,
 			x3, y3, u1, v1,
 			s.tintR * alpha, s.tintG * alpha, s.tintB * alpha, alpha);
+
+		// Flash: the silhouette shader stamps a solid-color copy of the
+		// frame on top, fading out as flashRemaining runs down — reads as
+		// the whole sprite lighting up (damage), which a multiplicative
+		// tint can't do (white tint = no change).
+		float flashLeft = s.flashRemaining;
+		float flashDuration = s.flashDuration;
+		if (flashLeft > 0f && flashDuration > 0f) {
+			float fa = Math.min(1f, flashLeft / flashDuration) * alpha;
+			useProgram(glowProgram);
+			ensureCapacity(sheet.textureId());
+			putQuad(x0, y0, u0, v0,
+				x1, y1, u1, v0,
+				x2, y2, u0, v1,
+				x3, y3, u1, v1,
+				s.flashR * fa, s.flashG * fa, s.flashB * fa, fa);
+			useProgram(program);
+		}
 	}
 
 	private float snapToPixel(float value, float origin)
@@ -302,6 +339,7 @@ public class SpriteBatch
 	public void drawSegment(int texture, SpriteSheet.Frame f, float x0, float y0,
 							float x1, float y1, float halfWidth, float alpha)
 	{
+		setAdditiveBlend(false); // ropes always alpha-blend
 		float dx = x1 - x0;
 		float dy = y1 - y0;
 		float len = (float) Math.sqrt(dx * dx + dy * dy);
@@ -326,6 +364,7 @@ public class SpriteBatch
 	public void drawLine(int texture, float x0, float y0, float x1, float y1,
 						 float halfThickness, float r, float g, float b, float a)
 	{
+		setAdditiveBlend(false); // debug overlays and skid marks always alpha-blend
 		float dx = x1 - x0;
 		float dy = y1 - y0;
 		float len = (float) Math.sqrt(dx * dx + dy * dy);

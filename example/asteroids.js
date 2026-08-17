@@ -7,10 +7,15 @@
 //   inheriting the ship's velocity); hold for autofire
 // - five drifting, spinning asteroids; ship, rocks and bolts all wrap
 //   around the screen edges (wrapAround)
-// - shoot all five to clear the wave; flying into a rock resets it
+// - shoot all five to clear the wave; the ship survives three hits,
+//   shown as three dots in the top-right corner — a crash costs a dot
+//   and grants brief invulnerability but the ship keeps flying; on the
+//   last life it blinks red as a warning, at zero the game resets
 // - native sound effects (createSound): a laser zap per shot, an
 //   explosion when a rock (or the ship) blows up, and a looping engine
 //   rumble while the thruster is held (loop + stop on release)
+// - bolts render additively (blend: 'add') so they glow over the stars;
+//   crashing triggers a native red damage flash (ship.flash)
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -138,6 +143,44 @@ module.exports = function () {
 			});
 		}
 
+		// --- Lives: three dots top right, one gone per crash --------------
+
+		var MAX_LIVES = 3;
+		var lives = MAX_LIVES;
+		var lifeDots = [];
+		for (var d = 0; d < MAX_LIVES; d++) {
+			var dot = Ti.UI.createView({
+				width: '14dp',
+				height: '14dp',
+				borderRadius: '7dp',
+				backgroundColor: '#ff5252',
+				top: '48dp',
+				right: (20 + d * 22) + 'dp'
+			});
+			win.add(dot);
+			lifeDots.push(dot);
+		}
+
+		function updateLifeDots() {
+			lifeDots.forEach(function (dot, index) {
+				dot.opacity = (index < lives) ? 1 : 0.15;
+			});
+		}
+
+		// Last-life warning: blink the ship red with the native flash
+		// helper — one short JS timer, the fade itself runs in the engine
+		var warnTimer = null;
+		function updateWarning() {
+			if (lives === 1 && warnTimer === null) {
+				warnTimer = setInterval(function () {
+					ship.flash('#ff5252', 350);
+				}, 700);
+			} else if (lives !== 1 && warnTimer !== null) {
+				clearInterval(warnTimer);
+				warnTimer = null;
+			}
+		}
+
 		function resetShip() {
 			ship.x = W / 2;
 			ship.y = H / 2;
@@ -149,13 +192,27 @@ module.exports = function () {
 			ship.frame = 0;
 		}
 
+		var invulnerableUntil = 0; // grace period after a respawn
 		ship.addEventListener('collision', function (e) {
-			if (e.group === 'asteroid') {
-				explodeSound.play();
-				notify('Crashed!');
-				resetShip();
-				spawnWave();
+			if (e.group !== 'asteroid' || Date.now() < invulnerableUntil) {
+				return;
 			}
+			lives--;
+			explodeSound.play();
+			ship.flash('#ff5252', 400); // native damage flash
+			if (lives <= 0) {
+				notify('Game over!');
+				lives = MAX_LIVES;
+				resetShip();
+				spawnWave(); // fresh rocks at the edges, fresh lives
+			} else {
+				// keep flying — the grace period below lets the ship
+				// clear the rock it just clipped
+				notify(lives === 1 ? 'Last life!' : 'Crashed!');
+			}
+			updateLifeDots();
+			updateWarning();
+			invulnerableUntil = Date.now() + 1500;
 		});
 
 		// --- Bullets (pooled) --------------------------------------------
@@ -168,6 +225,7 @@ module.exports = function () {
 					frame: 3,
 					width: SHIP_SIZE * 0.22,
 					height: SHIP_SIZE * 0.4,
+					blend: 'add', // bolts glow additively over the stars
 					zIndex: 8,
 					visible: false,
 					wrapAround: true,
@@ -315,6 +373,9 @@ module.exports = function () {
 		win.addEventListener('close', function () {
 			if (fireTimer) {
 				clearInterval(fireTimer);
+			}
+			if (warnTimer) {
+				clearInterval(warnTimer);
 			}
 			thrustSound.stop(); // don't leave the loop running past the window
 		});

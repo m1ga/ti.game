@@ -171,6 +171,7 @@ static const int kHardCap = 1000;
 	if (![sh frame:self.frame into:&f] || f.width <= 0.0f) {
 		return;
 	}
+	[batch setAdditiveBlend:self.additiveBlend];
 	float size = self.size;
 	float baseWidth = (size > 0.0f) ? size : f.width;
 	float aspect = f.height / f.width;

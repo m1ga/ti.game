@@ -99,6 +99,7 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 	float *_vertices;
 	int _quadCount;
 	GLint _currentTexture;
+	BOOL _additiveBlend;
 
 	GLuint _program;
 	GLuint _glowProgram;
@@ -152,10 +153,21 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 	_quadCount = 0;
 	_currentTexture = -1;
 	_activeProgram = 0;
+	_additiveBlend = NO;
 	[self useProgram:_program];
 	glActiveTexture(GL_TEXTURE0);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+- (void)setAdditiveBlend:(BOOL)additive
+{
+	if (additive == _additiveBlend) {
+		return;
+	}
+	[self flush];
+	glBlendFunc(GL_ONE, additive ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
+	_additiveBlend = additive;
 }
 
 /** Flush and switch programs; both share attribute locations. */
@@ -192,6 +204,7 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 	if (![sheet frame:s.frame into:&f]) {
 		return;
 	}
+	[self setAdditiveBlend:s.additiveBlend];
 	[self ensureCapacity:[sheet textureId]];
 
 	float w = [s drawWidth];
@@ -275,6 +288,24 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 				 x2:x2 y2:y2 u2:u0 v2:v1
 				 x3:x3 y3:y3 u3:u1 v3:v1
 				  r:s.tintR * alpha g:s.tintG * alpha b:s.tintB * alpha a:alpha];
+
+	// Flash: the silhouette shader stamps a solid-color copy of the
+	// frame on top, fading out as flashRemaining runs down — reads as
+	// the whole sprite lighting up (damage), which a multiplicative
+	// tint can't do (white tint = no change).
+	float flashLeft = s.flashRemaining;
+	float flashDuration = s.flashDuration;
+	if (flashLeft > 0.0f && flashDuration > 0.0f) {
+		float fa = MIN(1.0f, flashLeft / flashDuration) * alpha;
+		[self useProgram:_glowProgram];
+		[self ensureCapacity:[sheet textureId]];
+		[self putQuadX0:x0 y0:y0 u0:u0 v0:v0
+					 x1:x1 y1:y1 u1:u1 v1:v0
+					 x2:x2 y2:y2 u2:u0 v2:v1
+					 x3:x3 y3:y3 u3:u1 v3:v1
+					  r:s.flashR * fa g:s.flashG * fa b:s.flashB * fa a:fa];
+		[self useProgram:_program];
+	}
 }
 
 - (void)drawFrame:(GLuint)texture frame:(TGFrame)f
@@ -295,6 +326,7 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 				toX:(float)x1 y:(float)y1
 		  halfWidth:(float)halfWidth alpha:(float)alpha
 {
+	[self setAdditiveBlend:NO]; // ropes always alpha-blend
 	float dx = x1 - x0;
 	float dy = y1 - y0;
 	float len = sqrtf(dx * dx + dy * dy);
@@ -317,6 +349,7 @@ static inline float snapToPixel(float value, float origin, float screenScale)
    halfThickness:(float)halfThickness
 			   r:(float)r g:(float)g b:(float)b a:(float)a
 {
+	[self setAdditiveBlend:NO]; // debug overlays and skid marks always alpha-blend
 	float dx = x1 - x0;
 	float dy = y1 - y0;
 	float len = sqrtf(dx * dx + dy * dy);

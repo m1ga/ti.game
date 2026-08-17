@@ -55,6 +55,20 @@
 @property (atomic, assign) float tintG;
 @property (atomic, assign) float tintB;
 
+// Flash: a solid-color overlay on the sprite's silhouette that fades
+// out over flashDuration (damage hits, invincibility blinks). Set via
+// the proxy's flash(); flashRemaining counts down natively, 0 = off.
+@property (atomic, assign) float flashR;
+@property (atomic, assign) float flashG;
+@property (atomic, assign) float flashB;
+@property (atomic, assign) float flashDuration;  // seconds
+@property (atomic, assign) float flashRemaining; // seconds
+
+// Additive blending (glows, fire, lasers): the sprite's colors add
+// onto the backdrop instead of covering it. The batcher flushes once
+// per blend-mode change, so group additive sprites by zIndex.
+@property (atomic, assign) BOOL additiveBlend;
+
 // Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
 // frame draws behind the sprite (selection highlights, power-ups).
 // glowBlur is the blur radius in px; color as parsed 0..1 channels.

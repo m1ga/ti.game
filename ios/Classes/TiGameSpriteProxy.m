@@ -198,6 +198,18 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return _tintColor;
 }
 
+/** 'add' = additive blending — the sprite brightens the backdrop instead
+ *  of covering it (glows, lasers, fire); anything else = normal. */
+- (void)setBlend:(id)value
+{
+	self.sprite.additiveBlend = [@"add" isEqualToString:[TiUtils stringValue:value]];
+}
+
+- (NSString *)blend
+{
+	return self.sprite.additiveBlend ? @"add" : @"normal";
+}
+
 /** Glow tint, e.g. '#ffd54a'; visible once glowBlur > 0. */
 - (void)setGlowColor:(id)value
 {
@@ -750,6 +762,30 @@ static NSSet<NSString *> *toGroupSet(id value)
 - (void)stop:(id)unused
 {
 	[self.sprite stopAnimation];
+}
+
+/** Damage/invincibility flash: fills the sprite's silhouette with a
+ *  color (default white) and fades it out over a duration in ms
+ *  (default 150). sprite.flash('#f00', 300) — both args optional;
+ *  runs natively, calling again restarts it. */
+- (void)flash:(id)args
+{
+	NSArray *list = [args isKindOfClass:[NSArray class]] ? args : @[];
+	float fr = 1.0f, fg = 1.0f, fb = 1.0f;
+	TiColor *tiColor = (list.count > 0) ? [TiUtils colorValue:list[0]] : nil;
+	if (tiColor != nil) {
+		CGFloat r = 1, g = 1, b = 1, a = 1;
+		[[tiColor color] getRed:&r green:&g blue:&b alpha:&a];
+		fr = (float)r;
+		fg = (float)g;
+		fb = (float)b;
+	}
+	self.sprite.flashR = fr;
+	self.sprite.flashG = fg;
+	self.sprite.flashB = fb;
+	float seconds = ((list.count > 1) ? [TiUtils floatValue:list[1] def:150] : 150.0f) / 1000.0f;
+	self.sprite.flashDuration = seconds;
+	self.sprite.flashRemaining = seconds;
 }
 
 - (NSString *)animation

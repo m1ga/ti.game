@@ -26,6 +26,11 @@
 	screenScale:(float)screenScale; // float[16], column-major
 - (void)draw:(TGSprite *)sprite;
 
+/** Additive = (ONE, ONE) on premultiplied colors: quads brighten the
+ *  backdrop instead of covering it (glows, fire, lasers). Flushes the
+ *  pending batch on change, so mode switches cost one draw call. */
+- (void)setAdditiveBlend:(BOOL)additive;
+
 /** Axis-aligned textured quad with a straight-alpha tint color —
  *  the particle path (premultiplied internally, like drawLine). */
 - (void)drawFrame:(GLuint)texture frame:(TGFrame)f

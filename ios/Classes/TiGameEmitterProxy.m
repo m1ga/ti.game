@@ -265,6 +265,18 @@
 	self.emitter.tintB = (float)b;
 }
 
+/** 'add' = additive blending — particles brighten instead of cover
+ *  (fire, sparks, magic); anything else = normal alpha blending. */
+- (void)setBlend:(id)value
+{
+	self.emitter.additiveBlend = [@"add" isEqualToString:[TiUtils stringValue:value]];
+}
+
+- (NSString *)blend
+{
+	return self.emitter.additiveBlend ? @"add" : @"normal";
+}
+
 - (void)setEmitting:(id)value
 {
 	self.emitter.emitting = [TiUtils boolValue:value def:YES];

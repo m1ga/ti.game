@@ -105,6 +105,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("tintColor")) {
 			setTintColor(TiConvert.toString(options.get("tintColor")));
 		}
+		if (options.containsKey("blend")) {
+			setBlend(TiConvert.toString(options.get("blend")));
+		}
 		if (options.containsKey("glowColor")) {
 			setGlowColor(TiConvert.toString(options.get("glowColor")));
 		}
@@ -439,6 +442,49 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public String getTintColor()
 	{
 		return tintColor;
+	}
+
+	/** 'add' = additive blending — the sprite brightens the backdrop
+	 *  instead of covering it (glows, lasers, fire); anything else =
+	 *  normal alpha blending. */
+	@Kroll.setProperty
+	public void setBlend(String value)
+	{
+		sprite.additiveBlend = "add".equals(value);
+	}
+
+	@Kroll.getProperty
+	public String getBlend()
+	{
+		return sprite.additiveBlend ? "add" : "normal";
+	}
+
+	/** Damage/invincibility flash: fills the sprite's silhouette with
+	 *  `color` (default white) and fades it out over `duration` ms
+	 *  (default 150). Runs natively; calling again restarts it. */
+	@Kroll.method
+	public void flash(@Kroll.argument(optional = true) String color,
+					  @Kroll.argument(optional = true) Object duration)
+	{
+		float r = 1f;
+		float g = 1f;
+		float b = 1f;
+		if (color != null) {
+			try {
+				int parsed = Color.parseColor(expandShortHex(color));
+				r = Color.red(parsed) / 255f;
+				g = Color.green(parsed) / 255f;
+				b = Color.blue(parsed) / 255f;
+			} catch (IllegalArgumentException e) {
+				// keep white
+			}
+		}
+		sprite.flashR = r;
+		sprite.flashG = g;
+		sprite.flashB = b;
+		float seconds = TiConvert.toFloat(duration, 150f) / 1000f;
+		sprite.flashDuration = seconds;
+		sprite.flashRemaining = seconds;
 	}
 
 	/** Glow tint, e.g. '#ffd54a'; visible once glowBlur > 0. */

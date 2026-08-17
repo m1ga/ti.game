@@ -23,8 +23,9 @@ identical on both platforms.
   natively (chains, capes, bridges, grappling hooks)
 - Fullscreen camera effects (`cameraEffect`) — tint and glitch shader
   passes over the whole rendered scene; sprite glow highlights
-  (`glowColor`/`glowBlur`) and per-sprite color tinting (`tintColor`)
-- 15 example games in `example/` covering every feature
+  (`glowColor`/`glowBlur`), per-sprite color tinting (`tintColor`),
+  damage flashes (`flash()`) and additive blending (`blend: 'add'`)
+- 17 example games in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -399,7 +400,7 @@ a feature set — find the one closest to your game and start there:
 | `volley.js` | `restitution` ball, JS-driven hit response, simple AI timer |
 | `racing.js` | `carMode` drifting, skid marks, pixel art, lap/checkpoint logic |
 | `cards.js` | Deck dealing, fanned hand UI, selection tweens, idle wobble |
-| `asteroids.js` | `thrust`/`angularVelocity`, `wrapAround`, bullet pooling, laser/explosion effects + looping thruster sound |
+| `asteroids.js` | `thrust`/`angularVelocity`, `wrapAround`, bullet pooling, laser/explosion effects + looping thruster sound, additive bolts (`blend: 'add'`), crash damage flash (`flash()`) |
 | `topdown.js` | Tile map from a string array, solid tiles/house, `ySort` depth, 8-way d-pad, follower NPC on a decision timer |
 | `skate.js` | Endless runner: pixel-art parallax street, jump-button ollie over pooled obstacles, raised road sections to ride, crash sprite on collision |
 | `pointclick.js` | Adventure scene: tap-to-walk via distance-sized tweens, verb-coin icons on a hotspot, JS hit-testing vs. view taps, `ySort` depth |
@@ -408,6 +409,7 @@ a feature set — find the one closest to your game and start there:
 | `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground |
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
 | `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
+| `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` (overlaps bloom, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
 
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
@@ -480,8 +482,13 @@ mid-drag or mid-tween. All can be passed at creation.
 | Idle wobble | `idleAnimation`, `idleRotation`, `idleMovement`, `idleSpeed` |
 | Tint | `tintColor` (e.g. `'#ff5252'`) — multiplies the frame's colors (damage flashes, team colors, day/night shading); `null` or `'#fff'` = art unchanged |
 | Glow | `glowColor` (e.g. `'#ffc94d'`), `glowBlur` (blur radius in px; `0` = off), `glowOpacity` (halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur) — a tinted, blurred silhouette of the current frame drawn behind the sprite by a shader pass (selection highlights, power-ups); follows the sprite's shape, rotation and opacity |
+| Blend | `blend` (`'normal'`/`'add'`) — additive blending brightens the backdrop instead of covering it (glows, fire, lasers); costs one batch flush per mode change, so group additive sprites by `zIndex` |
 
-Methods: `play(name)`, `stop()`, `animate(options)`, `clearTweens()`.
+Methods: `play(name)`, `stop()`, `animate(options)`, `clearTweens()`,
+`flash(color, duration)` — fills the sprite's silhouette with `color`
+(default white) and fades it out over `duration` ms (default 150), all
+natively; the classic damage/invincibility flash a multiplicative
+`tintColor` can't do (white tint = no change).
 
 Events:
 
@@ -522,7 +529,7 @@ All properties are live.
 | Group | Properties |
 |---|---|
 | Placement | `x`, `y`, `target` (sprite to follow, null to detach), `offsetX`, `offsetY`, `zIndex` |
-| Look | `sheet`, `frame`, `size` (base px width; 0 = frame size), `tint`, `startScale`/`endScale`, `startOpacity`/`endOpacity` |
+| Look | `sheet`, `frame`, `size` (base px width; 0 = frame size), `tint`, `blend` (`'normal'`/`'add'` — additive particles brighten instead of cover: fire, sparks, magic), `startScale`/`endScale`, `startOpacity`/`endOpacity` |
 | Motion | `speed` (px/s, randomized 50–100%), `angle` (0 = up, clockwise), `spread` (degrees), `gravity` (px/s²), `lifetime` (ms) |
 | Emission | `rate` (particles/s), `emitting`, `maxParticles` (default 200, max 1000) |
 
