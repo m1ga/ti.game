@@ -399,7 +399,7 @@ a feature set — find the one closest to your game and start there:
 | `volley.js` | `restitution` ball, JS-driven hit response, simple AI timer |
 | `racing.js` | `carMode` drifting, skid marks, pixel art, lap/checkpoint logic |
 | `cards.js` | Deck dealing, fanned hand UI, selection tweens, idle wobble |
-| `asteroids.js` | `thrust`/`angularVelocity`, `wrapAround`, bullet pooling |
+| `asteroids.js` | `thrust`/`angularVelocity`, `wrapAround`, bullet pooling, laser/explosion effects + looping thruster sound |
 | `topdown.js` | Tile map from a string array, solid tiles/house, `ySort` depth, 8-way d-pad, follower NPC on a decision timer |
 | `skate.js` | Endless runner: pixel-art parallax street, jump-button ollie over pooled obstacles, raised road sections to ride, crash sprite on collision |
 | `pointclick.js` | Adventure scene: tap-to-walk via distance-sized tweens, verb-coin icons on a hotspot, JS hit-testing vs. view taps, `ySort` depth |

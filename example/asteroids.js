@@ -8,6 +8,9 @@
 // - five drifting, spinning asteroids; ship, rocks and bolts all wrap
 //   around the screen edges (wrapAround)
 // - shoot all five to clear the wave; flying into a rock resets it
+// - native sound effects (createSound): a laser zap per shot, an
+//   explosion when a rock (or the ship) blows up, and a looping engine
+//   rumble while the thruster is held (loop + stop on release)
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -43,6 +46,12 @@ module.exports = function () {
 	var shipSheet = Game.createSpriteSheet({ image: 'assets/ship.png', frameWidth: 64, frameHeight: 64 });
 	var rockSheet = Game.createSpriteSheet({ image: 'assets/asteroid.png', frameWidth: 64, frameHeight: 64 });
 	var starSheet = Game.createSpriteSheet({ image: 'assets/stars.png', frameWidth: 512, frameHeight: 512 });
+
+	// Low-latency effects from the shared native sound pool; the thruster
+	// loops while the button is held and stops on release.
+	var laserSound = Game.createSound({ url: 'assets/laser.wav', volume: 0.7 });
+	var explodeSound = Game.createSound({ url: 'assets/explode.wav' });
+	var thrustSound = Game.createSound({ url: 'assets/thrust.wav', volume: 0.8, loop: true });
 
 	var initialized = false;
 	gameView.addEventListener('resize', function (e) {
@@ -142,6 +151,7 @@ module.exports = function () {
 
 		ship.addEventListener('collision', function (e) {
 			if (e.group === 'asteroid') {
+				explodeSound.play();
 				notify('Crashed!');
 				resetShip();
 				spawnWave();
@@ -172,6 +182,7 @@ module.exports = function () {
 					}
 					deactivate(state);
 					e.other.visible = false; // rock gone (no render, no collision)
+					explodeSound.play();
 					destroyed++;
 					statusLabel.text = 'Rocks ' + destroyed + ' / ' + ROCK_COUNT;
 					if (destroyed >= ROCK_COUNT) {
@@ -203,6 +214,7 @@ module.exports = function () {
 			if (!state) {
 				return;
 			}
+			laserSound.play();
 			var rad = ship.rotation * Math.PI / 180;
 			var dirX = Math.sin(rad);
 			var dirY = -Math.cos(rad);
@@ -281,10 +293,12 @@ module.exports = function () {
 		bindHold(thrustButton, function () {
 			ship.thrust = THRUST;
 			ship.play('thrust'); // flame out of the tail while burning
+			thrustSound.play(); // looping engine rumble
 		}, function () {
 			ship.thrust = 0;
 			ship.stop();
 			ship.frame = 0;
+			thrustSound.stop();
 		});
 
 		var fireTimer = null;
@@ -302,6 +316,7 @@ module.exports = function () {
 			if (fireTimer) {
 				clearInterval(fireTimer);
 			}
+			thrustSound.stop(); // don't leave the loop running past the window
 		});
 
 		win.add(leftButton);
