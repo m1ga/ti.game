@@ -7,9 +7,9 @@
 /**
  * Native playback for one sound. Two modes, mirroring Android:
  *
- *   Effect (default): a small pool of AVAudioPlayers over one preloaded
- *   NSData buffer, so rapid plays overlap (jump, hit, collect) — the
- *   SoundPool equivalent.
+ *   Effect (default): a small pool of AVAudioPlayerNodes over one predecoded
+ *   PCM buffer on the module's shared AVAudioEngine, so rapid plays overlap
+ *   without creating or starting an AudioQueue on the JavaScript call path.
  *   Music (music = YES): a single streaming AVAudioPlayer; loops
  *   seamlessly and pauses/resumes with the app lifecycle.
  */
