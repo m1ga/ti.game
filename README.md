@@ -1,5 +1,9 @@
 # ti.game
 
+<p align="center">
+  <img src="assets/intro.jpg" width="100%" alt="intro image"/>
+</p>
+
 A 2D sprite game engine module for Titanium SDK (Android and iOS),
 rendered with OpenGL ES 2.0. You describe your scene and react to events
 from JavaScript; everything that runs every frame — rendering, animation,
