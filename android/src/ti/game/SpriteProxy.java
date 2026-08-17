@@ -186,6 +186,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("solidWith")) {
 			setSolidWith((Object[]) options.get("solidWith"));
 		}
+		if (options.containsKey("oneWay")) {
+			sprite.oneWay = TiConvert.toBoolean(options.get("oneWay"), false);
+		}
 		if (options.containsKey("restitution")) {
 			sprite.restitution = TiConvert.toFloat(options.get("restitution"));
 		}
@@ -1062,6 +1065,20 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public boolean getOnGround()
 	{
 		return sprite.onGround;
+	}
+
+	/** As a solid: riders only land on the top edge — they jump up
+	 *  through it and are never blocked sideways (pass-through floors). */
+	@Kroll.getProperty
+	public boolean getOneWay()
+	{
+		return sprite.oneWay;
+	}
+
+	@Kroll.setProperty
+	public void setOneWay(boolean value)
+	{
+		sprite.oneWay = value;
 	}
 
 	@Kroll.getProperty

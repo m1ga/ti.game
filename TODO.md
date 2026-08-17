@@ -36,8 +36,14 @@ traffic in the loop.
       circle/AABB collision events, contact-normal solid resolution
       (corner bounces), round touch area, circle debug overlay. Volley
       ball and asteroids use it.
-- [ ] One-way platforms (jump up through, land on top).
-- [ ] Moving platforms that carry the rider.
+- [x] One-way platforms (jump up through, land on top) — `oneWay: true`
+      on the solid; works for rect and circle riders. The platformer
+      staircase uses it.
+- [x] Moving platforms that carry the rider — riders inherit the ground
+      solid's per-frame movement (velocity, tweens, idle wobble; wrap
+      teleports excluded) before resolution, so they're carried sideways
+      and stay glued on the way down. Platformer demo has a patrolling
+      steel platform (a regular two-way solid).
 - [ ] Swept AABB option per sprite so fast bullets stop tunneling.
 - [ ] `gameView.raycast(x0, y0, x1, y1, groups)` one-shot query —
       line-of-sight, ground probes.

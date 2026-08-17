@@ -142,6 +142,21 @@ public class Sprite
 	public volatile Set<String> solidWith;
 	public volatile boolean onGround = false;
 
+	// One-way platform: as a solid, this sprite only catches riders
+	// falling onto its top edge — they jump up through it and are never
+	// blocked sideways or from below (pass-through floors).
+	public volatile boolean oneWay = false;
+
+	// How far update() moved this sprite this frame (velocity, tweens,
+	// idle wobble — wrap teleports excluded). The solid resolver applies
+	// the ground's delta to its rider, so moving platforms carry.
+	// GL thread only.
+	public float frameDeltaX = 0f;
+	public float frameDeltaY = 0f;
+
+	// The solid this sprite stood on last frame (GL thread only).
+	public Sprite groundSprite;
+
 	// Bounciness against solids: 0 = stop dead (platformer feet),
 	// 0..1 = reflect velocity with damping (balls). Tiny bounces come to rest.
 	public volatile float restitution = 0f;
@@ -280,6 +295,8 @@ public class Sprite
 	/** Called once per frame from the GL thread with the delta time in seconds. */
 	public void update(float dt)
 	{
+		float startX = x;
+		float startY = y;
 		if (carMode) {
 			updateCar(dt);
 		}
@@ -308,8 +325,10 @@ public class Sprite
 		}
 		if (wrapShift > 0f && x < wrapX) {
 			x += wrapShift;
+			startX += wrapShift; // teleport, not movement — keep it out of frameDelta
 		} else if (wrapShift < 0f && x > wrapX) {
 			x += wrapShift;
+			startX += wrapShift;
 		}
 		float flashLeft = flashRemaining;
 		if (flashLeft > 0f) {
@@ -318,6 +337,8 @@ public class Sprite
 		updateAnimation(dt);
 		updateTweens(dt);
 		updateIdle(dt);
+		frameDeltaX = x - startX;
+		frameDeltaY = y - startY;
 	}
 
 	/**

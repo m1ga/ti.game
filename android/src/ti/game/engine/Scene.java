@@ -465,6 +465,7 @@ public class Scene
 			if (groups == null || groups.isEmpty() || !s.visible) {
 				continue;
 			}
+			carryByGround(s);
 			if (s.circleHitbox) {
 				resolveCircleSolids(s, list, groups);
 				continue;
@@ -484,9 +485,18 @@ public class Scene
 				if (overlapX <= 0f || overlapY <= 0f) {
 					continue;
 				}
-				if (overlapY <= overlapX) {
+				boolean fromAbove = aabbA[1] + aabbA[3] < aabbB[1] + aabbB[3];
+				if (solid.oneWay) {
+					// pass-through except when falling onto the top edge:
+					// the rider's bottom was above it last frame
+					if (s.velocityY < 0f || aabbA[3] - s.frameDeltaY > aabbB[1] + 2f) {
+						continue;
+					}
+					fromAbove = true; // one-way only ever resolves as a landing
+				}
+				if (overlapY <= overlapX || solid.oneWay) {
 					// vertical resolution (compare AABB centers, *2 to avoid the division)
-					if (aabbA[1] + aabbA[3] < aabbB[1] + aabbB[3]) {
+					if (fromAbove) {
 						s.y -= overlapY; // hit the solid from above
 						float bounce = (s.restitution > 0f && s.velocityY > 0f)
 							? s.velocityY * s.restitution : 0f;
@@ -524,6 +534,7 @@ public class Scene
 				s.computeAABB(aabbA); // position changed — refresh for the next solid
 			}
 			s.onGround = grounded;
+			s.groundSprite = grounded ? groundedOn : null;
 			if (grounded && !wasOnGround) {
 				Sprite.SpriteEventListener listener = s.eventListener;
 				if (listener != null) {
@@ -531,6 +542,28 @@ public class Scene
 				}
 			}
 		}
+	}
+
+	/**
+	 * Moving platforms carry: before resolving, the rider inherits the
+	 * per-frame movement of the solid it stood on last frame, so it is
+	 * carried sideways and stays glued on the way down instead of
+	 * re-landing every frame. frameDelta excludes wrap teleports, and
+	 * direct JS position writes never enter it, so a teleporting
+	 * platform leaves its rider behind (as it should).
+	 */
+	private void carryByGround(Sprite s)
+	{
+		Sprite ground = s.groundSprite;
+		if (ground == null || s.dragged) { // a held finger outranks the platform
+			return;
+		}
+		if (!ground.visible || ground.scene != this) {
+			s.groundSprite = null; // platform vanished under the rider
+			return;
+		}
+		s.x += ground.frameDeltaX;
+		s.y += ground.frameDeltaY;
 	}
 
 	/**
@@ -580,6 +613,9 @@ public class Scene
 				ny = (nx != 0f) ? 0f : (min == toTop) ? -1f : 1f;
 				penetration = min + r;
 			}
+			if (solid.oneWay && (ny > -0.7f || s.velocityY < 0f)) {
+				continue; // one-way: balls only land on the top face
+			}
 			s.x += nx * penetration;
 			s.y += ny * penetration;
 			float vn = s.velocityX * nx + s.velocityY * ny;
@@ -599,6 +635,7 @@ public class Scene
 			}
 		}
 		s.onGround = grounded;
+		s.groundSprite = grounded ? groundedOn : null;
 		if (grounded && !wasOnGround) {
 			Sprite.SpriteEventListener listener = s.eventListener;
 			if (listener != null) {
