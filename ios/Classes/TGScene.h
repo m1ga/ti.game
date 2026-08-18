@@ -3,6 +3,8 @@
 //
 #import <Foundation/Foundation.h>
 
+@class TGDebugHud;
+@class TGFrameStats;
 @class TGParticleEmitter;
 @class TGRope;
 @class TGSkidTrail;
@@ -21,8 +23,17 @@
  */
 @interface TGScene : NSObject
 
-/** Renders debug overlays for every sprite (GameView.debug = true). */
+/** Renders debug overlays for every sprite (GameView.debug = { hitbox: true }). */
 @property (atomic, assign) BOOL debugAll;
+
+/** On-screen performance HUD (GameView.debug = { hud: 'topRight' }).
+ *  Lives here because three threads reach it: the JS thread configures
+ *  it, the render thread lays it out, the main thread hit-tests it. */
+@property (nonatomic, readonly) TGDebugHud *hud;
+
+/** Render telemetry behind the HUD and the 'performance' event. Off
+ *  until one of the two asks for it; see TGFrameStats. */
+@property (nonatomic, readonly) TGFrameStats *stats;
 
 /** Fading skid-mark segments emitted by carMode sprites (skidMarks).
  *  Drawn above sprites with zIndex <= 0 and below everything else. */

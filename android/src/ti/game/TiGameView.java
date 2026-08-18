@@ -99,6 +99,9 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		glView.setEGLConfigChooser(8, 8, 8, 8, 0, 0);
 		glView.setPreserveEGLContextOnPause(true);
 		renderer = new SceneRenderer(scene, proxy);
+		// The surface is in real pixels; the HUD sizes itself in dp so it
+		// reads the same on a 1x tablet and a 3x phone
+		renderer.setScreenScale(activity.getResources().getDisplayMetrics().density);
 		glView.setRenderer(renderer);
 		touchController = new TouchController(activity, scene, proxy);
 		glView.setOnTouchListener(touchController);
@@ -261,7 +264,19 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	{
 		if (!renderingShutdown) {
 			glView.onResume();
+			updateDisplayRefreshRate();
 			ti.game.engine.SoundEngine.notifyActivityResumed();
+		}
+	}
+
+	/** The baseline the debug HUD's dropped-frame count is measured
+	 *  against. Display.getRefreshRate is a UI-thread call, so it is
+	 *  pushed into the renderer instead of pulled from the GL thread. */
+	private void updateDisplayRefreshRate()
+	{
+		android.view.Display display = glView.getDisplay();
+		if (display != null) {
+			renderer.setDisplayRefreshRate(display.getRefreshRate());
 		}
 	}
 

@@ -75,6 +75,12 @@ public class ParticleEmitter
 		return maxParticles;
 	}
 
+	/** Live particles right now — read on the GL thread for the debug HUD. */
+	public int getActiveParticleCount()
+	{
+		return count;
+	}
+
 	/** Queues a one-shot burst of n particles (JS thread safe). */
 	public void emit(int n)
 	{

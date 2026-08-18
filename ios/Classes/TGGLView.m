@@ -17,6 +17,7 @@
 	GLint _drawableWidth;
 	GLint _drawableHeight;
 	NSCondition *_threadCondition;
+	CFTimeInterval _previousDisplayTimestamp; // render thread only
 
 	// Cross-thread flags (main writes, render thread reads)
 	atomic_bool _running;
@@ -180,6 +181,7 @@
 - (void)tick:(CADisplayLink *)link
 {
 	if (!atomic_load(&_running) || atomic_load(&_paused)) {
+		_previousDisplayTimestamp = 0;
 		_clockStale = YES;
 		return;
 	}
@@ -200,14 +202,36 @@
 		atomic_store(&_needsLayout, true); // zero-sized — try again next tick
 		return;
 	}
+	// The renderer decides whether this frame is measured; with the debug
+	// HUD off and nobody listening for 'performance' not one clock is read
+	BOOL measuring = [_renderer isMeasuring];
 	// Per-frame pool: the outer runloop pool only drains every few frames,
 	// letting snapshot copies from multiple ticks pile up
 	@autoreleasepool {
+		CFTimeInterval frameStart = measuring ? CACurrentMediaTime() : 0;
 		glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
 		[_renderer drawFrame:link.targetTimestamp];
+		CFTimeInterval drawEnd = measuring ? CACurrentMediaTime() : 0;
 		glBindRenderbuffer(GL_RENDERBUFFER, _colorRenderbuffer);
-		[_context presentRenderbuffer:GL_RENDERBUFFER];
+		// The swap is the one thing GLSurfaceView hides from the Android
+		// twin, which is why present time is an iOS-only HUD row
+		BOOL presented = [_context presentRenderbuffer:GL_RENDERBUFFER];
+		if (measuring) {
+			CFTimeInterval presentEnd = CACurrentMediaTime();
+			CFTimeInterval target = link.targetTimestamp - link.timestamp;
+			if (target <= 0.0) {
+				target = (link.duration > 0.0) ? link.duration : (1.0 / 60.0);
+			}
+			CFTimeInterval interval = (_previousDisplayTimestamp > 0.0)
+				? link.timestamp - _previousDisplayTimestamp : target;
+			[_renderer recordFrameCpuMs:(drawEnd - frameStart) * 1000.0
+							  presentMs:(presentEnd - drawEnd) * 1000.0
+							  presented:presented
+							   interval:interval
+								 target:target];
+		}
 	}
+	_previousDisplayTimestamp = link.timestamp;
 }
 
 - (void)applyMaxFps:(int)maxFps
