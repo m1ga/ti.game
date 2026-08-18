@@ -918,11 +918,20 @@ static float bottomEdge(TGSprite *s)
  * and visible sprites carrying a matching `collisionGroup`. Fires the
  * collision callback once per overlap-enter (re-fires after separation).
  */
+/**
+ * Fires the collision callback once per overlap-enter and the
+ * collision-end callback once per separation (also when the contact
+ * partner is hidden, removed from the scene, or stops matching the
+ * groups) — the enter/exit contact lifecycle of Unity/Godot triggers,
+ * minus a per-frame "stay" that would need bridge traffic.
+ */
 - (void)checkCollisions:(NSArray<TGSprite *> *)list
 {
 	for (TGSprite *s in list) {
 		NSSet<NSString *> *groups = s.collidesWith;
 		if (groups.count == 0 || !s.visible) {
+			// hidden or de-configured mid-contact: everything separates
+			[self endAllCollisions:s];
 			continue;
 		}
 		for (TGSprite *other in list) {
@@ -942,10 +951,51 @@ static float bottomEdge(TGSprite *s)
 						[listener sprite:s collidedWith:other];
 					}
 				}
-			} else {
+			} else if ([s.colliding containsObject:other]) {
 				[s.colliding removeObject:other];
+				fireCollisionEnd(s, other);
 			}
 		}
+		// Contacts the loop above can no longer see: partner left the
+		// scene, went invisible, or the group filter changed.
+		if (s.colliding.count > 0) {
+			NSMutableArray<TGSprite *> *stale = nil;
+			for (TGSprite *other in s.colliding) {
+				NSString *group = other.collisionGroup;
+				if (other.scene != self || !other.visible
+						|| group == nil || ![groups containsObject:group]) {
+					if (stale == nil) {
+						stale = [NSMutableArray array];
+					}
+					[stale addObject:other];
+				}
+			}
+			for (TGSprite *other in stale) {
+				[s.colliding removeObject:other];
+				fireCollisionEnd(s, other);
+			}
+		}
+	}
+}
+
+/** Separates every tracked contact of a sprite (hidden/de-configured). */
+- (void)endAllCollisions:(TGSprite *)s
+{
+	if (s.colliding.count == 0) {
+		return;
+	}
+	NSArray<TGSprite *> *contacts = [s.colliding allObjects];
+	[s.colliding removeAllObjects];
+	for (TGSprite *other in contacts) {
+		fireCollisionEnd(s, other);
+	}
+}
+
+static void fireCollisionEnd(TGSprite *s, TGSprite *other)
+{
+	id<TGSpriteEventListener> listener = s.eventListener;
+	if (listener != nil) {
+		[listener sprite:s separatedFrom:other];
 	}
 }
 

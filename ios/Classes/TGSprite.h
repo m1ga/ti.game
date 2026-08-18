@@ -14,6 +14,7 @@
 - (void)spriteAnimationComplete:(TGSprite *)sprite animationName:(NSString *)animationName;
 - (void)spriteTweenComplete:(TGSprite *)sprite;
 - (void)sprite:(TGSprite *)sprite collidedWith:(TGSprite *)other;
+- (void)sprite:(TGSprite *)sprite separatedFrom:(TGSprite *)other;
 - (void)sprite:(TGSprite *)sprite landedOn:(TGSprite *)solid;
 @end
 

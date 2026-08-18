@@ -1328,6 +1328,19 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Override
+	public void onCollisionEnd(Sprite s, Sprite other)
+	{
+		if (hasListeners("collisionend")) {
+			KrollDict data = new KrollDict();
+			data.put("group", other.collisionGroup);
+			data.put("other", other.proxy);
+			data.put("x", s.x);
+			data.put("y", s.y);
+			fireEvent("collisionend", data);
+		}
+	}
+
+	@Override
 	public void onLand(Sprite s, Sprite solid)
 	{
 		if (hasListeners("land")) {

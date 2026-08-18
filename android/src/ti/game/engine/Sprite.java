@@ -239,6 +239,7 @@ public class Sprite
 		void onAnimationComplete(Sprite sprite, String animationName);
 		void onTweenComplete(Sprite sprite);
 		void onCollision(Sprite sprite, Sprite other);
+		void onCollisionEnd(Sprite sprite, Sprite other);
 		void onLand(Sprite sprite, Sprite solid);
 	}
 

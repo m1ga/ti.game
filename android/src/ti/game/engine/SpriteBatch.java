@@ -433,16 +433,28 @@ public class SpriteBatch
 			float qw = layout.quads[i * 4 + 2];
 			float qh = layout.quads[i * 4 + 3];
 
+			// Quarter-texel UV inset: glyph cells sit edge-to-edge in the
+			// atlas, and sampling exactly on a cell boundary can round into
+			// the neighboring glyph (an underscore's bar showing up as a
+			// 1px line over the char below it). The inset keeps every
+			// sample inside the cell without shifting any interior texel.
+			float insetU = (f.width > 0f) ? (f.u1 - f.u0) / f.width * 0.25f : 0f;
+			float insetV = (f.height > 0f) ? (f.v1 - f.v0) / f.height * 0.25f : 0f;
+			float u0 = f.u0 + insetU;
+			float u1 = f.u1 - insetU;
+			float v0 = f.v0 + insetV;
+			float v1 = f.v1 - insetV;
+
 			float lx0 = (qx - ax) * sx, ly0 = (qy - ay) * sy;             // top-left
 			float lx1 = (qx + qw - ax) * sx, ly1 = ly0;                   // top-right
 			float lx2 = lx0, ly2 = (qy + qh - ay) * sy;                   // bottom-left
 			float lx3 = lx1, ly3 = ly2;                                   // bottom-right
 
 			ensureCapacity(texture);
-			putQuad(x + lx0 * cos - ly0 * sin, y + lx0 * sin + ly0 * cos, f.u0, f.v0,
-				x + lx1 * cos - ly1 * sin, y + lx1 * sin + ly1 * cos, f.u1, f.v0,
-				x + lx2 * cos - ly2 * sin, y + lx2 * sin + ly2 * cos, f.u0, f.v1,
-				x + lx3 * cos - ly3 * sin, y + lx3 * sin + ly3 * cos, f.u1, f.v1,
+			putQuad(x + lx0 * cos - ly0 * sin, y + lx0 * sin + ly0 * cos, u0, v0,
+				x + lx1 * cos - ly1 * sin, y + lx1 * sin + ly1 * cos, u1, v0,
+				x + lx2 * cos - ly2 * sin, y + lx2 * sin + ly2 * cos, u0, v1,
+				x + lx3 * cos - ly3 * sin, y + lx3 * sin + ly3 * cos, u1, v1,
 				r, g, b, a);
 		}
 	}

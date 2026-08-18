@@ -17,6 +17,7 @@
 //   Flip: flipX/flipY from movement — patrols turn around, tap flips gravity
 //   Text: bitmap-font labels in the GL scene — HUD, world signs, text buttons
 //   Swept: fast bullets vs a thin wall — swept: true stops the tunneling
+//   Zones: collision/collisionend lifecycle — water tint, pressure-plate door
 
 var demos = [
 	{ title: 'Basic demo', start: require('/basic') },
@@ -38,7 +39,8 @@ var demos = [
 	{ title: 'Blend & flash', start: require('/blend') },
 	{ title: 'Time scale', start: require('/timescale') },
 	{ title: 'Text', start: require('/text') },
-	{ title: 'Swept collision', start: require('/swept') }
+	{ title: 'Swept collision', start: require('/swept') },
+	{ title: 'Trigger zones', start: require('/zones') }
 ];
 
 var win = Ti.UI.createWindow({
@@ -65,16 +67,28 @@ const sv = Ti.UI.createScrollView({
 
 win.add(sv);
 
+// Two demos per row
+var row = null;
 demos.forEach(function (demo, index) {
+	if (index % 2 === 0) {
+		row = Ti.UI.createView({
+			layout: 'horizontal',
+			horizontalWrap: false,
+			width: Ti.UI.FILL,
+			height: Ti.UI.SIZE,
+			top: index === 0 ? 20 : 10
+		});
+		sv.add(row);
+	}
 	var button = Ti.UI.createButton({
 		title: demo.title,
-		top: index === 0 ? 20 : 10,
-		width: 220
+		left: '3%',
+		width: '46%'
 	});
 	button.addEventListener('click', function () {
 		demo.start();
 	});
-	sv.add(button);
+	row.add(button);
 });
 
 win.open();

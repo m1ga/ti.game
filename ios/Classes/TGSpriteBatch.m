@@ -428,16 +428,28 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 		float qw = quads[i * 4 + 2];
 		float qh = quads[i * 4 + 3];
 
+		// Quarter-texel UV inset: glyph cells sit edge-to-edge in the
+		// atlas, and sampling exactly on a cell boundary can round into
+		// the neighboring glyph (an underscore's bar showing up as a
+		// 1px line over the char below it). The inset keeps every
+		// sample inside the cell without shifting any interior texel.
+		float insetU = (f.width > 0.0f) ? (f.u1 - f.u0) / f.width * 0.25f : 0.0f;
+		float insetV = (f.height > 0.0f) ? (f.v1 - f.v0) / f.height * 0.25f : 0.0f;
+		float u0 = f.u0 + insetU;
+		float u1 = f.u1 - insetU;
+		float v0 = f.v0 + insetV;
+		float v1 = f.v1 - insetV;
+
 		float lx0 = (qx - ax) * sx, ly0 = (qy - ay) * sy;             // top-left
 		float lx1 = (qx + qw - ax) * sx, ly1 = ly0;                   // top-right
 		float lx2 = lx0, ly2 = (qy + qh - ay) * sy;                   // bottom-left
 		float lx3 = lx1, ly3 = ly2;                                   // bottom-right
 
 		[self ensureCapacity:texture];
-		[self putQuadX0:x + lx0 * cosr - ly0 * sinr y0:y + lx0 * sinr + ly0 * cosr u0:f.u0 v0:f.v0
-					 x1:x + lx1 * cosr - ly1 * sinr y1:y + lx1 * sinr + ly1 * cosr u1:f.u1 v1:f.v0
-					 x2:x + lx2 * cosr - ly2 * sinr y2:y + lx2 * sinr + ly2 * cosr u2:f.u0 v2:f.v1
-					 x3:x + lx3 * cosr - ly3 * sinr y3:y + lx3 * sinr + ly3 * cosr u3:f.u1 v3:f.v1
+		[self putQuadX0:x + lx0 * cosr - ly0 * sinr y0:y + lx0 * sinr + ly0 * cosr u0:u0 v0:v0
+					 x1:x + lx1 * cosr - ly1 * sinr y1:y + lx1 * sinr + ly1 * cosr u1:u1 v1:v0
+					 x2:x + lx2 * cosr - ly2 * sinr y2:y + lx2 * sinr + ly2 * cosr u2:u0 v2:v1
+					 x3:x + lx3 * cosr - ly3 * sinr y3:y + lx3 * sinr + ly3 * cosr u3:u1 v3:v1
 					  r:r g:g b:b a:a];
 	}
 }

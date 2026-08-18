@@ -941,6 +941,18 @@ static NSSet<NSString *> *toGroupSet(id value)
 	}
 }
 
+- (void)sprite:(TGSprite *)s separatedFrom:(TGSprite *)other
+{
+	if ([self _hasListeners:@"collisionend"]) {
+		NSMutableDictionary *data = [NSMutableDictionary dictionary];
+		data[@"group"] = other.collisionGroup;
+		data[@"other"] = other.proxy;
+		data[@"x"] = @(s.x);
+		data[@"y"] = @(s.y);
+		[self fireEvent:@"collisionend" withObject:data];
+	}
+}
+
 - (void)sprite:(TGSprite *)s landedOn:(TGSprite *)solid
 {
 	if ([self _hasListeners:@"land"]) {

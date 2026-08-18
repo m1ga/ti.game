@@ -3,6 +3,7 @@ package ti.game.engine;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -868,13 +869,19 @@ public class Scene
 	/**
 	 * AABB overlap test between sprites that declare `collidesWith` groups
 	 * and visible sprites carrying a matching `collisionGroup`. Fires the
-	 * collision callback once per overlap-enter (re-fires after separation).
+	 * collision callback once per overlap-enter and the collision-end
+	 * callback once per separation (also when the contact partner is
+	 * hidden, removed from the scene, or stops matching the groups) —
+	 * the enter/exit contact lifecycle of Unity/Godot triggers, minus a
+	 * per-frame "stay" that would need bridge traffic.
 	 */
 	private void checkCollisions(List<Sprite> list)
 	{
 		for (Sprite s : list) {
 			Set<String> groups = s.collidesWith;
 			if (groups == null || groups.isEmpty() || !s.visible) {
+				// hidden or de-configured mid-contact: everything separates
+				endAllCollisions(s);
 				continue;
 			}
 			for (Sprite other : list) {
@@ -893,10 +900,46 @@ public class Scene
 							listener.onCollision(s, other);
 						}
 					}
-				} else {
-					s.colliding.remove(other);
+				} else if (s.colliding.remove(other)) {
+					fireCollisionEnd(s, other);
 				}
 			}
+			// Contacts the loop above can no longer see: partner left the
+			// scene, went invisible, or the group filter changed.
+			if (!s.colliding.isEmpty()) {
+				Iterator<Sprite> it = s.colliding.iterator();
+				while (it.hasNext()) {
+					Sprite other = it.next();
+					String group = other.collisionGroup;
+					if (other.scene != this || !other.visible
+							|| group == null || !groups.contains(group)) {
+						it.remove();
+						fireCollisionEnd(s, other);
+					}
+				}
+			}
+		}
+	}
+
+	/** Separates every tracked contact of a sprite (hidden/de-configured). */
+	private void endAllCollisions(Sprite s)
+	{
+		if (s.colliding.isEmpty()) {
+			return;
+		}
+		Iterator<Sprite> it = s.colliding.iterator();
+		while (it.hasNext()) {
+			Sprite other = it.next();
+			it.remove();
+			fireCollisionEnd(s, other);
+		}
+	}
+
+	private static void fireCollisionEnd(Sprite s, Sprite other)
+	{
+		Sprite.SpriteEventListener listener = s.eventListener;
+		if (listener != null) {
+			listener.onCollisionEnd(s, other);
 		}
 	}
 

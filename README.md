@@ -34,7 +34,7 @@ identical on both platforms.
   the GL scene with a built-in pixel font, BMFont/AngelCode or monospace
   grid fonts (`createFont`); `screenFixed` pins any sprite to the surface
   for camera-proof HUDs
-- 20 example games in `example/` covering every feature
+- 21 example games in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -296,8 +296,13 @@ Notes:
 Tag obstacles with a `collisionGroup` and set
 `collidesWith: ['group', ...]` on the moving sprite: it fires a
 `collision` event (payload: `group`, `other` sprite, `x`, `y`) once per
-overlap-enter, re-arming after separation. This is independent of
-`solidWith` — use solids to *block*, collision events to *react*.
+overlap-enter and a matching `collisionend` once the shapes separate
+(the enter/exit trigger lifecycle — pressure plates, healing zones,
+"player left the area"). Removing or hiding the partner mid-contact also
+counts as separation. There is deliberately no per-frame "stay" event;
+track the in-between state in JS (you heard enter, you'll hear the end)
+or poll on a coarse timer. This is independent of `solidWith` — use
+solids to *block*, collision events to *react*.
 
 - A sprite with `width`/`height` but **no sheet** renders nothing and
   works as an invisible trigger: score zones, goals, checkpoints,
@@ -488,6 +493,7 @@ a feature set — find the one closest to your game and start there:
 | `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` (overlaps bloom, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
 | `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
 | `swept.js` | Swept AABB comparison: two lanes fire identical bullets at a thin wall with rising speed — the `swept: false` lane starts tunneling straight through, the `swept: true` lane never misses |
+| `zones.js` | `collision`/`collisionend` lifecycle: a water pool that tints the hero while he's inside, a pressure plate holding a door open exactly while the ball rests on it, and a remove-ball button showing that deleting a contact partner still fires the exit |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going |
 
 Run them with `ti build -p android` from `android/` (executes
@@ -587,6 +593,7 @@ Events:
 | `animationcomplete` | `animation` | Non-looping sheet animation finished |
 | `complete` | final transform values | Tween finished |
 | `collision` | `group`, `other`, `x`, `y` | Overlap with a `collidesWith` group began |
+| `collisionend` | `group`, `other`, `x`, `y` | That overlap ended (separation — also when the partner is removed or hidden) |
 | `land` | `x`, `y`, `other` (the solid), `group` | Landed on top of a `solidWith` solid |
 
 ### Sound
