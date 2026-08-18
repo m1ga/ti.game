@@ -3,6 +3,7 @@
 //
 #import <Foundation/Foundation.h>
 
+@class TGBitmapFont;
 @class TGDebugHud;
 @class TGFrameStats;
 @class TGParticleEmitter;
@@ -125,6 +126,11 @@
 /** Points default-font text at this scene's own font instance (called
  *  automatically on add; public so a proxy can re-resolve after clearing
  *  an explicit font). */
+/** This scene's built-in pixel font, created on first use. Also used by
+ *  the debug HUD, which shares this one texture rather than uploading a
+ *  second copy of the same 1.2 KB atlas. */
+- (TGBitmapFont *)defaultFont;
+
 - (void)resolveTextFont:(TGSprite *)sprite;
 /** Adds a group in one protected scene mutation. */
 - (void)addSprites:(NSArray<TGSprite *> *)sprites

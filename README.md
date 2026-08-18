@@ -600,6 +600,10 @@ var gameView = Game.createGameView({
 var gameView = Game.createGameView({
   debug: { hitbox: true, hud: 'bottomRight' } // both; corners: topLeft, topRight, bottomLeft, bottomRight
 });
+
+var gameView = Game.createGameView({
+  debug: { hud: true, hudFont: myFont }       // print it in the game's own typeface
+});
 ```
 
 Reading `gameView.debug` back always returns the normalized object —
@@ -611,28 +615,33 @@ under scroll, zoom, `shake()` and `cameraEffect: 'glitch'`. It starts as
 a compact line; **tap it** to expand into the full panel and tap again to
 collapse. Taps that land on the panel never reach the sprites underneath.
 
-Digits are drawn as seven segments, which cannot render M, K, V, W, X or
-Z — the labels are picked from what it can draw:
+Text is drawn with the same bitmap-font machinery as `createText`. With no
+`hudFont` the HUD borrows the scene's built-in pixel font — the one
+`createText` falls back to — so it uploads no texture of its own. Pass any
+font from `createFont` to match the game's typeface. Glyphs scale in whole
+steps of the font's native size, so a pixel font stays crisp.
+
+The compact line shows `FPS`, `MS` and `DC`. Expanded:
 
 | Label | Meaning |
 |---|---|
 | `FPS` | Frames presented in the last second |
-| `CPU` | Average engine time per frame, in ms (tick + draw; a `maxFps` cap is not counted) |
+| `MS` | Average engine time per frame (tick + draw; a `maxFps` cap is not counted) |
 | `P95` | 95th percentile of that per-frame time |
-| `tOP` | Worst single frame in the window |
-| `drOP` | Dropped frames — presentation intervals longer than one refresh |
-| `SPr` | Sprites drawn / sprites in the scene |
-| `EnIt` | Emitters in the scene |
-| `PArt` | Live particles across all emitters |
-| `dC` | Draw calls for the scene (the HUD's own are excluded) |
-| `tS` | Texture switches — each one costs a draw call |
-| `UPd` | Time in the scene tick (physics, animations, tweens) |
-| `tPrE` | Time spent uploading textures |
-| `bAt` | Time spent batching and drawing |
-| `PrE` | **iOS only** — time inside the buffer swap |
-| `PF` | **iOS only** — failed presents |
+| `MAX` | Worst single frame in the window |
+| `DROP` | Dropped frames — presentation intervals longer than one refresh |
+| `SPRITES` | Sprites drawn / sprites in the scene |
+| `EMITTERS` | Emitters in the scene |
+| `PARTICLES` | Live particles across all emitters |
+| `DRAWCALLS` | Draw calls for the scene (the HUD's own are excluded) |
+| `TEXSWITCH` | Texture switches — each one costs a draw call |
+| `UPDATE` | Time in the scene tick (physics, animations, tweens) |
+| `TEXTURE` | Time spent uploading textures |
+| `BATCH` | Time spent batching and drawing |
+| `PRESENT` | **iOS only** — time inside the buffer swap |
+| `PRESENTFAIL` | **iOS only** — failed presents |
 
-`PrE` and `PF` have no Android equivalent: `GLSurfaceView` swaps buffers
+`PRESENT` and `PRESENTFAIL` have no Android equivalent: `GLSurfaceView` swaps buffers
 on its own thread after the renderer returns, so there is no point at
 which the module could time the swap or read its result. The two rows are
 absent there rather than shown as zeros.
@@ -785,7 +794,7 @@ app down mid-frame.
 | `cameraEffect` | Fullscreen shader over the whole scene: `'none'` (default), `'tint'`, `'glitch'` |
 | `cameraTint` | Color for the `'tint'` effect, e.g. `'#4f8'` |
 | `cameraEffectIntensity` | Effect strength 0..1 (tint mix / glitch amount; default 1) |
-| `debug` | Developer aids: `true` = collision shapes for every sprite (shorthand for `{ hitbox: true }`), or `{ hitbox, hud }` where `hud` is `true`/`false` or a corner name (`'topLeft'`, `'topRight'`, `'bottomLeft'`, `'bottomRight'`) for the performance HUD — see [Debug HUD](#debug-hud). Reads back as the normalized object |
+| `debug` | Developer aids: `true` = collision shapes for every sprite (shorthand for `{ hitbox: true }`), or `{ hitbox, hud, hudFont }` where `hud` is `true`/`false` or a corner name (`'topLeft'`, `'topRight'`, `'bottomLeft'`, `'bottomRight'`) and `hudFont` is any `createFont` font — see [Debug HUD](#debug-hud). Reads back as the normalized object |
 
 Events: `press`, `tap`, `release` (any touch; payload `x`, `y`),
 `resize` (payload `width`, `height`), `timer` (payload `id` — only for
@@ -1054,7 +1063,6 @@ android/src/ti/game/
     ├── SpriteBatch.java     ES 2.0 batcher, one draw call per texture
     ├── ScreenOverlay.java   Screen-space pass: surface-pixel projection
     ├── DebugHud.java        On-screen performance HUD
-    ├── SegmentFont.java     Seven-segment glyphs for the HUD
     ├── FrameStats.java      Opt-in render telemetry, one-second windows
     ├── SkidTrail.java       Fading skid-mark ring buffer
     ├── TextureManager.java  GL upload, context-loss recovery

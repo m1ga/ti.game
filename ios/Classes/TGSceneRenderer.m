@@ -1,4 +1,5 @@
 #import "TGSceneRenderer.h"
+#import "TGBitmapFont.h"
 #import "TGDebugHud.h"
 #import "TGFrameStats.h"
 #import "TGParticleEmitter.h"
@@ -250,8 +251,17 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	// blending — the batcher needs no other state.
 	TGDebugHud *hud = _scene.hud;
 	if (hud.enabled) {
-		[_batch begin:[_overlay projection] originX:0.0f originY:0.0f screenScale:1.0f];
-		[hud draw:_batch texture:[_textures whiteTexture]
+		// The HUD's own font if it was given one, else the scene's built-in
+		// pixel font — the same instance createText() falls back to, so
+		// there is only ever one copy of that texture.
+		TGBitmapFont *hudFont = (hud.font != nil) ? hud.font : [_scene defaultFont];
+		[self ensureSheetLoadedOnce:hudFont.sheet];
+		// Screen space ignores camera travel, so the parallax terms are 0.
+		[_batch begin:_projection screenProjection:_screenProjection
+			  originX:left originY:top screenScale:scale
+			  travelX:0.0f travelY:0.0f];
+		[_batch setScreenSpace:YES];
+		[hud draw:_batch texture:[_textures whiteTexture] font:hudFont
 	   surfaceWidth:_surfaceWidth surfaceHeight:_surfaceHeight
 		screenScale:self.screenScale];
 		[_batch end];

@@ -1,4 +1,5 @@
 #import "TiGameGameViewProxy.h"
+#import "TGBitmapFont.h"
 #import "TGDebugHud.h"
 #import "TGFrameStats.h"
 #import "TGPostEffect.h"
@@ -7,6 +8,7 @@
 #import "TGScreenOverlay.h"
 #import "TGSprite.h"
 #import "TiGameEmitterProxy.h"
+#import "TiGameFontProxy.h"
 #import "TiGameGameView.h"
 #import "TiGameRopeProxy.h"
 #import "TiGameSpriteProxy.h"
@@ -127,10 +129,12 @@
 //   debug: { hitbox: true }            the same, spelled out
 //   debug: { hud: true }               performance HUD in the default corner
 //   debug: { hud: 'topRight' }         ...in the corner you pick
+//   debug: { hud: true, hudFont: f }   ...in the game's own typeface
 // The HUD key name is not settled with the maintainer yet; it appears
 // here and in the Android twin, nowhere else.
 static NSString *const kDebugHitboxKey = @"hitbox";
 static NSString *const kDebugHudKey = @"hud";
+static NSString *const kDebugHudFontKey = @"hudFont";
 
 - (void)setDebug:(id)value
 {
@@ -138,10 +142,14 @@ static NSString *const kDebugHudKey = @"hud";
 		NSDictionary *options = value;
 		self.scene.debugAll = [TiUtils boolValue:options[kDebugHitboxKey] def:NO];
 		[self applyHud:options[kDebugHudKey]];
+		id fontValue = options[kDebugHudFontKey];
+		self.scene.hud.font = [fontValue isKindOfClass:[TiGameFontProxy class]]
+			? ((TiGameFontProxy *)fontValue).font : nil;
 	} else {
 		// debug: true — the shorthand that predates the object form
 		self.scene.debugAll = [TiUtils boolValue:value def:NO];
 		[self applyHud:nil];
+		self.scene.hud.font = nil;
 	}
 	[self refreshStats];
 }

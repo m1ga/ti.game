@@ -198,10 +198,12 @@ public class GameViewProxy extends TiViewProxy
 	//   debug: { hitbox: true }            the same, spelled out
 	//   debug: { hud: true }               performance HUD in the default corner
 	//   debug: { hud: 'topRight' }         ...in the corner you pick
+	//   debug: { hud: true, hudFont: f }   ...in the game's own typeface
 	// The HUD key name is not settled with the maintainer yet; it appears
 	// here and in the iOS twin, nowhere else.
 	private static final String KEY_HITBOX = "hitbox";
 	private static final String KEY_HUD = "hud";
+	private static final String KEY_HUD_FONT = "hudFont";
 
 	/**
 	 * Reads back the normalized form, whichever form was written:
@@ -228,10 +230,14 @@ public class GameViewProxy extends TiViewProxy
 			java.util.Map<?, ?> options = (java.util.Map<?, ?>) value;
 			scene.debugAll = TiConvert.toBoolean(options.get(KEY_HITBOX), false);
 			applyHud(options.get(KEY_HUD));
+			Object fontValue = options.get(KEY_HUD_FONT);
+			scene.hud.font = (fontValue instanceof FontProxy)
+				? ((FontProxy) fontValue).getFont() : null;
 		} else {
 			// debug: true — the shorthand that predates the object form
 			scene.debugAll = TiConvert.toBoolean(value, false);
 			applyHud(null);
+			scene.hud.font = null;
 		}
 		refreshStats();
 	}

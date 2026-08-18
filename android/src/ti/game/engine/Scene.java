@@ -271,7 +271,9 @@ public class Scene
 	// when another GameView creates its own context).
 	private volatile BitmapFont defaultFont;
 
-	private synchronized BitmapFont defaultFont()
+	/** Also used by the debug HUD, which shares this one texture rather
+	 *  than uploading a second copy of the same 1.2 KB atlas. */
+	public synchronized BitmapFont defaultFont()
 	{
 		BitmapFont font = defaultFont;
 		if (font == null) {

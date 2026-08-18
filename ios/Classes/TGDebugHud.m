@@ -1,13 +1,15 @@
 #import "TGDebugHud.h"
 #import "TGScreenOverlay.h"
-#import "TGSegmentFont.h"
+#import "TGBitmapFont.h"
+#import "TGSpriteSheet.h"
 #import "TGSpriteBatch.h"
 
 static const NSUInteger kColumns = 3;
 static const NSUInteger kMaxRows = 6;
 
-// Layout, in points — multiplied by the screen scale.
-static const float kGlyphHeight = 9.0f;
+// Layout in points, multiplied by the screen scale — except the glyphs,
+// which step in whole multiples of the font's native size. A pixel font at
+// a fractional scale is a blurry pixel font.
 static const float kRowGap = 5.0f;
 static const float kColumnGap = 9.0f;
 static const float kPadding = 5.0f;
@@ -82,11 +84,12 @@ static const float kMargin = 8.0f;
 
 - (void)draw:(TGSpriteBatch *)batch
 	 texture:(GLuint)whiteTexture
+		font:(TGBitmapFont *)hudFont
 surfaceWidth:(float)surfaceWidth
 surfaceHeight:(float)surfaceHeight
  screenScale:(float)screenScale
 {
-	if (!_hasData) {
+	if (!_hasData || hudFont == nil || hudFont.sheet == nil || ![hudFont.sheet isReady]) {
 		return;
 	}
 	if ([self isExpanded] != _builtExpanded) {
@@ -94,7 +97,10 @@ surfaceHeight:(float)surfaceHeight
 	}
 
 	float scale = MAX(0.5f, screenScale);
-	float glyphHeight = kGlyphHeight * scale;
+	// Whole steps only: a pixel font drawn at 1.7x is a blurry mess, and at
+	// 2x it is exactly twice as crisp.
+	int glyphScale = MAX(1, (int)lroundf(scale));
+	float glyphHeight = hudFont.lineHeight * glyphScale;
 	float rowGap = kRowGap * scale;
 	float columnGap = kColumnGap * scale;
 	float padding = kPadding * scale;
@@ -110,7 +116,7 @@ surfaceHeight:(float)surfaceHeight
 		}
 		float width = 0.0f;
 		for (NSString *row in rows) {
-			width = MAX(width, [TGSegmentFont measure:row glyphHeight:glyphHeight]);
+			width = MAX(width, measureText(hudFont, row, glyphScale));
 		}
 		_columnWidths[c] = width;
 		contentWidth += width;
@@ -154,20 +160,61 @@ surfaceHeight:(float)surfaceHeight
 		}
 		float y = _origin[1] + padding;
 		for (NSString *row in rows) {
-			[TGSegmentFont draw:batch texture:whiteTexture text:row
-							  x:x y:y glyphHeight:glyphHeight
-							  r:0.75f g:1.0f b:0.8f a:1.0f];
+			drawText(batch, hudFont, row, x, y, glyphScale, 0.75f, 1.0f, 0.8f, 1.0f);
 			y += glyphHeight + rowGap;
 		}
 		x += _columnWidths[c] + columnGap;
 	}
 }
 
-/**
- * Labels are limited to what seven segments can draw (no M, K, V, W, X,
- * Z), hence CPU rather than MS and tOP rather than MAX. The README spells
- * every one of them out.
- */
+/** Pen width of `text` at the given whole-number scale. */
+static float measureText(TGBitmapFont *font, NSString *text, int scale)
+{
+	float width = 0.0f;
+	for (NSUInteger i = 0; i < text.length; i++) {
+		unichar c = [text characterAtIndex:i];
+		TGGlyph glyph;
+		width += [font glyphForCharacter:c into:&glyph] ? glyph.xAdvance : [font missingAdvance];
+		if (i + 1 < text.length) {
+			width += [font kernFirst:c second:[text characterAtIndex:i + 1]];
+		}
+	}
+	return width * scale;
+}
+
+/** Lays glyph quads straight into the batch — no TGTextSprite, no scene. */
+static void drawText(TGSpriteBatch *batch, TGBitmapFont *font, NSString *text,
+					 float x, float y, int scale,
+					 float r, float g, float b, float a)
+{
+	GLuint texture = (GLuint)[font.sheet textureId];
+	float pen = x;
+	for (NSUInteger i = 0; i < text.length; i++) {
+		unichar c = [text characterAtIndex:i];
+		TGGlyph glyph;
+		if (![font glyphForCharacter:c into:&glyph]) {
+			pen += [font missingAdvance] * scale;
+			continue;
+		}
+		TGFrame frame;
+		if ([font.sheet frame:glyph.frameIndex into:&frame]
+				&& glyph.width > 0.0f && glyph.height > 0.0f) {
+			float halfW = glyph.width * scale * 0.5f;
+			float halfH = glyph.height * scale * 0.5f;
+			[batch drawFrame:texture frame:frame
+						  cx:pen + glyph.xOffset * scale + halfW
+						  cy:y + glyph.yOffset * scale + halfH
+					   halfW:halfW halfH:halfH
+						   r:r g:g b:b a:a];
+		}
+		pen += glyph.xAdvance * scale;
+		if (i + 1 < text.length) {
+			pen += [font kernFirst:c second:[text characterAtIndex:i + 1]] * scale;
+		}
+	}
+}
+
+/** The README explains every label. */
 - (void)buildText
 {
 	BOOL full = [self isExpanded];
@@ -178,30 +225,30 @@ surfaceHeight:(float)surfaceHeight
 
 	if (!full) {
 		[self put:0 text:[NSString stringWithFormat:@"FPS %ld", lround(_latest.fps)]];
-		[self put:1 text:[NSString stringWithFormat:@"CPU %.1f", _latest.averageCpuMs]];
-		[self put:2 text:[NSString stringWithFormat:@"dC %d", _latest.drawCalls]];
+		[self put:1 text:[NSString stringWithFormat:@"MS %.1f", _latest.averageCpuMs]];
+		[self put:2 text:[NSString stringWithFormat:@"DC %d", _latest.drawCalls]];
 		return;
 	}
 
 	[self put:0 text:[NSString stringWithFormat:@"FPS %ld", lround(_latest.fps)]];
-	[self put:0 text:[NSString stringWithFormat:@"CPU %.1f", _latest.averageCpuMs]];
+	[self put:0 text:[NSString stringWithFormat:@"MS %.1f", _latest.averageCpuMs]];
 	[self put:0 text:[NSString stringWithFormat:@"P95 %.1f", _latest.p95CpuMs]];
-	[self put:0 text:[NSString stringWithFormat:@"tOP %.1f", _latest.maxCpuMs]];
-	[self put:0 text:[NSString stringWithFormat:@"drOP %d", _latest.droppedFrames]];
+	[self put:0 text:[NSString stringWithFormat:@"MAX %.1f", _latest.maxCpuMs]];
+	[self put:0 text:[NSString stringWithFormat:@"DROP %d", _latest.droppedFrames]];
 
-	[self put:1 text:[NSString stringWithFormat:@"SPr %d/%d", _latest.visibleSprites, _latest.sprites]];
-	[self put:1 text:[NSString stringWithFormat:@"EnIt %d", _latest.emitters]];
-	[self put:1 text:[NSString stringWithFormat:@"PArt %d", _latest.particles]];
-	[self put:1 text:[NSString stringWithFormat:@"dC %d", _latest.drawCalls]];
-	[self put:1 text:[NSString stringWithFormat:@"tS %d", _latest.textureSwitches]];
+	[self put:1 text:[NSString stringWithFormat:@"SPRITES %d/%d", _latest.visibleSprites, _latest.sprites]];
+	[self put:1 text:[NSString stringWithFormat:@"EMITTERS %d", _latest.emitters]];
+	[self put:1 text:[NSString stringWithFormat:@"PARTICLES %d", _latest.particles]];
+	[self put:1 text:[NSString stringWithFormat:@"DRAWCALLS %d", _latest.drawCalls]];
+	[self put:1 text:[NSString stringWithFormat:@"TEXSWITCH %d", _latest.textureSwitches]];
 
-	[self put:2 text:[NSString stringWithFormat:@"UPd %.1f", _latest.averageUpdateMs]];
-	[self put:2 text:[NSString stringWithFormat:@"tPrE %.1f", _latest.averageTexturePrepareMs]];
-	[self put:2 text:[NSString stringWithFormat:@"bAt %.1f", _latest.averageBatchMs]];
+	[self put:2 text:[NSString stringWithFormat:@"UPDATE %.1f", _latest.averageUpdateMs]];
+	[self put:2 text:[NSString stringWithFormat:@"TEXTURE %.1f", _latest.averageTexturePrepareMs]];
+	[self put:2 text:[NSString stringWithFormat:@"BATCH %.1f", _latest.averageBatchMs]];
 	// Only this platform can time the swap — the Android twin has no
 	// equivalent rows rather than two zeros that mean nothing
-	[self put:2 text:[NSString stringWithFormat:@"PrE %.1f", _latest.averagePresentMs]];
-	[self put:2 text:[NSString stringWithFormat:@"PF %d", _latest.presentFailures]];
+	[self put:2 text:[NSString stringWithFormat:@"PRESENT %.1f", _latest.averagePresentMs]];
+	[self put:2 text:[NSString stringWithFormat:@"PRESENTFAIL %d", _latest.presentFailures]];
 }
 
 - (void)put:(NSUInteger)column text:(NSString *)text

@@ -271,8 +271,15 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		// re-enables blending — the batcher needs no other state.
 		DebugHud hud = scene.hud;
 		if (hud.enabled) {
-			batch.begin(overlay.projection(), 0f, 0f, 1f);
-			hud.draw(batch, textures.whiteTexture(), surfaceWidth, surfaceHeight, screenScale);
+			// The HUD's own font if it was given one, else the scene's
+			// built-in pixel font — the same instance createText() falls
+			// back to, so there is only ever one copy of that texture.
+			BitmapFont hudFont = (hud.font != null) ? hud.font : scene.defaultFont();
+			ensureSheetLoaded(hudFont.sheet);
+			// Screen space ignores camera travel, so the parallax terms are 0.
+			batch.begin(projection, screenProjection, left, top, scale, 0f, 0f);
+			batch.setScreenSpace(true);
+			hud.draw(batch, textures.whiteTexture(), hudFont, surfaceWidth, surfaceHeight, screenScale);
 			batch.end();
 		}
 
