@@ -162,7 +162,9 @@ traffic in the loop.
 - [ ] Native virtual joystick/d-pad that writes directly into a sprite's
       `velocity`/`steering`/`throttle` (`joystick.bind(sprite, ...)`) —
       no bridge in the loop; replaces the hand-rolled button overlays in
-      the demos.
+      the demos. Both halves it needs already exist for the debug HUD:
+      `ScreenOverlay` draws in surface pixels, and the touch controllers
+      hit-test in surface pixels before converting to world space.
 - [ ] Gamepad support (Android key/motion events, iOS GCController) with
       the same native binding plus discrete button events.
 
@@ -216,8 +218,11 @@ traffic in the loop.
 
 ## Developer experience (sprinkle in between)
 
-- [ ] Stats overlay next to the debug overlay: fps, draw calls, sprite
-      and particle counts.
+- [x] Stats overlay next to the debug overlay: fps, draw calls, sprite
+      and particle counts — `debug: { hud: 'topRight' }`, tap to expand,
+      plus a `performance` event. Present time and present failures are
+      iOS-only; `GLSurfaceView` swaps buffers where the Android renderer
+      cannot time it.
 - [ ] TypeScript definitions (`ti.game.d.ts`) for the JS API.
 - [ ] Aseprite JSON import alongside TexturePacker — tags auto-define
       named animations.

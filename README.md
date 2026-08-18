@@ -20,6 +20,7 @@ identical on both platforms.
   swept AABB for fast bullets (`swept: true` — no tunneling)
 - Parallax scroll looping, screen wrapping, idle wobble animation
 - Pixel-art mode (nearest-neighbor filtering), debug overlay for hitboxes
+  and an on-screen performance HUD (fps, frame time, draw calls, counts)
 - Sound: low-latency overlapping effects + looping music (`createSound`),
   auto-paused and resumed with the app
 - Particles: native pooled emitters (`createEmitter`) — continuous rate or
@@ -416,9 +417,11 @@ solids to *block*, collision events to *react*.
   the path crossed, and `solidWith` walls stop it at the impact point
   instead of letting it teleport through. Circle hitboxes sweep as their
   bounding box; the swept demo shows the comparison side by side.
-- `debug: true` on a sprite (or on the GameView for everything) renders
-  the shapes: **green** = collision AABB (with `hitboxScale`), **blue** =
-  sprite/touch bounds, **orange dot** = anchor.
+- `debug: true` on a sprite (or `debug: { hitbox: true }` on the GameView
+  for everything) renders the shapes: **green** = collision AABB (with
+  `hitboxScale`), **blue** = sprite/touch bounds, **orange dot** = anchor.
+  The GameView's `debug` also turns on the performance HUD — see
+  [Debug HUD](#debug-hud).
 
 ### Play sounds
 
@@ -580,6 +583,80 @@ Give the player, trees and buildings the same `zIndex` with `ySort`, keep
 ground tiles on a lower `zIndex`, and the Zelda-style depth illusion
 falls out automatically (see `topdown.js`).
 
+### Debug HUD
+
+The GameView's `debug` property turns on the two developer aids. It takes
+a boolean or an object:
+
+```javascript
+var gameView = Game.createGameView({
+  debug: true                                 // collision shapes (shorthand for { hitbox: true })
+});
+
+var gameView = Game.createGameView({
+  debug: { hud: true }                        // performance HUD, default corner (top left)
+});
+
+var gameView = Game.createGameView({
+  debug: { hitbox: true, hud: 'bottomRight' } // both; corners: topLeft, topRight, bottomLeft, bottomRight
+});
+```
+
+Reading `gameView.debug` back always returns the normalized object —
+`{ hitbox: false, hud: 'bottomRight' }` — whichever form was written.
+The sprite-level `debug` stays a plain boolean.
+
+The HUD draws in screen space, after the camera effect, so it stays put
+under scroll, zoom, `shake()` and `cameraEffect: 'glitch'`. It starts as
+a compact line; **tap it** to expand into the full panel and tap again to
+collapse. Taps that land on the panel never reach the sprites underneath.
+
+Digits are drawn as seven segments, which cannot render M, K, V, W, X or
+Z — the labels are picked from what it can draw:
+
+| Label | Meaning |
+|---|---|
+| `FPS` | Frames presented in the last second |
+| `CPU` | Average engine time per frame, in ms (tick + draw; a `maxFps` cap is not counted) |
+| `P95` | 95th percentile of that per-frame time |
+| `tOP` | Worst single frame in the window |
+| `drOP` | Dropped frames — presentation intervals longer than one refresh |
+| `SPr` | Sprites drawn / sprites in the scene |
+| `EnIt` | Emitters in the scene |
+| `PArt` | Live particles across all emitters |
+| `dC` | Draw calls for the scene (the HUD's own are excluded) |
+| `tS` | Texture switches — each one costs a draw call |
+| `UPd` | Time in the scene tick (physics, animations, tweens) |
+| `tPrE` | Time spent uploading textures |
+| `bAt` | Time spent batching and drawing |
+| `PrE` | **iOS only** — time inside the buffer swap |
+| `PF` | **iOS only** — failed presents |
+
+`PrE` and `PF` have no Android equivalent: `GLSurfaceView` swaps buffers
+on its own thread after the renderer returns, so there is no point at
+which the module could time the swap or read its result. The two rows are
+absent there rather than shown as zeros.
+
+The same numbers arrive in JS through the `performance` event, fired at
+most once a second on the GameView. Android omits the `averagePresentMs`
+and `presentFailures` keys instead of sending zeros:
+
+```javascript
+gameView.addEventListener('performance', function (e) {
+  Ti.API.info(e.fps + ' fps, ' + e.averageCpuMs.toFixed(1) + ' ms, ' + e.drawCalls + ' draw calls');
+});
+```
+
+Payload: `fps`, `averageCpuMs`, `p95CpuMs`, `maxCpuMs`, `averageUpdateMs`,
+`averageTexturePrepareMs`, `averageBatchMs`, `averagePresentMs` (iOS),
+`droppedFrames`, `presentFailures` (iOS), `sprites`, `visibleSprites`,
+`emitters`, `particles`, `drawCalls`, `textureSwitches`, `surfaceWidth`,
+`surfaceHeight`.
+
+Measuring is opt-in all the way down: with the HUD off and no
+`performance` listener attached, the renderer never reads a clock and the
+HUD costs nothing. `particles.js` and `bulkadd.js` have it switched on.
+
 ## Learn from the examples
 
 `example/app.js` is a launcher; each demo is a self-contained file showing
@@ -598,7 +675,7 @@ a feature set — find the one closest to your game and start there:
 | `topdown.js` | Tile map from a string array, solid tiles/house, `ySort` depth, 8-way d-pad, follower NPC on a decision timer |
 | `skate.js` | Endless runner: pixel-art parallax street, jump-button ollie over pooled obstacles, raised road sections to ride, crash sprite on collision |
 | `pointclick.js` | Adventure scene: tap-to-walk via `findPath` + `followPath` (the player routes around the oak's trunk, an invisible obstacle box), verb-coin icons on a hotspot, JS hit-testing vs. view taps, `ySort` depth |
-| `particles.js` | Emitter playground: continuous spark fountain, tap-for-fireworks bursts, smoke trail following a dragged sprite |
+| `particles.js` | Emitter playground: continuous spark fountain, tap-for-fireworks bursts, smoke trail following a dragged sprite, debug HUD on (`debug: { hud: 'topRight' }`) |
 | `rhythm.js` | DDR-style note catcher: pooled notes on native velocity, `press`-event pads, timing-based good/bad sounds, tinted hit bursts, miss trigger zone |
 | `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground, `scrollFactor` parallax (1.35x cloud shadows, a scrollFactor-0 sun pinned to the view) |
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
@@ -619,6 +696,7 @@ a feature set — find the one closest to your game and start there:
 | `demoscene.js` | Old-school cracktro: per-character sine text scroller on rotated copies of one closed `followPath` loop, additive copper bars bobbing on circle paths (constant speed on a circle = perfect sine), glowing floating logo, tween-scrolled `tileRepeat` starfield, looping chiptune on the music backend |
 | `maze.js` | A* playground: tap a tile and `findPath` routes the player through a wall-tile maze (`cellSize` = tile size, so the grid matches the map) — faint dots show every grid cell of the raw route (`simplify: false`), gold dots the simplified waypoints handed to `followPath`; a hound re-paths to the player on a `gameView.every` timer and sends you `flash`ing back on contact |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going; a GAME clock on `gameView.every(1000, ...)` freezes with the scene while a REAL `setInterval` clock keeps ticking |
+| `bulkadd.js` | One `add([...])` call for a mixed sprite/emitter/rope array, add/remove buttons, debug HUD on |
 
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
@@ -707,11 +785,13 @@ app down mid-frame.
 | `cameraEffect` | Fullscreen shader over the whole scene: `'none'` (default), `'tint'`, `'glitch'` |
 | `cameraTint` | Color for the `'tint'` effect, e.g. `'#4f8'` |
 | `cameraEffectIntensity` | Effect strength 0..1 (tint mix / glitch amount; default 1) |
-| `debug` | Draw collision shapes for every sprite |
+| `debug` | Developer aids: `true` = collision shapes for every sprite (shorthand for `{ hitbox: true }`), or `{ hitbox, hud }` where `hud` is `true`/`false` or a corner name (`'topLeft'`, `'topRight'`, `'bottomLeft'`, `'bottomRight'`) for the performance HUD — see [Debug HUD](#debug-hud). Reads back as the normalized object |
 
 Events: `press`, `tap`, `release` (any touch; payload `x`, `y`),
-`resize` (payload `width`, `height`) and `timer` (payload `id` — only
-for `after()`/`every()` calls made without a callback).
+`resize` (payload `width`, `height`), `timer` (payload `id` — only for
+`after()`/`every()` calls made without a callback) and `performance`
+(render telemetry, at most once a second, only while a listener is
+attached — see [Debug HUD](#debug-hud)).
 
 ### SpriteSheet
 
@@ -972,6 +1052,10 @@ android/src/ti/game/
     ├── Animation.java       Frame indices + fps + loop
     ├── SceneRenderer.java   GLSurfaceView.Renderer — the game loop
     ├── SpriteBatch.java     ES 2.0 batcher, one draw call per texture
+    ├── ScreenOverlay.java   Screen-space pass: surface-pixel projection
+    ├── DebugHud.java        On-screen performance HUD
+    ├── SegmentFont.java     Seven-segment glyphs for the HUD
+    ├── FrameStats.java      Opt-in render telemetry, one-second windows
     ├── SkidTrail.java       Fading skid-mark ring buffer
     ├── TextureManager.java  GL upload, context-loss recovery
     ├── TouchController.java Hit test, drag, pinch, rotate
