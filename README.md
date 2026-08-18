@@ -670,13 +670,17 @@ mid-drag or mid-tween. All can be passed at creation.
 | `glowOpacity` | Halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur |
 | `blend` | `'normal'`/`'add'` — additive blending brightens the backdrop instead of covering it (glows, fire, lasers); costs one batch flush per mode change, so group additive sprites by `zIndex` |
 
-Methods: `play(name)`, `stop()`, `animate(options)`, `clearTweens()`,
-`flash(color, duration)` — fills the sprite's silhouette with `color`
-(default white) and fades it out over `duration` ms (default 150), all
-natively; the classic damage/invincibility flash a multiplicative
-`tintColor` can't do (white tint = no change).
+#### Methods
 
-Events:
+| Method | Description |
+|---|---|
+| `play(name)` | Start the named sheet animation; returns false for unknown names |
+| `stop()` | Stop the running sheet animation (the current frame stays) |
+| `animate(options)` | Native tween of `x`, `y`, `scale`/`scaleX`/`scaleY`, `rotation`, `opacity`, `glowOpacity` with `duration`/`delay` (ms) and `easing` (`EASE_*` constants); an optional `frame` is set once it finishes; fires `complete` |
+| `clearTweens()` | Cancel all running tweens (values stay where they are) |
+| `flash(color, duration)` | Fill the sprite's silhouette with `color` (default white) and fade it out over `duration` ms (default 150), all natively — the damage/invincibility flash a multiplicative `tintColor` can't do (white tint = no change) |
+
+#### Events
 
 | Event | Payload | When |
 |---|---|---|
