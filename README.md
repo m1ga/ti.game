@@ -556,21 +556,119 @@ Options: `image`, `frameWidth`/`frameHeight` **or** `atlas`,
 All properties are live: reading returns the current native value, even
 mid-drag or mid-tween. All can be passed at creation.
 
-| Group | Properties |
+#### Transform
+
+| Property | Description |
 |---|---|
-| Transform | `x`, `y`, `width`, `height` (default: frame size), `scale`, `scaleX`, `scaleY` (negative flips), `rotation`, `anchorX`, `anchorY`, `opacity`, `visible`, `pixelSnap` (render-only framebuffer alignment; default false), `screenFixed` (x/y become surface coordinates; camera position, zoom and shake are ignored — HUDs; touch maps back automatically), `zIndex`, `ySort`, `flipX`, `flipY` (mirror the drawn frame only — position, anchor, physics and hit testing are unaffected, unlike negative scale) |
-| Sheet/animation | `sheet`, `frame`, `animations`, `animation` (read-only), `tileRepeat` (`true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture) |
-| Touch behaviors | `draggable`, `pinchable`, `rotatable`, `touchEnabled` (false = touches pass through to sprites underneath) |
-| Physics | `velocityX`, `velocityY`, `gravity`, `maxSpeed` |
-| Solids | `solidWith`, `onGround` (read-only), `restitution`, `oneWay` (as a solid: landings on the top edge only — pass-through from below/sideways); moving solids carry their riders automatically, `carryRiders: false` opts a solid out (world-scroll terrain) |
-| Collision | `collisionGroup`, `collidesWith`, `hitboxScale`, `hitboxShape` (`'rect'`/`'circle'` — circles also bounce off solid corners along the contact normal), `swept` (movement is collision-tested as a path — fast bullets stop tunneling through thin targets and solids), `debug` |
-| Car | `carMode`, `throttle`, `steering`, `enginePower`, `turnRate`, `grip`, `drag`, `skidMarks`, `skidThreshold`, `drifting` (read-only) |
-| Flight | `thrust`, `angularVelocity`, `wrapAround` |
-| Wrap/loop | `wrapX`, `wrapShift` |
-| Idle wobble | `idleAnimation`, `idleRotation`, `idleMovement`, `idleSpeed` |
-| Tint | `tintColor` (e.g. `'#ff5252'`) — multiplies the frame's colors (damage flashes, team colors, day/night shading); `null` or `'#fff'` = art unchanged |
-| Glow | `glowColor` (e.g. `'#ffc94d'`), `glowBlur` (blur radius in px; `0` = off), `glowOpacity` (halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur) — a tinted, blurred silhouette of the current frame drawn behind the sprite by a shader pass (selection highlights, power-ups); follows the sprite's shape, rotation and opacity |
-| Blend | `blend` (`'normal'`/`'add'`) — additive blending brightens the backdrop instead of covering it (glows, fire, lasers); costs one batch flush per mode change, so group additive sprites by `zIndex` |
+| `x`, `y` | Position of the anchor point, world px (surface px with `screenFixed`) |
+| `width`, `height` | Drawn size in px; default: the sheet frame's size |
+| `scale` | Sets `scaleX` and `scaleY` together (default 1) |
+| `scaleX`, `scaleY` | Per-axis scale; negative values flip |
+| `rotation` | Degrees, positive = clockwise |
+| `anchorX`, `anchorY` | Anchor as a fraction of the size (default 0.5/0.5 = center) — position, rotation and scaling pivot here |
+| `opacity` | 0..1 (default 1); 0 also disables touch |
+| `visible` | false hides the sprite and removes it from touch and collision |
+| `pixelSnap` | Snap only the rendered anchor to the framebuffer pixel grid (default false); physics and live `x`/`y` stay subpixel floats |
+| `screenFixed` | `x`/`y` become surface coordinates; camera position, zoom and shake are ignored (HUDs, on-screen buttons) — touch maps back automatically |
+| `zIndex` | Draw order (higher = in front) |
+| `ySort` | Within the same `zIndex`, sort by bottom edge — top-down depth (see below) |
+| `flipX`, `flipY` | Mirror the drawn frame only — position, anchor, physics and hit testing are unaffected, unlike negative scale |
+
+#### Sheet & animation
+
+| Property | Description |
+|---|---|
+| `sheet` | The SpriteSheet to draw frames from; no sheet = invisible trigger sprite |
+| `frame` | Current sheet frame index (stops a running animation when set) |
+| `animations` | Named animation definitions: `{ frames, fps, loop, frame }` |
+| `animation` | Name of the running animation (read-only) |
+| `tileRepeat` | `true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture |
+
+#### Touch behaviors
+
+| Property | Description |
+|---|---|
+| `draggable` | Native drag & drop |
+| `pinchable` | Two-finger scale while held |
+| `rotatable` | Two-finger rotate while held |
+| `touchEnabled` | false = touches pass through to sprites underneath |
+
+#### Physics
+
+| Property | Description |
+|---|---|
+| `velocityX`, `velocityY` | px/s, integrated every frame |
+| `gravity` | px/s² applied to `velocityY` |
+| `maxSpeed` | Speed cap in px/s for `thrust` and `carMode` (default 500) |
+
+#### Solids
+
+| Property | Description |
+|---|---|
+| `solidWith` | Groups whose sprites block this one's movement (push-out along the axis of least penetration) |
+| `onGround` | true while standing on a solid (read-only — gate jumps on it) |
+| `restitution` | Bounciness against solids: 0 = stop dead, 0..1 = reflect with damping |
+| `oneWay` | As a solid: catches landings on the top edge only — pass-through from below and sideways |
+| `carryRiders` | As a solid: riders inherit this sprite's movement (default true); false for world-scroll terrain |
+
+#### Collision
+
+| Property | Description |
+|---|---|
+| `collisionGroup` | This sprite's group tag (what others test against) |
+| `collidesWith` | Groups that fire `collision`/`collisionend` events on overlap |
+| `hitboxScale` | Shrinks the hitbox around the anchor (default 1); slightly small hitboxes feel fairer |
+| `hitboxShape` | `'rect'` (default) or `'circle'` — circles also bounce off solid corners along the contact normal |
+| `swept` | Movement is collision-tested as a path (swept AABB) — fast bullets stop tunneling through thin targets and solids |
+| `debug` | Draw this sprite's collision shapes and anchor |
+
+#### Car physics
+
+| Property | Description |
+|---|---|
+| `carMode` | Enables the arcade car model (rotation 0 = facing up) |
+| `throttle` | -1 (brake/reverse) .. 1 (gas) |
+| `steering` | -1 (left) .. 1 (right) |
+| `enginePower` | Forward acceleration, px/s² (default 600) |
+| `turnRate` | deg/s at full steering and speed (default 200) |
+| `grip` | Lateral friction, 1/s (default 4) — lower = more drift |
+| `drag` | Longitudinal friction, 1/s (default 0.6) |
+| `skidMarks` | Rear tires leave fading marks while drifting |
+| `skidThreshold` | Lateral px/s that counts as drifting; 0 = auto (20% of `maxSpeed`) |
+| `drifting` | true while lateral speed exceeds the threshold (read-only) |
+
+#### Newtonian flight
+
+| Property | Description |
+|---|---|
+| `thrust` | Acceleration along the current heading, px/s² (capped at `maxSpeed`) |
+| `angularVelocity` | Spin in deg/s |
+| `wrapAround` | Leaving one screen edge re-enters from the opposite one (Asteroids) |
+
+#### Wrap / loop
+
+| Property | Description |
+|---|---|
+| `wrapX`, `wrapShift` | Seamless scroll looping: when `x` passes `wrapX`, it jumps by `wrapShift` — parallax layers with no JS in the loop |
+
+#### Idle wobble
+
+| Property | Description |
+|---|---|
+| `idleAnimation` | Gentle organic sway around the base transform |
+| `idleRotation` | Wobble amplitude in degrees (default 3) |
+| `idleMovement` | Drift amplitude in px (default 4) |
+| `idleSpeed` | Frequency multiplier (default 1) |
+
+#### Color & effects
+
+| Property | Description |
+|---|---|
+| `tintColor` | Multiplies the frame's colors, e.g. `'#ff5252'` (team colors, day/night shading); `null` or `'#fff'` = art unchanged |
+| `glowColor` | Glow tint, e.g. `'#ffc94d'` — a tinted, blurred silhouette drawn behind the sprite (selection highlights, power-ups); follows shape, rotation and opacity |
+| `glowBlur` | Glow blur radius in px; `0` = off |
+| `glowOpacity` | Halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur |
+| `blend` | `'normal'`/`'add'` — additive blending brightens the backdrop instead of covering it (glows, fire, lasers); costs one batch flush per mode change, so group additive sprites by `zIndex` |
 
 Methods: `play(name)`, `stop()`, `animate(options)`, `clearTweens()`,
 `flash(color, duration)` — fills the sprite's silhouette with `color`
