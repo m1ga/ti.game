@@ -56,6 +56,11 @@ module.exports = function () {
 
 	function init(W, H) {
 
+		scoreLabel.scale = Math.max(2, Math.round(W / 260));
+		scoreLabel.x = W / 2;
+		scoreLabel.y = H * 0.07;
+		gameView.add(scoreLabel);
+
 		var PLAYER_SIZE = Math.round(Math.min(W, H) * 0.16);
 		var BALL_SIZE = Math.round(Math.min(W, H) * 0.11);
 		var RUN_SPEED = W * 0.45;
@@ -313,7 +318,6 @@ module.exports = function () {
 	}
 
 	win.add(gameView);
-	win.add(scoreLabel);
 	// Back — return to the launcher
 	var backButton = Ti.UI.createButton({
 		title: 'Back',

@@ -15,6 +15,7 @@
 //   Camera: dead-zone follow, bounds, zoom buttons and screen shake
 //   Rope: native Verlet ropes — drag the balls they hang from
 //   Flip: flipX/flipY from movement — patrols turn around, tap flips gravity
+//   Text: bitmap-font labels in the GL scene — HUD, world signs, text buttons
 
 var demos = [
 	{ title: 'Basic demo', start: require('/basic') },
@@ -34,7 +35,8 @@ var demos = [
 	{ title: 'Rope', start: require('/rope') },
 	{ title: 'Flip', start: require('/flip') },
 	{ title: 'Blend & flash', start: require('/blend') },
-	{ title: 'Time scale', start: require('/timescale') }
+	{ title: 'Time scale', start: require('/timescale') },
+	{ title: 'Text', start: require('/text') }
 ];
 
 var win = Ti.UI.createWindow({

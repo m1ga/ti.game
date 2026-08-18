@@ -29,7 +29,11 @@ identical on both platforms.
   passes over the whole rendered scene; sprite glow highlights
   (`glowColor`/`glowBlur`), per-sprite color tinting (`tintColor`),
   damage flashes (`flash()`) and additive blending (`blend: 'add'`)
-- 18 example games in `example/` covering every feature
+- Bitmap-font text sprites (`createText`) — HUD scores and labels inside
+  the GL scene with a built-in pixel font, BMFont/AngelCode or monospace
+  grid fonts (`createFont`); `screenFixed` pins any sprite to the surface
+  for camera-proof HUDs
+- 19 example games in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -396,6 +400,51 @@ tail sprite is simply leashed, but with sprites on both ends you can
 drag either one and the other is towed behind once the rope goes taut
 (carts, chained crates).
 
+### Draw text
+
+```javascript
+var score = Game.createText({
+    text: 'SCORE 0',
+    x: 16, y: 40, anchorX: 0, anchorY: 0,
+    scale: 3,                  // bitmap fonts size by scale
+    screenFixed: true,         // stick to the surface, ignore the camera
+    zIndex: 100
+});
+gameView.add(score);
+score.text = 'SCORE 10';       // native re-layout next frame
+```
+
+Text objects ARE sprites: they z-sort (`zIndex`/`ySort`), tween
+(`animate`), wobble (`idleAnimation`), tint, `flash()`, glow, fire touch
+events (text buttons need no overlay views) and scroll with the camera —
+all glyphs render as quads in the same batch, so a label costs one draw
+call. With no `font`, a built-in monospace pixel font is used (combine
+with integer `scale` values for crisp pixels). Custom fonts:
+
+```javascript
+// BMFont/AngelCode (.fnt text or JSON export, kerning included) — made
+// by BMFont, Hiero, fontbm or tools/genfont.py
+var font = Game.createFont({ font: 'assets/hud.fnt' });
+
+// or a monospace grid image: cells row-major for ASCII 32..126
+// (or pass `characters` for a custom set)
+var font = Game.createFont({ image: 'assets/mono.png', charWidth: 9, charHeight: 15 });
+
+var label = Game.createText({ font: font, text: 'HELLO' });
+```
+
+Multi-line text uses `\n` with `align: 'left'|'center'|'right'`;
+`letterSpacing` (px) and `lineSpacing` (multiplier) tune the layout.
+`tools/genfont.py` rasterizes any TTF into either format. The built-in
+font covers ASCII 32..126 — stick to plain characters or ship a font
+with more glyphs.
+
+`screenFixed: true` works on any sprite, not just text: the sprite's
+`x`/`y` become surface coordinates and camera position, zoom and shake
+are ignored — HUDs, on-screen buttons, overlays. Touch events map back
+automatically (see `text.js`: the score HUD stays put while the camera
+follows the ball).
+
 ### Depth in top-down scenes
 
 `ySort: true` sorts sprites within the same `zIndex` by their **bottom
@@ -429,6 +478,7 @@ a feature set — find the one closest to your game and start there:
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
 | `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
 | `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` (overlaps bloom, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
+| `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going |
 
 Run them with `ti build -p android` from `android/` (executes
@@ -444,6 +494,8 @@ Run them with `ti build -p android` from `android/` (executes
 - `createSound(options)` → Sound
 - `createEmitter(options)` → Emitter
 - `createRope(options)` → Rope
+- `createFont(options)` → Font
+- `createText(options)` → Text
 - Easing constants: `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`,
   `EASE_BOUNCE`, `EASE_ELASTIC`
 
@@ -491,7 +543,7 @@ mid-drag or mid-tween. All can be passed at creation.
 
 | Group | Properties |
 |---|---|
-| Transform | `x`, `y`, `width`, `height` (default: frame size), `scale`, `scaleX`, `scaleY` (negative flips), `rotation`, `anchorX`, `anchorY`, `opacity`, `visible`, `pixelSnap` (render-only framebuffer alignment; default false), `zIndex`, `ySort`, `flipX`, `flipY` (mirror the drawn frame only — position, anchor, physics and hit testing are unaffected, unlike negative scale) |
+| Transform | `x`, `y`, `width`, `height` (default: frame size), `scale`, `scaleX`, `scaleY` (negative flips), `rotation`, `anchorX`, `anchorY`, `opacity`, `visible`, `pixelSnap` (render-only framebuffer alignment; default false), `screenFixed` (x/y become surface coordinates; camera position, zoom and shake are ignored — HUDs; touch maps back automatically), `zIndex`, `ySort`, `flipX`, `flipY` (mirror the drawn frame only — position, anchor, physics and hit testing are unaffected, unlike negative scale) |
 | Sheet/animation | `sheet`, `frame`, `animations`, `animation` (read-only), `tileRepeat` (`true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture) |
 | Touch behaviors | `draggable`, `pinchable`, `rotatable`, `touchEnabled` (false = touches pass through to sprites underneath) |
 | Physics | `velocityX`, `velocityY`, `gravity`, `maxSpeed` |
@@ -542,6 +594,37 @@ Options: `url` (required), `volume` (0..1, default 1), `loop`,
 | `loop` | Repeat until `stop()` |
 | `music` | Which backend was chosen (read-only) |
 
+### Font
+
+Options — pick one source:
+
+| Source | Options |
+|---|---|
+| BMFont | `font` (.fnt path — AngelCode text or JSON export; kerning supported). Page image loads from next to the descriptor, or pass `image` to override |
+| Grid | `image` + `charWidth`/`charHeight` (monospace cells, row-major); `characters` (default: ASCII 32..126) |
+| Built-in | no options — the embedded 9x15 pixel font (also used when `font` fails to parse) |
+
+`smoothing` (default true; the built-in font is always crisp) filters the
+glyph texture like a sprite sheet. `lineHeight` (read-only) is the font's
+natural line height in px. Generate either format from a TTF with
+`tools/genfont.py`.
+
+### Text
+
+Everything from **Sprite** (text objects are sprites — tint, tweens,
+touch, `screenFixed`, ...) plus:
+
+| Member | Description |
+|---|---|
+| `text` | The string; `\n` breaks lines. Updates re-layout natively |
+| `font` | A Font object; omit for the built-in pixel font |
+| `align` | Multi-line alignment: `'left'` (default), `'center'`, `'right'` |
+| `letterSpacing` | Extra px between glyphs (negative tightens) |
+| `lineSpacing` | Multiplier on the font's line height (default 1) |
+
+`width`/`height` read the laid-out text block size; there is no font
+"size" — scale the sprite (`scale`) like any pixel art.
+
 ### Emitter
 
 Add/remove via `gameView.add(emitter)` / `remove(emitter)`, like sprites.
@@ -569,12 +652,17 @@ android/src/ti/game/
 ├── SoundProxy.java          createSound() — SoundPool effect or MediaPlayer music
 ├── EmitterProxy.java        createEmitter() — JS-facing particle emitter
 ├── RopeProxy.java           createRope() — JS-facing Verlet rope
+├── FontProxy.java           createFont() — BMFont, grid or built-in
+├── TextProxy.java           createText() — JS-facing text sprite
 └── engine/                  Pure native engine (no per-frame bridge use)
     ├── Scene.java           Scene graph, solids, collisions, wrapping
     ├── ParticleEmitter.java Pooled particles: spawn, integrate, fade, draw
     ├── Rope.java            Verlet chain: integrate, constrain, draw
     ├── SoundEngine.java     Shared SoundPool + audio lifecycle
     ├── Sprite.java          State + physics/animation/tween/idle ticking
+    ├── TextSprite.java      Sprite subclass: glyph layout + text state
+    ├── BitmapFont.java      Glyph metrics + kerning over a SpriteSheet
+    ├── DefaultFont.java     Embedded built-in pixel font (9x15 grid)
     ├── SpriteSheet.java     Texture + UV frame table
     ├── Animation.java       Frame indices + fps + loop
     ├── SceneRenderer.java   GLSurfaceView.Renderer — the game loop
@@ -587,7 +675,7 @@ android/src/ti/game/
 ```
 
 Contribution rules for the codebase live in `AGENTS.md`; planned features
-(sound, particles, font rendering) in `TODO.md`.
+(tile maps, input, sprite parenting) in `TODO.md`.
 
 ### iOS
 

@@ -180,6 +180,7 @@ public class Rope
 	/** Draws all segments through the shared batcher. GL thread. */
 	public void draw(SpriteBatch batch)
 	{
+		batch.setScreenSpace(false); // particles and ropes live in world space
 		SpriteSheet sh = sheet;
 		if (!visible || pointCount < 2 || sh == null || !sh.isReady()) {
 			return;

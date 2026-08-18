@@ -49,6 +49,11 @@
 @property (atomic, assign) BOOL pixelSnap;
 @property (atomic, assign) int zIndex;
 
+// Screen-fixed: (x, y) are surface coordinates and the sprite ignores
+// camera position, zoom and shake — HUD scores, buttons, overlays.
+// Touch input maps back automatically.
+@property (atomic, assign) BOOL screenFixed;
+
 // Tint: multiplies the frame's colors (white = art unchanged) — damage
 // flashes, team colors, day/night shading. Parsed 0..1 channels.
 @property (atomic, assign) float tintR;

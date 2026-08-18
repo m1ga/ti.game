@@ -35,21 +35,10 @@ module.exports = function () {
 	var hillSheet = Game.createSpriteSheet({ image: 'assets/hills.png', frameWidth: 512, frameHeight: 110 });
 	var groundSheet = Game.createSpriteSheet({ image: 'assets/ground.png', frameWidth: 64, frameHeight: 64 });
 
-	var scoreLabel = Ti.UI.createLabel({
-		text: '0 / ' + GATE_COUNT,
-		color: '#fff',
-		font: { fontSize: 28, fontWeight: 'bold' },
-		shadowColor: '#4a785a',
-		shadowOffset: { x: 0, y: 2 },
-		top: 40
-	});
-	var statusLabel = Ti.UI.createLabel({
-		text: 'Tap to start!',
-		color: '#fff',
-		font: { fontSize: 22, fontWeight: 'bold' },
-		shadowColor: '#4a785a',
-		shadowOffset: { x: 0, y: 2 }
-	});
+	// HUD as GL text sprites (built-in pixel font) — screenFixed keeps
+	// them glued to the surface; positioned once the surface size is known
+	var scoreLabel = Game.createText({ text: '0 / ' + GATE_COUNT, screenFixed: true, zIndex: 100 });
+	var statusLabel = Game.createText({ text: 'Tap to start!', screenFixed: true, zIndex: 100 });
 
 	var initialized = false;
 	gameView.addEventListener('resize', function (e) {
@@ -60,6 +49,15 @@ module.exports = function () {
 	});
 
 	function init(W, H) {
+
+		var TEXT_SCALE = Math.max(2, Math.round(W / 240));
+		scoreLabel.scale = TEXT_SCALE;
+		scoreLabel.x = W / 2;
+		scoreLabel.y = H * 0.08;
+		statusLabel.scale = TEXT_SCALE;
+		statusLabel.x = W / 2;
+		statusLabel.y = H * 0.45;
+		gameView.add([scoreLabel, statusLabel]);
 
 		var SPEED = W * 0.35;              // world scroll speed, px/s
 		var GATE_SPACING = W * 0.55;
@@ -234,7 +232,7 @@ module.exports = function () {
 
 		function gameOver() {
 			freeze();
-			statusLabel.text = 'Oink! Game over — tap to retry';
+			statusLabel.text = 'Oink! Game over - tap to retry';
 			statusLabel.visible = true;
 			pig.animate({ rotation: 180, opacity: 0.7, duration: 400, easing: Game.EASE_IN });
 		}
@@ -282,8 +280,6 @@ module.exports = function () {
 	}
 
 	win.add(gameView);
-	win.add(scoreLabel);
-	win.add(statusLabel);
 	// Back — return to the launcher
 	var backButton = Ti.UI.createButton({
 		title: 'Back',

@@ -179,6 +179,7 @@ public class ParticleEmitter
 	/** Draws all live particles through the shared batcher. GL thread. */
 	public void draw(SpriteBatch batch)
 	{
+		batch.setScreenSpace(false); // particles and ropes live in world space
 		SpriteSheet sh = sheet;
 		if (count == 0 || sh == null || !sh.isReady()) {
 			return;

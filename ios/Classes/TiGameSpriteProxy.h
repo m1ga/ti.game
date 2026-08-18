@@ -16,4 +16,7 @@
 
 @property (nonatomic, readonly) TGSprite *sprite;
 
+/** Subclasses (TiGameTextProxy) supply their own TGSprite specialization. */
+- (instancetype)initWithSprite:(TGSprite *)sprite;
+
 @end

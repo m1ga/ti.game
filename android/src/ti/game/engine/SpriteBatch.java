@@ -94,7 +94,9 @@ public class SpriteBatch
 	private int activeProgram = 0;
 	private int uProj, uTex;             // main program
 	private int uProjGlow, uTexGlow;     // glow program
-	private float[] projection;
+	private float[] projection;          // world space (camera + zoom + shake)
+	private float[] screenProjection;    // surface pixels (screenFixed sprites)
+	private boolean screenSpace = false;
 	private float pixelOriginX;
 	private float pixelOriginY;
 	private float pixelScale = 1f;
@@ -141,9 +143,12 @@ public class SpriteBatch
 		return shader;
 	}
 
-	public void begin(float[] projectionMatrix, float originX, float originY, float screenScale)
+	public void begin(float[] projectionMatrix, float[] screenProjectionMatrix,
+					  float originX, float originY, float screenScale)
 	{
 		projection = projectionMatrix;
+		screenProjection = screenProjectionMatrix;
+		screenSpace = false;
 		pixelOriginX = originX;
 		pixelOriginY = originY;
 		pixelScale = Math.max(0.0001f, screenScale);
@@ -173,6 +178,27 @@ public class SpriteBatch
 		additiveBlend = additive;
 	}
 
+	/**
+	 * Screen space = the identity projection in surface pixels: screenFixed
+	 * sprites (HUDs) ignore camera position, zoom and shake. Flushes the
+	 * pending batch on change, like a texture or blend switch.
+	 */
+	public void setScreenSpace(boolean fixed)
+	{
+		if (fixed == screenSpace) {
+			return;
+		}
+		flush();
+		screenSpace = fixed;
+		uploadProjection(activeProgram);
+	}
+
+	private void uploadProjection(int p)
+	{
+		GLES20.glUniformMatrix4fv((p == program) ? uProj : uProjGlow, 1, false,
+			screenSpace ? screenProjection : projection, 0);
+	}
+
 	/** Flush and switch programs; both share attribute locations. */
 	private void useProgram(int p)
 	{
@@ -181,7 +207,7 @@ public class SpriteBatch
 		}
 		flush();
 		GLES20.glUseProgram(p);
-		GLES20.glUniformMatrix4fv((p == program) ? uProj : uProjGlow, 1, false, projection, 0);
+		uploadProjection(p);
 		GLES20.glUniform1i((p == program) ? uTex : uTexGlow, 0);
 		activeProgram = p;
 	}
@@ -199,6 +225,10 @@ public class SpriteBatch
 
 	public void draw(Sprite s)
 	{
+		if (s instanceof TextSprite) {
+			drawText((TextSprite) s);
+			return;
+		}
 		SpriteSheet sheet = s.sheet;
 		if (sheet == null || !sheet.isReady()) {
 			return;
@@ -207,6 +237,7 @@ public class SpriteBatch
 		if (f == null) {
 			return;
 		}
+		setScreenSpace(s.screenFixed);
 		setAdditiveBlend(s.additiveBlend);
 		ensureCapacity(sheet.textureId());
 
@@ -223,8 +254,8 @@ public class SpriteBatch
 		float x = s.x;
 		float y = s.y;
 		if (s.pixelSnap) {
-			x = snapToPixel(x, pixelOriginX);
-			y = snapToPixel(y, pixelOriginY);
+			x = snapToPixel(s, x, pixelOriginX);
+			y = snapToPixel(s, y, pixelOriginY);
 		}
 
 		// tileRepeat: run the UVs past 1 so GL_REPEAT tiles the texture at
@@ -311,10 +342,109 @@ public class SpriteBatch
 		}
 	}
 
-	private float snapToPixel(float value, float origin)
+	private float snapToPixel(Sprite s, float value, float origin)
 	{
+		if (s.screenFixed) {
+			return (float) Math.floor(value + 0.5f); // already surface pixels
+		}
 		float screenCoordinate = (value - origin) * pixelScale;
 		return origin + (float) Math.floor(screenCoordinate + 0.5f) / pixelScale;
+	}
+
+	/**
+	 * Text: one quad per glyph, transformed by the sprite's anchor, scale
+	 * and rotation like a single frame would be. All glyphs share the
+	 * font's texture, so a label is one batch run; glow and flash reuse
+	 * the silhouette shader per glyph.
+	 */
+	private void drawText(TextSprite s)
+	{
+		BitmapFont font = s.font;
+		if (font == null) {
+			return;
+		}
+		SpriteSheet sheet = font.sheet;
+		if (sheet == null || !sheet.isReady()) {
+			return;
+		}
+		TextSprite.Layout layout = s.layout();
+		if (layout.count == 0) {
+			return;
+		}
+		setScreenSpace(s.screenFixed);
+		setAdditiveBlend(s.additiveBlend);
+		int texture = sheet.textureId();
+
+		float ax = s.anchorX * layout.width;
+		float ay = s.anchorY * layout.height;
+		double rad = Math.toRadians(s.rotation);
+		float cos = (float) Math.cos(rad);
+		float sin = (float) Math.sin(rad);
+		float sx = s.scaleX;
+		float sy = s.scaleY;
+		float alpha = Math.max(0f, Math.min(1f, s.opacity));
+		float x = s.x;
+		float y = s.y;
+		if (s.pixelSnap) {
+			x = snapToPixel(s, x, pixelOriginX);
+			y = snapToPixel(s, y, pixelOriginY);
+		}
+
+		float blur = s.glowBlur;
+		float glow = Math.max(0f, Math.min(1f, s.glowOpacity)) * alpha;
+		if (blur > 0f && glow > 0f) {
+			useProgram(glowProgram);
+			for (int k = 0; k < GLOW_RING.length; k += 3) {
+				float ox = GLOW_RING[k] * blur;
+				float oy = GLOW_RING[k + 1] * blur;
+				float ga = GLOW_RING[k + 2] * glow;
+				putGlyphQuads(s, sheet, layout, texture, x + ox, y + oy, ax, ay,
+					cos, sin, sx, sy, s.glowR * ga, s.glowG * ga, s.glowB * ga, ga);
+			}
+			useProgram(program);
+		}
+
+		putGlyphQuads(s, sheet, layout, texture, x, y, ax, ay, cos, sin, sx, sy,
+			s.tintR * alpha, s.tintG * alpha, s.tintB * alpha, alpha);
+
+		float flashLeft = s.flashRemaining;
+		float flashDuration = s.flashDuration;
+		if (flashLeft > 0f && flashDuration > 0f) {
+			float fa = Math.min(1f, flashLeft / flashDuration) * alpha;
+			useProgram(glowProgram);
+			putGlyphQuads(s, sheet, layout, texture, x, y, ax, ay, cos, sin, sx, sy,
+				s.flashR * fa, s.flashG * fa, s.flashB * fa, fa);
+			useProgram(program);
+		}
+	}
+
+	private void putGlyphQuads(TextSprite s, SpriteSheet sheet, TextSprite.Layout layout,
+							   int texture, float x, float y, float ax, float ay,
+							   float cos, float sin, float sx, float sy,
+							   float r, float g, float b, float a)
+	{
+		for (int i = 0; i < layout.count; i++) {
+			SpriteSheet.Frame f = sheet.frame(layout.frameIndices[i]);
+			if (f == null) {
+				continue;
+			}
+			float qx = layout.quads[i * 4];
+			float qy = layout.quads[i * 4 + 1];
+			float qw = layout.quads[i * 4 + 2];
+			float qh = layout.quads[i * 4 + 3];
+
+			float lx0 = (qx - ax) * sx, ly0 = (qy - ay) * sy;             // top-left
+			float lx1 = (qx + qw - ax) * sx, ly1 = ly0;                   // top-right
+			float lx2 = lx0, ly2 = (qy + qh - ay) * sy;                   // bottom-left
+			float lx3 = lx1, ly3 = ly2;                                   // bottom-right
+
+			ensureCapacity(texture);
+			putQuad(x + lx0 * cos - ly0 * sin, y + lx0 * sin + ly0 * cos, f.u0, f.v0,
+				x + lx1 * cos - ly1 * sin, y + lx1 * sin + ly1 * cos, f.u1, f.v0,
+				x + lx2 * cos - ly2 * sin, y + lx2 * sin + ly2 * cos, f.u0, f.v1,
+				x + lx3 * cos - ly3 * sin, y + lx3 * sin + ly3 * cos, f.u1, f.v1,
+				r, g, b, a);
+		}
 	}
 
 	/**

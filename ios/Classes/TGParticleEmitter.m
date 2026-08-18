@@ -163,6 +163,7 @@ static const int kHardCap = 1000;
 
 - (void)draw:(TGSpriteBatch *)batch
 {
+	[batch setScreenSpace:NO]; // particles and ropes live in world space
 	TGSpriteSheet *sh = self.sheet;
 	if (_count == 0 || sh == nil || ![sh isReady]) {
 		return;

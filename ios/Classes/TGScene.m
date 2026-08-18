@@ -3,6 +3,9 @@
 #import "TGRope.h"
 #import "TGSkidTrail.h"
 #import "TGSprite.h"
+#import "TGTextSprite.h"
+#import "TGBitmapFont.h"
+#import "TGDefaultFont.h"
 #import <math.h>
 
 static float bottomEdge(TGSprite *s)
@@ -22,6 +25,7 @@ static float bottomEdge(TGSprite *s)
 	BOOL _zOrderDirty;   // guarded by @synchronized(_sprites)
 	BOOL _hasYSort;      // guarded by @synchronized(_sprites)
 	NSArray<TGSprite *> *_snapshotCache; // guarded by @synchronized(_sprites)
+	TGBitmapFont *_defaultFont;             // guarded by @synchronized(self)
 	float _aabbA[4];
 	float _aabbB[4];
 	float _centerA[2];
@@ -64,6 +68,27 @@ static float bottomEdge(TGSprite *s)
 	}
 }
 
+// This scene's built-in pixel font, shared by every default-font text
+// sprite in the view — one instance per scene, because the font's GL
+// texture belongs to this view's context (a global one would go stale
+// when another GameView creates its own context).
+- (TGBitmapFont *)defaultFont
+{
+	@synchronized (self) {
+		if (_defaultFont == nil) {
+			_defaultFont = [TGDefaultFont makeFont];
+		}
+		return _defaultFont;
+	}
+}
+
+- (void)resolveTextFont:(TGSprite *)sprite
+{
+	if ([sprite isKindOfClass:[TGTextSprite class]] && ((TGTextSprite *)sprite).usesDefaultFont) {
+		[(TGTextSprite *)sprite setTextFont:[self defaultFont]];
+	}
+}
+
 - (void)add:(TGSprite *)sprite
 {
 	if (sprite == nil) {
@@ -73,6 +98,7 @@ static float bottomEdge(TGSprite *s)
 		if (![_sprites containsObject:sprite]) {
 			[_sprites addObject:sprite];
 			sprite.scene = self;
+			[self resolveTextFont:sprite];
 			_zOrderDirty = YES;
 			_snapshotCache = nil;
 			if (sprite.ySort) {
@@ -92,6 +118,7 @@ static float bottomEdge(TGSprite *s)
 			if (sprite != nil && ![_sprites containsObject:sprite]) {
 				[_sprites addObject:sprite];
 				sprite.scene = self;
+				[self resolveTextFont:sprite];
 				spritesAdded = YES;
 				if (sprite.ySort) {
 					_hasYSort = YES;
@@ -381,6 +408,16 @@ static float bottomEdge(TGSprite *s)
 - (float)screenToWorldY:(float)sy
 {
 	return [self viewOriginY] + sy / MAX(0.0001f, self.cameraScale);
+}
+
+- (float)worldToScreenX:(float)wx
+{
+	return (wx - [self viewOriginX]) * MAX(0.0001f, self.cameraScale);
+}
+
+- (float)worldToScreenY:(float)wy
+{
+	return (wy - [self viewOriginY]) * MAX(0.0001f, self.cameraScale);
 }
 
 /** Dead-zone follow, after physics so the camera never lags. */

@@ -62,17 +62,21 @@ traffic in the loop.
 
 ## 5. Font rendering
 
-- [ ] Bitmap-font text sprites: `Game.createText({ font, text })` using a
-      glyph atlas (BMFont/AngelCode format plus a simple monospace grid
-      mode) — HUD scores/labels inside the GL scene instead of overlaid
-      Titanium labels, so they can scroll with the camera, z-sort, tween
-      and wobble like any sprite.
-- [ ] `text` property updates re-layout natively; per-glyph quads go
-      through the SpriteBatch.
-- [ ] Ship a default pixel font atlas in the module assets; generator
-      script for custom fonts.
-- [ ] Migrate the demo HUDs (flappy score, racing laps, volley score,
-      asteroids rocks) once available.
+- [x] Bitmap-font text sprites: `Game.createText({ font, text })` using a
+      glyph atlas (BMFont/AngelCode text + JSON formats with kerning,
+      plus a simple monospace grid mode via `createFont`) — TextSprite
+      extends Sprite, so text z-sorts, tweens, wobbles, tints, flashes
+      and takes touches like any sprite.
+- [x] `text` property updates re-layout natively; per-glyph quads go
+      through the SpriteBatch (one batch run per label).
+- [x] Default pixel font: a 9x15 grid embedded in the module as a ~1.2 KB
+      base64 PNG (no asset resolution needed on either platform);
+      `tools/genfont.py` generates grid or BMFont atlases from any TTF.
+- [x] Migrated the demo HUDs (flappy score + status, racing laps, volley
+      score, asteroids rocks); `text.js` demos the rest.
+- [x] Bonus: `screenFixed` on any sprite — surface-coordinate rendering
+      that ignores camera position/zoom/shake (touch maps back), so HUDs
+      survive a scrolling camera without overlay views.
 
 ## 6. Input
 

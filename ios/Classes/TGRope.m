@@ -168,6 +168,7 @@ static const int kMaxSegments = 200;
 
 - (void)draw:(TGSpriteBatch *)batch
 {
+	[batch setScreenSpace:NO]; // particles and ropes live in world space
 	TGSpriteSheet *sh = self.sheet;
 	if (!self.visible || _pointCount < 2 || sh == nil || ![sh isReady]) {
 		return;

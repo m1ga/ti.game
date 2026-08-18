@@ -443,6 +443,15 @@ static _Atomic int TGIdleSequence = 0;
 	if (!self.visible || self.opacity <= 0.0f || !self.touchEnabled) {
 		return NO;
 	}
+	// Screen-fixed sprites live in surface coordinates; the touch
+	// arrives in world space, so map it back before testing.
+	if (self.screenFixed) {
+		TGScene *sc = self.scene;
+		if (sc != nil) {
+			px = [sc worldToScreenX:px];
+			py = [sc worldToScreenY:py];
+		}
+	}
 	float w = [self drawWidth];
 	float h = [self drawHeight];
 	if (w <= 0.0f || h <= 0.0f) {

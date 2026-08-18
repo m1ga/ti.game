@@ -68,6 +68,11 @@ module.exports = function () {
 
 	function init(W, H) {
 
+		statusLabel.scale = Math.max(2, Math.round(W / 260));
+		statusLabel.x = W / 2;
+		statusLabel.y = H * 0.07;
+		gameView.add(statusLabel);
+
 		var SHIP_SIZE = Math.round(Math.min(W, H) * 0.13);
 		var ROCK_COUNT = 5;
 		var TURN_SPEED = 220;              // deg/s while a turn button is held
@@ -389,7 +394,6 @@ module.exports = function () {
 	}
 
 	win.add(gameView);
-	win.add(statusLabel);
 	// Back — return to the launcher
 	var backButton = Ti.UI.createButton({
 		title: 'Back',

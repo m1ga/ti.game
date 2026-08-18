@@ -25,6 +25,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	private final TextureManager textures = new TextureManager();
 	private final PostEffect postEffect = new PostEffect();
 	private final float[] projection = new float[16];
+	private final float[] screenProjection = new float[16]; // screenFixed sprites
 
 	private long lastFrameNanos = 0;
 	private float effectTime = 0f; // drives the glitch animation
@@ -127,6 +128,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		float visibleW = surfaceWidth / scale;
 		float visibleH = surfaceHeight / scale;
 		Matrix.orthoM(projection, 0, left, left + visibleW, top + visibleH, top, -1f, 1f);
+		Matrix.orthoM(screenProjection, 0, 0f, surfaceWidth, surfaceHeight, 0f, -1f, 1f);
 
 		GLES20.glClearColor(scene.bgRed, scene.bgGreen, scene.bgBlue, scene.bgAlpha);
 		GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
@@ -146,7 +148,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			ensureSheetLoaded(rope.sheet);
 		}
 
-		batch.begin(projection, left, top, scale);
+		batch.begin(projection, screenProjection, left, top, scale);
 		// Skid marks slot between background (zIndex <= 0, e.g. the track)
 		// and foreground sprites (the car), so they overlay the road but
 		// stay under whatever drives across them. Emitters merge into the
@@ -206,6 +208,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	private void drawSkidTrail()
 	{
 		if (!scene.skidTrail.isEmpty()) {
+			batch.setScreenSpace(false);
 			scene.skidTrail.draw(batch, textures.whiteTexture());
 		}
 	}
@@ -220,6 +223,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	 */
 	private void drawDebugOverlay(Sprite s)
 	{
+		batch.setScreenSpace(s.screenFixed); // overlay in the sprite's own space
 		int white = textures.whiteTexture();
 		float t = 1.5f; // half line thickness
 

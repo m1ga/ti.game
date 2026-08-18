@@ -1,6 +1,8 @@
 #import "TGSpriteBatch.h"
+#import "TGBitmapFont.h"
 #import "TGSprite.h"
 #import "TGSpriteSheet.h"
+#import "TGTextSprite.h"
 #import <math.h>
 
 static const int kMaxQuads = 1000;
@@ -89,8 +91,11 @@ static GLuint buildProgram(const char *fragmentSource)
 	return p;
 }
 
-static inline float snapToPixel(float value, float origin, float screenScale)
+static inline float snapToPixel(TGSprite *s, float value, float origin, float screenScale)
 {
+	if (s.screenFixed) {
+		return floorf(value + 0.5f); // already surface pixels
+	}
 	float screenCoordinate = (value - origin) * screenScale;
 	return origin + floorf(screenCoordinate + 0.5f) / screenScale;
 }
@@ -107,7 +112,9 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 	GLuint _vbo; // vertex upload buffer; client-side arrays stall the driver
 	GLint _uProj, _uTex;         // main program
 	GLint _uProjGlow, _uTexGlow; // glow program
-	const float *_projection;
+	const float *_projection;       // world space (camera + zoom + shake)
+	const float *_screenProjection; // surface pixels (screenFixed sprites)
+	BOOL _screenSpace;
 	float _pixelOriginX;
 	float _pixelOriginY;
 	float _pixelScale;
@@ -142,11 +149,14 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 }
 
 - (void)begin:(const float *)projectionMatrix
+	screenProjection:(const float *)screenProjectionMatrix
 	 originX:(float)originX
 	 originY:(float)originY
 	screenScale:(float)screenScale
 {
 	_projection = projectionMatrix;
+	_screenProjection = screenProjectionMatrix;
+	_screenSpace = NO;
 	_pixelOriginX = originX;
 	_pixelOriginY = originY;
 	_pixelScale = MAX(0.0001f, screenScale);
@@ -170,6 +180,22 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 	_additiveBlend = additive;
 }
 
+- (void)setScreenSpace:(BOOL)fixed
+{
+	if (fixed == _screenSpace) {
+		return;
+	}
+	[self flush];
+	_screenSpace = fixed;
+	[self uploadProjection:_activeProgram];
+}
+
+- (void)uploadProjection:(GLuint)p
+{
+	glUniformMatrix4fv((p == _program) ? _uProj : _uProjGlow, 1, GL_FALSE,
+		_screenSpace ? _screenProjection : _projection);
+}
+
 /** Flush and switch programs; both share attribute locations. */
 - (void)useProgram:(GLuint)p
 {
@@ -178,7 +204,7 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 	}
 	[self flush];
 	glUseProgram(p);
-	glUniformMatrix4fv((p == _program) ? _uProj : _uProjGlow, 1, GL_FALSE, _projection);
+	[self uploadProjection:p];
 	glUniform1i((p == _program) ? _uTex : _uTexGlow, 0);
 	_activeProgram = p;
 }
@@ -196,6 +222,10 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 
 - (void)draw:(TGSprite *)s
 {
+	if ([s isKindOfClass:[TGTextSprite class]]) {
+		[self drawText:(TGTextSprite *)s];
+		return;
+	}
 	TGSpriteSheet *sheet = s.sheet;
 	if (sheet == nil || ![sheet isReady]) {
 		return;
@@ -204,6 +234,7 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 	if (![sheet frame:s.frame into:&f]) {
 		return;
 	}
+	[self setScreenSpace:s.screenFixed];
 	[self setAdditiveBlend:s.additiveBlend];
 	[self ensureCapacity:[sheet textureId]];
 
@@ -220,8 +251,8 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 	float x = s.x;
 	float y = s.y;
 	if (s.pixelSnap) {
-		x = snapToPixel(x, _pixelOriginX, _pixelScale);
-		y = snapToPixel(y, _pixelOriginY, _pixelScale);
+		x = snapToPixel(s, x, _pixelOriginX, _pixelScale);
+		y = snapToPixel(s, y, _pixelOriginY, _pixelScale);
 	}
 
 	// tileRepeat: run the UVs past 1 so GL_REPEAT tiles the texture at
@@ -305,6 +336,109 @@ static inline float snapToPixel(float value, float origin, float screenScale)
 					 x3:x3 y3:y3 u3:u1 v3:v1
 					  r:s.flashR * fa g:s.flashG * fa b:s.flashB * fa a:fa];
 		[self useProgram:_program];
+	}
+}
+
+/**
+ * Text: one quad per glyph, transformed by the sprite's anchor, scale
+ * and rotation like a single frame would be. All glyphs share the
+ * font's texture, so a label is one batch run; glow and flash reuse
+ * the silhouette shader per glyph.
+ */
+- (void)drawText:(TGTextSprite *)s
+{
+	TGBitmapFont *font = s.font;
+	if (font == nil) {
+		return;
+	}
+	TGSpriteSheet *sheet = font.sheet;
+	if (sheet == nil || ![sheet isReady]) {
+		return;
+	}
+	TGTextLayout *layout = [s layout];
+	if (layout.count == 0) {
+		return;
+	}
+	[self setScreenSpace:s.screenFixed];
+	[self setAdditiveBlend:s.additiveBlend];
+	GLint texture = [sheet textureId];
+
+	float ax = s.anchorX * layout.width;
+	float ay = s.anchorY * layout.height;
+	float rad = s.rotation * (float)M_PI / 180.0f;
+	float cosr = cosf(rad);
+	float sinr = sinf(rad);
+	float sx = s.scaleX;
+	float sy = s.scaleY;
+	float alpha = MAX(0.0f, MIN(1.0f, s.opacity));
+	float x = s.x;
+	float y = s.y;
+	if (s.pixelSnap) {
+		x = snapToPixel(s, x, _pixelOriginX, _pixelScale);
+		y = snapToPixel(s, y, _pixelOriginY, _pixelScale);
+	}
+
+	float blur = s.glowBlur;
+	float glow = MAX(0.0f, MIN(1.0f, s.glowOpacity)) * alpha;
+	if (blur > 0.0f && glow > 0.0f) {
+		[self useProgram:_glowProgram];
+		for (int k = 0; k < 16 * 3; k += 3) {
+			float ox = kGlowRing[k] * blur;
+			float oy = kGlowRing[k + 1] * blur;
+			float ga = kGlowRing[k + 2] * glow;
+			[self putGlyphQuads:sheet layout:layout texture:texture
+							  x:x + ox y:y + oy ax:ax ay:ay
+							cos:cosr sin:sinr sx:sx sy:sy
+							  r:s.glowR * ga g:s.glowG * ga b:s.glowB * ga a:ga];
+		}
+		[self useProgram:_program];
+	}
+
+	[self putGlyphQuads:sheet layout:layout texture:texture
+					  x:x y:y ax:ax ay:ay cos:cosr sin:sinr sx:sx sy:sy
+					  r:s.tintR * alpha g:s.tintG * alpha b:s.tintB * alpha a:alpha];
+
+	float flashLeft = s.flashRemaining;
+	float flashDuration = s.flashDuration;
+	if (flashLeft > 0.0f && flashDuration > 0.0f) {
+		float fa = MIN(1.0f, flashLeft / flashDuration) * alpha;
+		[self useProgram:_glowProgram];
+		[self putGlyphQuads:sheet layout:layout texture:texture
+						  x:x y:y ax:ax ay:ay cos:cosr sin:sinr sx:sx sy:sy
+						  r:s.flashR * fa g:s.flashG * fa b:s.flashB * fa a:fa];
+		[self useProgram:_program];
+	}
+}
+
+- (void)putGlyphQuads:(TGSpriteSheet *)sheet layout:(TGTextLayout *)layout
+			  texture:(GLint)texture
+					x:(float)x y:(float)y ax:(float)ax ay:(float)ay
+				  cos:(float)cosr sin:(float)sinr sx:(float)sx sy:(float)sy
+					r:(float)r g:(float)g b:(float)b a:(float)a
+{
+	const float *quads = layout.quads;
+	const int *frameIndices = layout.frameIndices;
+	for (int i = 0; i < layout.count; i++) {
+		TGFrame f;
+		if (![sheet frame:frameIndices[i] into:&f]) {
+			continue;
+		}
+		float qx = quads[i * 4];
+		float qy = quads[i * 4 + 1];
+		float qw = quads[i * 4 + 2];
+		float qh = quads[i * 4 + 3];
+
+		float lx0 = (qx - ax) * sx, ly0 = (qy - ay) * sy;             // top-left
+		float lx1 = (qx + qw - ax) * sx, ly1 = ly0;                   // top-right
+		float lx2 = lx0, ly2 = (qy + qh - ay) * sy;                   // bottom-left
+		float lx3 = lx1, ly3 = ly2;                                   // bottom-right
+
+		[self ensureCapacity:texture];
+		[self putQuadX0:x + lx0 * cosr - ly0 * sinr y0:y + lx0 * sinr + ly0 * cosr u0:f.u0 v0:f.v0
+					 x1:x + lx1 * cosr - ly1 * sinr y1:y + lx1 * sinr + ly1 * cosr u1:f.u1 v1:f.v0
+					 x2:x + lx2 * cosr - ly2 * sinr y2:y + lx2 * sinr + ly2 * cosr u2:f.u0 v2:f.v1
+					 x3:x + lx3 * cosr - ly3 * sinr y3:y + lx3 * sinr + ly3 * cosr u3:f.u1 v3:f.v1
+					  r:r g:g b:b a:a];
 	}
 }
 

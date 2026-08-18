@@ -103,6 +103,17 @@ public class Scene
 		return viewOriginY() + sy / Math.max(0.0001f, cameraScale);
 	}
 
+	/** Maps a world position back to surface coordinates (screenFixed sprites). */
+	public float worldToScreenX(float wx)
+	{
+		return (wx - viewOriginX()) * Math.max(0.0001f, cameraScale);
+	}
+
+	public float worldToScreenY(float wy)
+	{
+		return (wy - viewOriginY()) * Math.max(0.0001f, cameraScale);
+	}
+
 	public volatile float bgRed = 0f;
 	public volatile float bgGreen = 0f;
 	public volatile float bgBlue = 0f;
@@ -153,12 +164,37 @@ public class Scene
 		}
 	}
 
+	// This scene's built-in pixel font, shared by every default-font text
+	// sprite in the view — one instance per scene, because the font's GL
+	// texture belongs to this view's context (a global one would go stale
+	// when another GameView creates its own context).
+	private volatile BitmapFont defaultFont;
+
+	private synchronized BitmapFont defaultFont()
+	{
+		BitmapFont font = defaultFont;
+		if (font == null) {
+			font = DefaultFont.create();
+			defaultFont = font;
+		}
+		return font;
+	}
+
+	/** Points default-font text at this scene's own font instance. */
+	public void resolveTextFont(Sprite sprite)
+	{
+		if (sprite instanceof TextSprite && ((TextSprite) sprite).usesDefaultFont) {
+			((TextSprite) sprite).setFont(defaultFont());
+		}
+	}
+
 	public void add(Sprite sprite)
 	{
 		synchronized (lock) {
 			if (!sprites.contains(sprite)) {
 				sprites.add(sprite);
 				sprite.scene = this;
+				resolveTextFont(sprite);
 				zOrderDirty = true;
 				if (sprite.ySort) {
 					hasYSort = true;
@@ -176,6 +212,7 @@ public class Scene
 				if (sprite != null && !sprites.contains(sprite)) {
 					sprites.add(sprite);
 					sprite.scene = this;
+					resolveTextFont(sprite);
 					spritesAdded = true;
 					if (sprite.ySort) {
 						hasYSort = true;
