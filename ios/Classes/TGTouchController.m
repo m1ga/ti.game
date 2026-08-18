@@ -69,6 +69,18 @@ static const NSTimeInterval kTapTimeout = 0.3;
 					   [_scene screenToWorldY:(float)(p.y * _contentScale)]);
 }
 
+/** Gestures track coordinates in the sprite's own space, so drags on
+ *  screenFixed sprites (HUD buttons) follow the finger 1:1. */
+- (float)toSpriteSpaceX:(TGSprite *)s x:(float)wx
+{
+	return s.screenFixed ? [_scene worldToScreenX:wx] : wx;
+}
+
+- (float)toSpriteSpaceY:(TGSprite *)s y:(float)wy
+{
+	return s.screenFixed ? [_scene worldToScreenY:wy] : wy;
+}
+
 static float distanceBetween(float x0, float y0, float x1, float y1)
 {
 	float dx = x1 - x0;
@@ -189,18 +201,20 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	if (hit == nil || [self gestureForSprite:hit] != nil) {
 		return NO;
 	}
+	float tx = [self toSpriteSpaceX:hit x:wx];
+	float ty = [self toSpriteSpaceY:hit y:wy];
 	TGGesture *g = [TGGesture new];
 	g.touch = touch;
 	g.sprite = hit;
-	g.downX = wx;
-	g.downY = wy;
+	g.downX = tx;
+	g.downY = ty;
 	g.downTime = touch.timestamp;
-	g.grabOffsetX = wx - hit.x;
-	g.grabOffsetY = wy - hit.y;
+	g.grabOffsetX = tx - hit.x;
+	g.grabOffsetY = ty - hit.y;
 	[_gestures addObject:g];
 	NSMutableDictionary *data = [self positionData:hit];
-	data[@"touchX"] = @(wx);
-	data[@"touchY"] = @(wy);
+	data[@"touchX"] = @(tx);
+	data[@"touchY"] = @(ty);
 	fireOnSprite(hit, @"press", data);
 	return YES;
 }
@@ -249,6 +263,8 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 - (void)drag:(TGGesture *)g toX:(float)tx y:(float)ty time:(NSTimeInterval)now
 {
 	TGSprite *s = g.sprite;
+	tx = [self toSpriteSpaceX:s x:tx];
+	ty = [self toSpriteSpaceY:s y:ty];
 	if (!g.dragging && distanceBetween(tx, ty, g.downX, g.downY) > _touchSlop) {
 		g.dragging = YES;
 		s.dragged = YES;
@@ -369,6 +385,8 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	}
 	[_gestures removeObjectIdenticalTo:g];
 	TGSprite *s = g.sprite;
+	upX = [self toSpriteSpaceX:s x:upX];
+	upY = [self toSpriteSpaceY:s y:upY];
 	s.dragged = NO;
 	if (g.dragging) {
 		fireOnSprite(s, @"dragend", [self positionData:s]);

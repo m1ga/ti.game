@@ -34,6 +34,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	TGTextureManager *_textures;
 	TGPostEffect *_postEffect;
 	float _projection[16];
+	float _screenProjection[16]; // screenFixed sprites
 	CFTimeInterval _lastFrameTime;
 	float _effectTime; // drives the glitch animation
 	float _debugAabb[4];
@@ -115,6 +116,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	float visibleW = _surfaceWidth / scale;
 	float visibleH = _surfaceHeight / scale;
 	orthoM(_projection, left, left + visibleW, top + visibleH, top, -1.0f, 1.0f);
+	orthoM(_screenProjection, 0.0f, _surfaceWidth, _surfaceHeight, 0.0f, -1.0f, 1.0f);
 
 	glClearColor(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -132,7 +134,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		[self ensureSheetLoadedOnce:rope.sheet];
 	}
 
-	[_batch begin:_projection originX:left originY:top screenScale:scale];
+	[_batch begin:_projection screenProjection:_screenProjection
+		  originX:left originY:top screenScale:scale];
 	// Skid marks slot between background (zIndex <= 0, e.g. the track)
 	// and foreground sprites (the car), so they overlay the road but
 	// stay under whatever drives across them. Emitters merge into the
@@ -196,6 +199,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 - (void)drawSkidTrail
 {
 	if (![_scene.skidTrail isEmpty]) {
+		[_batch setScreenSpace:NO];
 		[_scene.skidTrail draw:_batch whiteTexture:[_textures whiteTexture]];
 	}
 }
@@ -207,6 +211,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
  */
 - (void)drawDebugOverlay:(TGSprite *)s
 {
+	[_batch setScreenSpace:s.screenFixed]; // overlay in the sprite's own space
 	GLuint white = [_textures whiteTexture];
 	float t = 1.5f; // half line thickness
 

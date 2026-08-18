@@ -12,8 +12,13 @@
 
 - (instancetype)init
 {
+	return [self initWithSprite:[[TGSprite alloc] init]];
+}
+
+- (instancetype)initWithSprite:(TGSprite *)sprite
+{
 	if (self = [super init]) {
-		_sprite = [[TGSprite alloc] init];
+		_sprite = sprite;
 		_sprite.proxy = self;
 		_sprite.eventListener = self;
 	}
@@ -273,6 +278,18 @@ static NSSet<NSString *> *toGroupSet(id value)
 - (NSNumber *)pixelSnap
 {
 	return @(self.sprite.pixelSnap);
+}
+
+/** true = (x, y) are surface coordinates and the sprite ignores camera
+ *  position, zoom and shake — HUD scores, buttons, overlays. */
+- (void)setScreenFixed:(id)value
+{
+	self.sprite.screenFixed = [TiUtils boolValue:value def:NO];
+}
+
+- (NSNumber *)screenFixed
+{
+	return @(self.sprite.screenFixed);
 }
 
 - (void)setZIndex:(id)value

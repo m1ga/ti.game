@@ -198,17 +198,33 @@ public class TouchController implements View.OnTouchListener
 		if (hit == null || isClaimed(hit)) {
 			return false;
 		}
-		gestures.put(pointerId, new Gesture(hit, wx, wy, time));
+		// Gestures track coordinates in the sprite's own space, so drags
+		// on screenFixed sprites (HUD buttons) follow the finger 1:1.
+		float tx = toSpriteSpaceX(hit, wx);
+		float ty = toSpriteSpaceY(hit, wy);
+		gestures.put(pointerId, new Gesture(hit, tx, ty, time));
 		KrollDict data = positionData(hit);
-		data.put("touchX", wx);
-		data.put("touchY", wy);
+		data.put("touchX", tx);
+		data.put("touchY", ty);
 		fire(hit, "press", data);
 		return true;
+	}
+
+	private float toSpriteSpaceX(Sprite s, float wx)
+	{
+		return s.screenFixed ? scene.worldToScreenX(wx) : wx;
+	}
+
+	private float toSpriteSpaceY(Sprite s, float wy)
+	{
+		return s.screenFixed ? scene.worldToScreenY(wy) : wy;
 	}
 
 	private void drag(Gesture g, float tx, float ty, long now)
 	{
 		Sprite s = g.sprite;
+		tx = toSpriteSpaceX(s, tx);
+		ty = toSpriteSpaceY(s, ty);
 		if (!g.dragging && distance(tx, ty, g.downX, g.downY) > touchSlop) {
 			g.dragging = true;
 			s.dragged = true;
@@ -272,6 +288,8 @@ public class TouchController implements View.OnTouchListener
 		}
 		gestures.remove(pointerId);
 		Sprite s = g.sprite;
+		upX = toSpriteSpaceX(s, upX);
+		upY = toSpriteSpaceY(s, upY);
 		s.dragged = false;
 		if (g.dragging) {
 			fire(s, "dragend", positionData(s));

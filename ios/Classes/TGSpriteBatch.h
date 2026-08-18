@@ -21,10 +21,16 @@
 - (void)createGLResources;
 
 - (void)begin:(const float *)projectionMatrix
+	screenProjection:(const float *)screenProjectionMatrix
 	 originX:(float)originX
 	 originY:(float)originY
-	screenScale:(float)screenScale; // float[16], column-major
+	screenScale:(float)screenScale; // float[16] each, column-major
 - (void)draw:(TGSprite *)sprite;
+
+/** Screen space = the identity projection in surface pixels: screenFixed
+ *  sprites (HUDs) ignore camera position, zoom and shake. Flushes the
+ *  pending batch on change, like a texture or blend switch. */
+- (void)setScreenSpace:(BOOL)fixed;
 
 /** Additive = (ONE, ONE) on premultiplied colors: quads brighten the
  *  backdrop instead of covering it (glows, fire, lasers). Flushes the

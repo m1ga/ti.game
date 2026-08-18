@@ -27,14 +27,9 @@ module.exports = function () {
 		// debug: true  // show collision shapes for every sprite
 	});
 
-	var lapLabel = Ti.UI.createLabel({
-		text: 'Lap 0 · CP 0/3',
-		color: '#fff',
-		font: { fontSize: 22, fontWeight: 'bold' },
-		shadowColor: '#222',
-		shadowOffset: { x: 0, y: 2 },
-		top: 40
-	});
+	// HUD as a GL text sprite (built-in pixel font) — screenFixed keeps it
+	// glued to the surface; positioned once the surface size is known
+	var lapLabel = Game.createText({ text: 'Lap 0 - CP 0/3', screenFixed: true, zIndex: 100 });
 
 	var trackSheet = Game.createSpriteSheet({ image: 'assets/track.png', frameWidth: 256, frameHeight: 256, smoothing: false });
 	var carSheet = Game.createSpriteSheet({ image: 'assets/car.png', frameWidth: 64, frameHeight: 64, smoothing: false });
@@ -48,6 +43,11 @@ module.exports = function () {
 	});
 
 	function init(W, H) {
+
+		lapLabel.scale = Math.max(2, Math.round(W / 260));
+		lapLabel.x = W / 2;
+		lapLabel.y = H * 0.07;
+		gameView.add(lapLabel);
 
 		// Keep the track above the on-screen controls
 		// Scene units per dp: measure the real surface scale instead of
@@ -157,7 +157,7 @@ module.exports = function () {
 		}
 
 		function updateLabel() {
-			lapLabel.text = 'Lap ' + laps + ' · CP ' + visitedCount() + '/3';
+			lapLabel.text = 'Lap ' + laps + ' - CP ' + visitedCount() + '/3';
 		}
 
 		car.addEventListener('collision', function (e) {
@@ -249,7 +249,6 @@ module.exports = function () {
 	}
 
 	win.add(gameView);
-	win.add(lapLabel);
 	// Back — return to the launcher
 	var backButton = Ti.UI.createButton({
 		title: 'Back',

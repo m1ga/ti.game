@@ -37,6 +37,11 @@ public class Sprite
 	public volatile boolean pixelSnap = false;
 	public volatile int zIndex = 0;
 
+	// Screen-fixed: (x, y) are surface coordinates and the sprite ignores
+	// camera position, zoom and shake — HUD scores, buttons, overlays.
+	// Touch input maps back automatically.
+	public volatile boolean screenFixed = false;
+
 	// Tint: multiplies the frame's colors (white = art unchanged) — damage
 	// flashes, team colors, day/night shading. Parsed 0..1 channels.
 	public volatile float tintR = 1f;
@@ -548,6 +553,15 @@ public class Sprite
 	{
 		if (!visible || opacity <= 0f || !touchEnabled) {
 			return false;
+		}
+		// Screen-fixed sprites live in surface coordinates; the touch
+		// arrives in world space, so map it back before testing.
+		if (screenFixed) {
+			Scene sc = scene;
+			if (sc != null) {
+				px = sc.worldToScreenX(px);
+				py = sc.worldToScreenY(py);
+			}
 		}
 		float w = drawWidth();
 		float h = drawHeight();

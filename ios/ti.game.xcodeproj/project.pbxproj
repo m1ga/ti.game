@@ -75,6 +75,16 @@
 		A1B2C3D41404000000000000 /* TiGameRopeProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41402000000000000 /* TiGameRopeProxy.m */; };
 		A1B2C3D41503000000000000 /* TiGameSoundProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41501000000000000 /* TiGameSoundProxy.h */; };
 		A1B2C3D41504000000000000 /* TiGameSoundProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41502000000000000 /* TiGameSoundProxy.m */; };
+		A1B2C3D41703000000000000 /* TGBitmapFont.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41701000000000000 /* TGBitmapFont.h */; };
+		A1B2C3D41704000000000000 /* TGBitmapFont.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41702000000000000 /* TGBitmapFont.m */; };
+		A1B2C3D41803000000000000 /* TGTextSprite.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41801000000000000 /* TGTextSprite.h */; };
+		A1B2C3D41804000000000000 /* TGTextSprite.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41802000000000000 /* TGTextSprite.m */; };
+		A1B2C3D41903000000000000 /* TGDefaultFont.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41901000000000000 /* TGDefaultFont.h */; };
+		A1B2C3D41904000000000000 /* TGDefaultFont.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41902000000000000 /* TGDefaultFont.m */; };
+		A1B2C3D42003000000000000 /* TiGameFontProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42001000000000000 /* TiGameFontProxy.h */; };
+		A1B2C3D42004000000000000 /* TiGameFontProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42002000000000000 /* TiGameFontProxy.m */; };
+		A1B2C3D42103000000000000 /* TiGameTextProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42101000000000000 /* TiGameTextProxy.h */; };
+		A1B2C3D42104000000000000 /* TiGameTextProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42102000000000000 /* TiGameTextProxy.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -143,6 +153,16 @@
 		A1B2C3D41402000000000000 /* TiGameRopeProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameRopeProxy.m"; path = "Classes/TiGameRopeProxy.m"; sourceTree = "<group>"; };
 		A1B2C3D41501000000000000 /* TiGameSoundProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameSoundProxy.h"; path = "Classes/TiGameSoundProxy.h"; sourceTree = "<group>"; };
 		A1B2C3D41502000000000000 /* TiGameSoundProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameSoundProxy.m"; path = "Classes/TiGameSoundProxy.m"; sourceTree = "<group>"; };
+		A1B2C3D41701000000000000 /* TGBitmapFont.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGBitmapFont.h"; path = "Classes/TGBitmapFont.h"; sourceTree = "<group>"; };
+		A1B2C3D41702000000000000 /* TGBitmapFont.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGBitmapFont.m"; path = "Classes/TGBitmapFont.m"; sourceTree = "<group>"; };
+		A1B2C3D41801000000000000 /* TGTextSprite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTextSprite.h"; path = "Classes/TGTextSprite.h"; sourceTree = "<group>"; };
+		A1B2C3D41802000000000000 /* TGTextSprite.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTextSprite.m"; path = "Classes/TGTextSprite.m"; sourceTree = "<group>"; };
+		A1B2C3D41901000000000000 /* TGDefaultFont.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGDefaultFont.h"; path = "Classes/TGDefaultFont.h"; sourceTree = "<group>"; };
+		A1B2C3D41902000000000000 /* TGDefaultFont.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGDefaultFont.m"; path = "Classes/TGDefaultFont.m"; sourceTree = "<group>"; };
+		A1B2C3D42001000000000000 /* TiGameFontProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameFontProxy.h"; path = "Classes/TiGameFontProxy.h"; sourceTree = "<group>"; };
+		A1B2C3D42002000000000000 /* TiGameFontProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameFontProxy.m"; path = "Classes/TiGameFontProxy.m"; sourceTree = "<group>"; };
+		A1B2C3D42101000000000000 /* TiGameTextProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameTextProxy.h"; path = "Classes/TiGameTextProxy.h"; sourceTree = "<group>"; };
+		A1B2C3D42102000000000000 /* TiGameTextProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameTextProxy.m"; path = "Classes/TiGameTextProxy.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -235,6 +255,16 @@
 				A1B2C3D41402000000000000 /* TiGameRopeProxy.m */,
 				A1B2C3D41501000000000000 /* TiGameSoundProxy.h */,
 				A1B2C3D41502000000000000 /* TiGameSoundProxy.m */,
+				A1B2C3D41701000000000000 /* TGBitmapFont.h */,
+				A1B2C3D41702000000000000 /* TGBitmapFont.m */,
+				A1B2C3D41801000000000000 /* TGTextSprite.h */,
+				A1B2C3D41802000000000000 /* TGTextSprite.m */,
+				A1B2C3D41901000000000000 /* TGDefaultFont.h */,
+				A1B2C3D41902000000000000 /* TGDefaultFont.m */,
+				A1B2C3D42001000000000000 /* TiGameFontProxy.h */,
+				A1B2C3D42002000000000000 /* TiGameFontProxy.m */,
+				A1B2C3D42101000000000000 /* TiGameTextProxy.h */,
+				A1B2C3D42102000000000000 /* TiGameTextProxy.m */,
 				24DE9E0F11C5FE74003F90F6 /* TiGameModuleAssets.h */,
 				24DE9E1011C5FE74003F90F6 /* TiGameModuleAssets.m */,
 				24DD6CF71134B3F500162E58 /* TiGameModule.h */,
@@ -269,6 +299,11 @@
 				A1B2C3D41303000000000000 /* TiGameEmitterProxy.h in Headers */,
 				A1B2C3D41403000000000000 /* TiGameRopeProxy.h in Headers */,
 				A1B2C3D41503000000000000 /* TiGameSoundProxy.h in Headers */,
+				A1B2C3D41703000000000000 /* TGBitmapFont.h in Headers */,
+				A1B2C3D41803000000000000 /* TGTextSprite.h in Headers */,
+				A1B2C3D41903000000000000 /* TGDefaultFont.h in Headers */,
+				A1B2C3D42003000000000000 /* TiGameFontProxy.h in Headers */,
+				A1B2C3D42103000000000000 /* TiGameTextProxy.h in Headers */,
 				A1B2C3D40003000000000000 /* TGAnimation.h in Headers */,
 				A1B2C3D40103000000000000 /* TGEasing.h in Headers */,
 				A1B2C3D40203000000000000 /* TGGLView.h in Headers */,
@@ -365,6 +400,11 @@
 				A1B2C3D41304000000000000 /* TiGameEmitterProxy.m in Sources */,
 				A1B2C3D41404000000000000 /* TiGameRopeProxy.m in Sources */,
 				A1B2C3D41504000000000000 /* TiGameSoundProxy.m in Sources */,
+				A1B2C3D41704000000000000 /* TGBitmapFont.m in Sources */,
+				A1B2C3D41804000000000000 /* TGTextSprite.m in Sources */,
+				A1B2C3D41904000000000000 /* TGDefaultFont.m in Sources */,
+				A1B2C3D42004000000000000 /* TiGameFontProxy.m in Sources */,
+				A1B2C3D42104000000000000 /* TiGameTextProxy.m in Sources */,
 				A1B2C3D40004000000000000 /* TGAnimation.m in Sources */,
 				A1B2C3D40104000000000000 /* TGEasing.m in Sources */,
 				A1B2C3D40204000000000000 /* TGGLView.m in Sources */,

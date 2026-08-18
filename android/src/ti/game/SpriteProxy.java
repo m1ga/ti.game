@@ -39,14 +39,21 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 {
 	private static final String LCAT = "TiGameSprite";
 
-	private final Sprite sprite = new Sprite();
+	protected final Sprite sprite;
 	private SpriteSheetProxy sheetProxy;
 	private String glowColor;
 	private String tintColor;
 
 	public SpriteProxy()
 	{
+		this(new Sprite());
+	}
+
+	/** Subclasses (TextProxy) supply their own Sprite specialization. */
+	protected SpriteProxy(Sprite sprite)
+	{
 		super();
+		this.sprite = sprite;
 		sprite.proxy = this;
 		sprite.eventListener = this;
 	}
@@ -122,6 +129,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("pixelSnap")) {
 			sprite.pixelSnap = TiConvert.toBoolean(options.get("pixelSnap"), false);
+		}
+		if (options.containsKey("screenFixed")) {
+			sprite.screenFixed = TiConvert.toBoolean(options.get("screenFixed"), false);
 		}
 		if (options.containsKey("zIndex")) {
 			sprite.zIndex = TiConvert.toInt(options.get("zIndex"));
@@ -582,6 +592,20 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setPixelSnap(boolean value)
 	{
 		sprite.pixelSnap = value;
+	}
+
+	/** true = (x, y) are surface coordinates and the sprite ignores camera
+	 *  position, zoom and shake — HUD scores, buttons, overlays. */
+	@Kroll.getProperty
+	public boolean getScreenFixed()
+	{
+		return sprite.screenFixed;
+	}
+
+	@Kroll.setProperty
+	public void setScreenFixed(boolean value)
+	{
+		sprite.screenFixed = value;
 	}
 
 	@Kroll.getProperty

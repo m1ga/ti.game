@@ -74,6 +74,10 @@
 - (float)screenToWorldX:(float)sx;
 - (float)screenToWorldY:(float)sy;
 
+/** Maps a world position back to surface coordinates (screenFixed sprites). */
+- (float)worldToScreenX:(float)wx;
+- (float)worldToScreenY:(float)wy;
+
 // Fullscreen camera effect (main thread writes, render thread reads):
 // the scene renders into an offscreen texture and TGPostEffect draws it
 // to the screen through the effect shader. TGPostEffectNone renders
@@ -90,6 +94,10 @@
 @property (atomic, assign) float bgAlpha;
 
 - (void)add:(TGSprite *)sprite;
+/** Points default-font text at this scene's own font instance (called
+ *  automatically on add; public so a proxy can re-resolve after clearing
+ *  an explicit font). */
+- (void)resolveTextFont:(TGSprite *)sprite;
 /** Adds a group in one protected scene mutation. */
 - (void)addSprites:(NSArray<TGSprite *> *)sprites
 		  emitters:(NSArray<TGParticleEmitter *> *)emitters
