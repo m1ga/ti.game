@@ -184,6 +184,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("hitboxShape")) {
 			setHitboxShape(TiConvert.toString(options.get("hitboxShape")));
 		}
+		if (options.containsKey("swept")) {
+			sprite.swept = TiConvert.toBoolean(options.get("swept"), false);
+		}
 		if (options.containsKey("debug")) {
 			sprite.debug = TiConvert.toBoolean(options.get("debug"), false);
 		}
@@ -1017,6 +1020,20 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setHitboxShape(String value)
 	{
 		sprite.circleHitbox = "circle".equals(value);
+	}
+
+	/** Swept AABB: this sprite's movement is collision-tested as a path,
+	 *  so fast bullets can't tunnel through thin targets or solids. */
+	@Kroll.getProperty
+	public boolean getSwept()
+	{
+		return sprite.swept;
+	}
+
+	@Kroll.setProperty
+	public void setSwept(boolean value)
+	{
+		sprite.swept = value;
 	}
 
 	@Kroll.getProperty

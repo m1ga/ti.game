@@ -16,6 +16,7 @@
 //   Rope: native Verlet ropes — drag the balls they hang from
 //   Flip: flipX/flipY from movement — patrols turn around, tap flips gravity
 //   Text: bitmap-font labels in the GL scene — HUD, world signs, text buttons
+//   Swept: fast bullets vs a thin wall — swept: true stops the tunneling
 
 var demos = [
 	{ title: 'Basic demo', start: require('/basic') },
@@ -36,7 +37,8 @@ var demos = [
 	{ title: 'Flip', start: require('/flip') },
 	{ title: 'Blend & flash', start: require('/blend') },
 	{ title: 'Time scale', start: require('/timescale') },
-	{ title: 'Text', start: require('/text') }
+	{ title: 'Text', start: require('/text') },
+	{ title: 'Swept collision', start: require('/swept') }
 ];
 
 var win = Ti.UI.createWindow({

@@ -16,7 +16,8 @@ identical on both platforms.
 - Touch: tap, press, drag & drop, pinch-to-scale, two-finger rotate
 - Physics: velocity + gravity, platformer solids, bouncing (restitution),
   arcade car model with drifting + skid marks, Newtonian flight (thrust)
-- Collision groups with events, invisible trigger zones, hitbox tuning
+- Collision groups with events, invisible trigger zones, hitbox tuning,
+  swept AABB for fast bullets (`swept: true` — no tunneling)
 - Parallax scroll looping, screen wrapping, idle wobble animation
 - Pixel-art mode (nearest-neighbor filtering), debug overlay for hitboxes
 - Sound: low-latency overlapping effects + looping music (`createSound`),
@@ -33,7 +34,7 @@ identical on both platforms.
   the GL scene with a built-in pixel font, BMFont/AngelCode or monospace
   grid fonts (`createFont`); `screenFixed` pins any sprite to the surface
   for camera-proof HUDs
-- 19 example games in `example/` covering every feature
+- 20 example games in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -308,6 +309,13 @@ overlap-enter, re-arming after separation. This is independent of
   sprites also resolve against solids along the contact normal, so a
   ball bounces off a corner diagonally instead of like a box (the volley
   ball and the asteroids use it), and their touch area is round.
+- **Fast movers tunnel** without help: a bullet that travels further per
+  frame than a target is thick never overlaps it on any frame, so the
+  discrete test misses. `swept: true` on the moving sprite tests its
+  movement as a path (swept AABB) — `collision` events fire for anything
+  the path crossed, and `solidWith` walls stop it at the impact point
+  instead of letting it teleport through. Circle hitboxes sweep as their
+  bounding box; the swept demo shows the comparison side by side.
 - `debug: true` on a sprite (or on the GameView for everything) renders
   the shapes: **green** = collision AABB (with `hitboxScale`), **blue** =
   sprite/touch bounds, **orange dot** = anchor.
@@ -479,6 +487,7 @@ a feature set — find the one closest to your game and start there:
 | `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
 | `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` (overlaps bloom, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
 | `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
+| `swept.js` | Swept AABB comparison: two lanes fire identical bullets at a thin wall with rising speed — the `swept: false` lane starts tunneling straight through, the `swept: true` lane never misses |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going |
 
 Run them with `ti build -p android` from `android/` (executes
@@ -548,7 +557,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | Touch behaviors | `draggable`, `pinchable`, `rotatable`, `touchEnabled` (false = touches pass through to sprites underneath) |
 | Physics | `velocityX`, `velocityY`, `gravity`, `maxSpeed` |
 | Solids | `solidWith`, `onGround` (read-only), `restitution`, `oneWay` (as a solid: landings on the top edge only — pass-through from below/sideways); moving solids carry their riders automatically, `carryRiders: false` opts a solid out (world-scroll terrain) |
-| Collision | `collisionGroup`, `collidesWith`, `hitboxScale`, `hitboxShape` (`'rect'`/`'circle'` — circles also bounce off solid corners along the contact normal), `debug` |
+| Collision | `collisionGroup`, `collidesWith`, `hitboxScale`, `hitboxShape` (`'rect'`/`'circle'` — circles also bounce off solid corners along the contact normal), `swept` (movement is collision-tested as a path — fast bullets stop tunneling through thin targets and solids), `debug` |
 | Car | `carMode`, `throttle`, `steering`, `enginePower`, `turnRate`, `grip`, `drag`, `skidMarks`, `skidThreshold`, `drifting` (read-only) |
 | Flight | `thrust`, `angularVelocity`, `wrapAround` |
 | Wrap/loop | `wrapX`, `wrapShift` |

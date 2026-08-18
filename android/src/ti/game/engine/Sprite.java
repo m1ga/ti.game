@@ -125,6 +125,13 @@ public class Sprite
 	// art rarely fills its frame; smaller values make collisions feel fair.
 	public volatile float hitboxScale = 1f;
 
+	// Swept AABB collision: the sprite's movement this frame is tested as
+	// a path, not just at the end position, so fast movers (bullets)
+	// can't tunnel through thin targets or solids between frames. Applies
+	// to collidesWith events and solidWith blocking; circle hitboxes
+	// sweep as their bounding box.
+	public volatile boolean swept = false;
+
 	// true = the hitbox is a circle (radius = half the smaller drawn side
 	// x hitboxScale, centered on the sprite center) — balls, asteroids.
 	// Collision events test circle-vs-circle/AABB; against solids, the

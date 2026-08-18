@@ -47,7 +47,11 @@ traffic in the loop.
       teleports excluded) before resolution, so they're carried sideways
       and stay glued on the way down. Platformer demo has a patrolling
       steel platform (a regular two-way solid).
-- [ ] Swept AABB option per sprite so fast bullets stop tunneling.
+- [x] Swept AABB option per sprite so fast bullets stop tunneling —
+      `swept: true` path-tests the frame's movement (Minkowski + slab)
+      for both collision events and solid blocking (clamped to the
+      impact point, then resolved by the normal static pass); the swept
+      demo compares both lanes side by side.
 - [ ] `gameView.raycast(x0, y0, x1, y1, groups)` one-shot query —
       line-of-sight, ground probes.
 - [ ] Slopes (platformer terrain) — only if terrain games become a goal.

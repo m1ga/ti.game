@@ -130,6 +130,13 @@
 // Shrinks the collision AABB around the anchor (1 = full frame).
 @property (atomic, assign) float hitboxScale;
 
+// Swept AABB collision: the sprite's movement this frame is tested as
+// a path, not just at the end position, so fast movers (bullets) can't
+// tunnel through thin targets or solids between frames. Applies to
+// collidesWith events and solidWith blocking; circle hitboxes sweep as
+// their bounding box.
+@property (atomic, assign) BOOL swept;
+
 // YES = the hitbox is a circle (radius = half the smaller drawn side
 // x hitboxScale, centered on the sprite center) — balls, asteroids.
 @property (atomic, assign) BOOL circleHitbox;

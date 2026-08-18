@@ -344,6 +344,94 @@ public class Scene
 	private final float[] centerA = new float[2];
 	private final float[] centerB = new float[2];
 
+	// sweptHit result: entry time in 0..1, entry axis (0 = x, 1 = y)
+	private final float[] sweptResult = new float[2];
+
+	/**
+	 * Swept AABB: does a point moving from (cx, cy) by (dx, dy) this frame
+	 * cross the box? Callers inflate the box by the mover's half extents
+	 * (Minkowski sum), turning box-vs-box sweeping into this segment test
+	 * (slab method). Catches fast movers that would tunnel straight
+	 * through thin targets between frames. GL thread only.
+	 */
+	private boolean sweptHit(float cx, float cy, float dx, float dy,
+							 float minX, float minY, float maxX, float maxY)
+	{
+		float tmin = 0f;
+		float tmax = 1f;
+		float axis = 0f;
+		if (dx > -1e-6f && dx < 1e-6f) {
+			if (cx < minX || cx > maxX) {
+				return false;
+			}
+		} else {
+			float t1 = (minX - cx) / dx;
+			float t2 = (maxX - cx) / dx;
+			if (t1 > t2) {
+				float t = t1;
+				t1 = t2;
+				t2 = t;
+			}
+			if (t1 > tmin) {
+				tmin = t1;
+			}
+			if (t2 < tmax) {
+				tmax = t2;
+			}
+			if (tmin > tmax) {
+				return false;
+			}
+		}
+		if (dy > -1e-6f && dy < 1e-6f) {
+			if (cy < minY || cy > maxY) {
+				return false;
+			}
+		} else {
+			float t1 = (minY - cy) / dy;
+			float t2 = (maxY - cy) / dy;
+			if (t1 > t2) {
+				float t = t1;
+				t1 = t2;
+				t2 = t;
+			}
+			if (t1 > tmin) {
+				tmin = t1;
+				axis = 1f;
+			}
+			if (t2 < tmax) {
+				tmax = t2;
+			}
+			if (tmin > tmax) {
+				return false;
+			}
+		}
+		sweptResult[0] = tmin;
+		sweptResult[1] = axis;
+		return true;
+	}
+
+	/**
+	 * Path-of-travel overlap test for swept sprites: did the mover's box
+	 * cross the target's box at any point this frame? Relative motion, so
+	 * a fast target can't slip past a slow bullet either.
+	 */
+	private boolean sweptShapesOverlap(Sprite s, Sprite other)
+	{
+		float dx = s.frameDeltaX - other.frameDeltaX;
+		float dy = s.frameDeltaY - other.frameDeltaY;
+		if (dx * dx + dy * dy < 1e-4f) {
+			return false;
+		}
+		s.computeAABB(aabbA);
+		other.computeAABB(aabbB);
+		float hw = (aabbA[2] - aabbA[0]) / 2f;
+		float hh = (aabbA[3] - aabbA[1]) / 2f;
+		float cx = (aabbA[0] + aabbA[2]) / 2f - dx; // center at frame start
+		float cy = (aabbA[1] + aabbA[3]) / 2f - dy;
+		return sweptHit(cx, cy, dx, dy,
+			aabbB[0] - hw, aabbB[1] - hh, aabbB[2] + hw, aabbB[3] + hh);
+	}
+
 	/** Shape-aware overlap test (rect/rect, circle/circle, circle/rect). */
 	private boolean shapesOverlap(Sprite a, Sprite b)
 	{
@@ -541,6 +629,9 @@ public class Scene
 				continue;
 			}
 			carryByGround(s);
+			if (s.swept) {
+				sweepAgainstSolids(s, list, groups);
+			}
 			if (s.circleHitbox) {
 				resolveCircleSolids(s, list, groups);
 				continue;
@@ -617,6 +708,58 @@ public class Scene
 				}
 			}
 		}
+	}
+
+	/**
+	 * Swept solid blocking: finds the earliest wall the sprite's movement
+	 * crossed this frame and pulls the sprite back to the impact point,
+	 * half a pixel past contact — the static resolver below then sees an
+	 * ordinary touch and handles push-out, restitution, onGround and the
+	 * land event exactly like a slow collision. Without this, a sprite
+	 * faster than a solid is thick teleports straight through it.
+	 */
+	private void sweepAgainstSolids(Sprite s, List<Sprite> list, Set<String> groups)
+	{
+		float dx = s.frameDeltaX;
+		float dy = s.frameDeltaY;
+		float len2 = dx * dx + dy * dy;
+		if (len2 < 1e-4f) {
+			return;
+		}
+		s.computeAABB(aabbA);
+		float hw = (aabbA[2] - aabbA[0]) / 2f;
+		float hh = (aabbA[3] - aabbA[1]) / 2f;
+		float cx = (aabbA[0] + aabbA[2]) / 2f - dx; // center at frame start
+		float cy = (aabbA[1] + aabbA[3]) / 2f - dy;
+		float earliest = Float.MAX_VALUE;
+		for (Sprite solid : list) {
+			String group = solid.collisionGroup;
+			if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
+				continue;
+			}
+			solid.computeAABB(aabbB);
+			if (!sweptHit(cx, cy, dx, dy,
+					aabbB[0] - hw, aabbB[1] - hh, aabbB[2] + hw, aabbB[3] + hh)) {
+				continue;
+			}
+			if (solid.oneWay
+					&& (sweptResult[1] != 1f || dy <= 0f || s.velocityY < 0f)) {
+				continue; // one-way: only falling onto the top face counts
+			}
+			if (sweptResult[0] < earliest) {
+				earliest = sweptResult[0];
+			}
+		}
+		if (earliest >= 1f) {
+			return; // no crossing (end-position overlaps resolve statically)
+		}
+		float t = Math.min(1f, earliest + 0.5f / (float) Math.sqrt(len2));
+		float back = 1f - t;
+		s.x -= dx * back;
+		s.y -= dy * back;
+		// keep the carry delta honest in case something rides this sprite
+		s.frameDeltaX -= dx * back;
+		s.frameDeltaY -= dy * back;
 	}
 
 	/**
@@ -740,6 +883,9 @@ public class Scene
 					continue;
 				}
 				boolean overlap = shapesOverlap(s, other);
+				if (!overlap && s.swept) {
+					overlap = sweptShapesOverlap(s, other);
+				}
 				if (overlap) {
 					if (s.colliding.add(other)) {
 						Sprite.SpriteEventListener listener = s.eventListener;

@@ -633,6 +633,18 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return self.sprite.circleHitbox ? @"circle" : @"rect";
 }
 
+/** Swept AABB: this sprite's movement is collision-tested as a path,
+ *  so fast bullets can't tunnel through thin targets or solids. */
+- (void)setSwept:(id)value
+{
+	self.sprite.swept = [TiUtils boolValue:value def:NO];
+}
+
+- (NSNumber *)swept
+{
+	return @(self.sprite.swept);
+}
+
 - (void)setDebug:(id)value
 {
 	self.sprite.debug = [TiUtils boolValue:value def:NO];

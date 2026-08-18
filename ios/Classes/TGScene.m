@@ -6,6 +6,7 @@
 #import "TGTextSprite.h"
 #import "TGBitmapFont.h"
 #import "TGDefaultFont.h"
+#import <float.h>
 #import <math.h>
 
 static float bottomEdge(TGSprite *s)
@@ -30,6 +31,7 @@ static float bottomEdge(TGSprite *s)
 	float _aabbB[4];
 	float _centerA[2];
 	float _centerB[2];
+	float _sweptResult[2]; // entry time in 0..1, entry axis (0 = x, 1 = y)
 }
 
 - (instancetype)init
@@ -550,6 +552,147 @@ static float bottomEdge(TGSprite *s)
  * Landing on top zeroes downward velocity, sets onGround and fires the
  * land callback on the ground-touch transition.
  */
+/**
+ * Swept AABB: does a point moving from (cx, cy) by (dx, dy) this frame
+ * cross the box? Callers inflate the box by the mover's half extents
+ * (Minkowski sum), turning box-vs-box sweeping into this segment test
+ * (slab method). Catches fast movers that would tunnel straight through
+ * thin targets between frames. Render thread only.
+ */
+- (BOOL)sweptHitFromX:(float)cx y:(float)cy dx:(float)dx dy:(float)dy
+				 minX:(float)minX minY:(float)minY maxX:(float)maxX maxY:(float)maxY
+{
+	float tmin = 0.0f;
+	float tmax = 1.0f;
+	float axis = 0.0f;
+	if (dx > -1e-6f && dx < 1e-6f) {
+		if (cx < minX || cx > maxX) {
+			return NO;
+		}
+	} else {
+		float t1 = (minX - cx) / dx;
+		float t2 = (maxX - cx) / dx;
+		if (t1 > t2) {
+			float t = t1;
+			t1 = t2;
+			t2 = t;
+		}
+		if (t1 > tmin) {
+			tmin = t1;
+		}
+		if (t2 < tmax) {
+			tmax = t2;
+		}
+		if (tmin > tmax) {
+			return NO;
+		}
+	}
+	if (dy > -1e-6f && dy < 1e-6f) {
+		if (cy < minY || cy > maxY) {
+			return NO;
+		}
+	} else {
+		float t1 = (minY - cy) / dy;
+		float t2 = (maxY - cy) / dy;
+		if (t1 > t2) {
+			float t = t1;
+			t1 = t2;
+			t2 = t;
+		}
+		if (t1 > tmin) {
+			tmin = t1;
+			axis = 1.0f;
+		}
+		if (t2 < tmax) {
+			tmax = t2;
+		}
+		if (tmin > tmax) {
+			return NO;
+		}
+	}
+	_sweptResult[0] = tmin;
+	_sweptResult[1] = axis;
+	return YES;
+}
+
+/**
+ * Path-of-travel overlap test for swept sprites: did the mover's box
+ * cross the target's box at any point this frame? Relative motion, so a
+ * fast target can't slip past a slow bullet either.
+ */
+- (BOOL)sweptShapesOverlap:(TGSprite *)s with:(TGSprite *)other
+{
+	float dx = s.frameDeltaX - other.frameDeltaX;
+	float dy = s.frameDeltaY - other.frameDeltaY;
+	if (dx * dx + dy * dy < 1e-4f) {
+		return NO;
+	}
+	[s computeAABB:_aabbA];
+	[other computeAABB:_aabbB];
+	float hw = (_aabbA[2] - _aabbA[0]) / 2.0f;
+	float hh = (_aabbA[3] - _aabbA[1]) / 2.0f;
+	float cx = (_aabbA[0] + _aabbA[2]) / 2.0f - dx; // center at frame start
+	float cy = (_aabbA[1] + _aabbA[3]) / 2.0f - dy;
+	return [self sweptHitFromX:cx y:cy dx:dx dy:dy
+						  minX:_aabbB[0] - hw minY:_aabbB[1] - hh
+						  maxX:_aabbB[2] + hw maxY:_aabbB[3] + hh];
+}
+
+/**
+ * Swept solid blocking: finds the earliest wall the sprite's movement
+ * crossed this frame and pulls the sprite back to the impact point,
+ * half a pixel past contact — the static resolver below then sees an
+ * ordinary touch and handles push-out, restitution, onGround and the
+ * land event exactly like a slow collision. Without this, a sprite
+ * faster than a solid is thick teleports straight through it.
+ */
+- (void)sweepAgainstSolids:(TGSprite *)s
+					inList:(NSArray<TGSprite *> *)list
+					groups:(NSSet<NSString *> *)groups
+{
+	float dx = s.frameDeltaX;
+	float dy = s.frameDeltaY;
+	float len2 = dx * dx + dy * dy;
+	if (len2 < 1e-4f) {
+		return;
+	}
+	[s computeAABB:_aabbA];
+	float hw = (_aabbA[2] - _aabbA[0]) / 2.0f;
+	float hh = (_aabbA[3] - _aabbA[1]) / 2.0f;
+	float cx = (_aabbA[0] + _aabbA[2]) / 2.0f - dx; // center at frame start
+	float cy = (_aabbA[1] + _aabbA[3]) / 2.0f - dy;
+	float earliest = FLT_MAX;
+	for (TGSprite *solid in list) {
+		NSString *group = solid.collisionGroup;
+		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]) {
+			continue;
+		}
+		[solid computeAABB:_aabbB];
+		if (![self sweptHitFromX:cx y:cy dx:dx dy:dy
+							minX:_aabbB[0] - hw minY:_aabbB[1] - hh
+							maxX:_aabbB[2] + hw maxY:_aabbB[3] + hh]) {
+			continue;
+		}
+		if (solid.oneWay
+				&& (_sweptResult[1] != 1.0f || dy <= 0.0f || s.velocityY < 0.0f)) {
+			continue; // one-way: only falling onto the top face counts
+		}
+		if (_sweptResult[0] < earliest) {
+			earliest = _sweptResult[0];
+		}
+	}
+	if (earliest >= 1.0f) {
+		return; // no crossing (end-position overlaps resolve statically)
+	}
+	float t = MIN(1.0f, earliest + 0.5f / sqrtf(len2));
+	float back = 1.0f - t;
+	s.x -= dx * back;
+	s.y -= dy * back;
+	// keep the carry delta honest in case something rides this sprite
+	s.frameDeltaX -= dx * back;
+	s.frameDeltaY -= dy * back;
+}
+
 /** Shape-aware overlap test (rect/rect, circle/circle, circle/rect). */
 - (BOOL)shapesOverlap:(TGSprite *)a with:(TGSprite *)b
 {
@@ -612,6 +755,9 @@ static float bottomEdge(TGSprite *s)
 			continue;
 		}
 		[self carryByGround:s];
+		if (s.swept) {
+			[self sweepAgainstSolids:s inList:list groups:groups];
+		}
 		if (s.circleHitbox) {
 			[self resolveCircleSolids:s inList:list groups:groups];
 			continue;
@@ -785,6 +931,9 @@ static float bottomEdge(TGSprite *s)
 				continue;
 			}
 			BOOL overlap = [self shapesOverlap:s with:other];
+			if (!overlap && s.swept) {
+				overlap = [self sweptShapesOverlap:s with:other];
+			}
 			if (overlap) {
 				if (![s.colliding containsObject:other]) {
 					[s.colliding addObject:other];
