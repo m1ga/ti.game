@@ -68,7 +68,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		statusLabel.scale = Math.max(2, Math.round(W / 260));
+		statusLabel.scale = Math.max(1, Math.round(W / 260));
 		statusLabel.x = W / 2;
 		statusLabel.y = H * 0.07;
 		gameView.add(statusLabel);

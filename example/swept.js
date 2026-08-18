@@ -47,7 +47,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var UNIT = Math.max(2, Math.round(W / 380));
+		var UNIT = Math.max(1, Math.round(W / 380));
 		var WALL_W = 8;
 		var WALL_X = W * 0.72;
 		var BULLET = Math.max(10, Math.round(W * 0.014));

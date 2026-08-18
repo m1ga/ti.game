@@ -44,7 +44,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var UNIT = Math.max(2, Math.round(W / 380));
+		var UNIT = Math.max(1, Math.round(W / 380));
 
 		gameView.add(Game.createText({
 			text: 'COLLISION ENTER / EXIT',

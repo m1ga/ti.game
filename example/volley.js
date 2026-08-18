@@ -56,7 +56,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		scoreLabel.scale = Math.max(2, Math.round(W / 260));
+		scoreLabel.scale = Math.max(1, Math.round(W / 260));
 		scoreLabel.x = W / 2;
 		scoreLabel.y = H * 0.07;
 		gameView.add(scoreLabel);

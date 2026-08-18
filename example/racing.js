@@ -44,7 +44,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		lapLabel.scale = Math.max(2, Math.round(W / 260));
+		lapLabel.scale = Math.max(1, Math.round(W / 260));
 		lapLabel.x = W / 2;
 		lapLabel.y = H * 0.07;
 		gameView.add(lapLabel);

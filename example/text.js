@@ -41,7 +41,7 @@ module.exports = function () {
 
 		var WORLD_W = W * 2;
 		var WORLD_H = H * 2;
-		var UNIT = Math.max(2, Math.round(W / 200)); // pixel-font scale
+		var UNIT = Math.max(1, Math.round(W / 200)); // pixel-font scale
 
 		// --- world-space text: scrolls with the camera like any sprite ---
 
