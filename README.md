@@ -170,6 +170,23 @@ sprites are no problem. Textures upload to the GPU once, lazily, on first
 use; the EGL context is preserved across app pauses, and after a real
 context loss everything (textures, shaders) is re-created automatically.
 
+**Batching pitfalls.** Everything that changes GPU state mid-scene cuts
+the batch and costs one draw call — invisible on screen, so know the four
+sources instead of discovering them in a profiler:
+
+- *Texture switches* — sprites drawn back-to-back from different sheets.
+  One shared atlas = one batch.
+- *Blend mode changes* — every `'normal'` ↔ `'add'` transition in draw
+  order flushes. Alternating additive and normal sprites degrades toward
+  one draw call per sprite; group additive sprites into their own
+  `zIndex` band so each frame switches twice, not constantly.
+- *Glow and flash* — each glowing sprite switches to the silhouette
+  shader and back: **2 extra draw calls per glowing sprite per frame**
+  (plus 2 more while a `flash()` runs), even on a shared texture. A few
+  highlights are free; putting a glow on every coin in a level is not.
+- *Ropes, skid marks and debug overlays* always draw with normal
+  blending, so interleaving them with additive content flushes too.
+
 **Collision cost** is O(colliders × candidates) per frame — each sprite
 with `collidesWith`/`solidWith` is tested against sprites carrying a
 matching `collisionGroup`. Keep group lists targeted (a bullet checking
@@ -666,7 +683,7 @@ mid-drag or mid-tween. All can be passed at creation.
 |---|---|
 | `tintColor` | Multiplies the frame's colors, e.g. `'#ff5252'` (team colors, day/night shading); `null` or `'#fff'` = art unchanged |
 | `glowColor` | Glow tint, e.g. `'#ffc94d'` — a tinted, blurred silhouette drawn behind the sprite (selection highlights, power-ups); follows shape, rotation and opacity |
-| `glowBlur` | Glow blur radius in px; `0` = off |
+| `glowBlur` | Glow blur radius in px; `0` = off. An active glow costs 2 extra draw calls per sprite per frame (shader switches) — fine for a few highlights, not for every coin on screen |
 | `glowOpacity` | Halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur |
 | `blend` | `'normal'`/`'add'` — additive blending brightens the backdrop instead of covering it (glows, fire, lasers); costs one batch flush per mode change, so group additive sprites by `zIndex` |
 
