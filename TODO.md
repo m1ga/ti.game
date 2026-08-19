@@ -15,6 +15,16 @@ traffic in the loop.
 - [x] Native camera shake: `gameView.shake({ strength, duration })` —
       detuned-sine rumble on the projection only (skate demo shakes on
       crash; camera.js demos two-axis follow, bounds, zoom and shake).
+- [ ] `gameView.panTo(x, y, { duration, easing })` — native cinematic
+      camera moves for cutscene beats, instead of following an invisible
+      sprite; fires a `pancomplete`-style event and hands control back
+      to `follow` if one is active.
+- [ ] Per-sprite parallax: `scrollFactor` (0..1, default 1) scales how
+      much camera movement applies to a sprite — parallax backgrounds
+      as one property instead of hand-scrolled layers (Phaser
+      scrollFactor / Godot CanvasLayer equivalent). Pure projection
+      math; `screenFixed` is the existing 0 case. Touch mapping must
+      account for it.
 
 ## 2. Sprite color & blending
 
@@ -71,6 +81,11 @@ traffic in the loop.
       — fine at 16x12, dead at 200x200).
 - [ ] Collision layer: solid tiles feed the existing solidWith/collision
       systems without per-tile sprites.
+- [ ] A* pathfinding over the collision grid:
+      `gameView.findPath(from, to)` returns waypoints ready for
+      `followPath` — a discrete query like `raycast`, no per-frame JS
+      (Godot AStar2D / GameMaker mp_grid equivalent; point-&-click and
+      topdown walk straight lines today).
 
 ## 5. Font rendering
 
@@ -89,6 +104,9 @@ traffic in the loop.
 - [x] Bonus: `screenFixed` on any sprite — surface-coordinate rendering
       that ignores camera position/zoom/shake (touch maps back), so HUDs
       survive a scrolling camera without overlay views.
+- [ ] Word wrap: `maxWidth` on text sprites — glyph layout breaks lines
+      natively (on word boundaries, re-wraps on `text` updates, respects
+      `align`), so dialog boxes stop needing hand-broken `\n` lines.
 
 ## 6. Input
 
@@ -115,6 +133,14 @@ traffic in the loop.
 ## 9. Animation polish
 
 - [ ] Per-frame animation events (footsteps on frames 1 and 3).
+- [ ] Tween `repeat` / `yoyo` options on `animate` (count or infinite) —
+      blinks, pulses and ping-pong scrolls stay fully native instead of
+      re-launching from `complete` in JS (the demoscene subtitle and
+      starfield do exactly that). `tintColor` as a tweenable property in
+      the same pass.
+- [ ] Animation loop modes: ping-pong playback, a per-sprite speed
+      multiplier and a random start offset — a field of torches
+      shouldn't flicker in sync.
 - [x] Chaining: `play('attack', { then: 'idle' })` instead of juggling
       `animationcomplete` handlers in JS — `then` takes a name or an
       array; the queue plays out natively as each non-looping animation
@@ -126,6 +152,15 @@ traffic in the loop.
       rounds corners via precomputed quadratic Beziers; non-looping
       runs fire `pathcomplete`. Path movement feeds frameDelta, so
       path-driven platforms carry riders. path.js demos it.
+
+## 10. Game clock
+
+- [ ] Native timers on the game clock: `gameView.after(ms)` /
+      `gameView.every(ms)` returning a cancelable handle that fires a
+      discrete `timer` event — they scale with `timeScale` and freeze at
+      `0`, unlike `setTimeout` (Phaser time events / Godot Timer;
+      skate juggles three JS timers and cleans them up by hand on
+      close).
 
 ## Developer experience (sprinkle in between)
 
