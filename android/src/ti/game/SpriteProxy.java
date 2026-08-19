@@ -135,6 +135,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("screenFixed")) {
 			sprite.screenFixed = TiConvert.toBoolean(options.get("screenFixed"), false);
 		}
+		if (options.containsKey("scrollFactor")) {
+			sprite.scrollFactor = TiConvert.toFloat(options.get("scrollFactor"), 1f);
+		}
 		if (options.containsKey("zIndex")) {
 			sprite.zIndex = TiConvert.toInt(options.get("zIndex"));
 		}
@@ -612,6 +615,22 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setScreenFixed(boolean value)
 	{
 		sprite.screenFixed = value;
+	}
+
+	/** Parallax: how much camera travel moves this sprite — 1 = normal,
+	 *  0.5 = half-speed background layer, 0 = pinned to the view (but
+	 *  still zooming, unlike screenFixed). Rendering and touch only;
+	 *  x/y, physics and collisions stay in world coordinates. */
+	@Kroll.getProperty
+	public float getScrollFactor()
+	{
+		return sprite.scrollFactor;
+	}
+
+	@Kroll.setProperty
+	public void setScrollFactor(float value)
+	{
+		sprite.scrollFactor = value;
 	}
 
 	@Kroll.getProperty

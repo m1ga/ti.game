@@ -39,8 +39,15 @@ NSString *TGBlendModeName(TGBlendMode mode);
 	screenProjection:(const float *)screenProjectionMatrix
 	 originX:(float)originX
 	 originY:(float)originY
-	screenScale:(float)screenScale; // float[16] each, column-major
+	screenScale:(float)screenScale
+	 travelX:(float)travelX
+	 travelY:(float)travelY; // float[16] each, column-major; travel = camera position + shake
 - (void)draw:(TGSprite *)sprite;
+
+/** Draw-time position for parallax: only scrollFactor of the camera
+ *  travel moves the sprite (identical draw position, no batch flush). */
+- (float)parallaxX:(TGSprite *)sprite;
+- (float)parallaxY:(TGSprite *)sprite;
 
 /** Screen space = the identity projection in surface pixels: screenFixed
  *  sprites (HUDs) ignore camera position, zoom and shake. Flushes the

@@ -148,7 +148,10 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			ensureSheetLoaded(rope.sheet);
 		}
 
-		batch.begin(projection, screenProjection, left, top, scale);
+		// Camera travel (position + shake, without the zoom-centering term)
+		// — the share of it that parallax sprites give back at draw time
+		batch.begin(projection, screenProjection, left, top, scale,
+			scene.cameraX + scene.shakeOffsetX, scene.cameraY + scene.shakeOffsetY);
 		// Skid marks slot between background (zIndex <= 0, e.g. the track)
 		// and foreground sprites (the car), so they overlay the road but
 		// stay under whatever drives across them. Emitters merge into the
@@ -226,10 +229,15 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		batch.setScreenSpace(s.screenFixed); // overlay in the sprite's own space
 		int white = textures.whiteTexture();
 		float t = 1.5f; // half line thickness
+		// Parallax sprites render shifted — shift the overlay with the art
+		float ox = batch.parallaxX(s) - s.x;
+		float oy = batch.parallaxY(s) - s.y;
 
 		// Collision shape — green (AABB, or circle for circleHitbox)
 		if (s.circleHitbox) {
 			s.hitCenter(debugCenter);
+			debugCenter[0] += ox;
+			debugCenter[1] += oy;
 			float r = s.hitRadius();
 			int segments = 20;
 			for (int i = 0; i < segments; i++) {
@@ -242,7 +250,8 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			}
 		} else {
 			s.computeAABB(debugAabb);
-			float minX = debugAabb[0], minY = debugAabb[1], maxX = debugAabb[2], maxY = debugAabb[3];
+			float minX = debugAabb[0] + ox, minY = debugAabb[1] + oy;
+			float maxX = debugAabb[2] + ox, maxY = debugAabb[3] + oy;
 			batch.drawLine(white, minX, minY, maxX, minY, t, 0.2f, 1f, 0.4f, 0.9f);
 			batch.drawLine(white, maxX, minY, maxX, maxY, t, 0.2f, 1f, 0.4f, 0.9f);
 			batch.drawLine(white, maxX, maxY, minX, maxY, t, 0.2f, 1f, 0.4f, 0.9f);
@@ -264,8 +273,8 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			for (int i = 0; i < 4; i++) {
 				float lx = (((i & 1) == 0) ? -ax : w - ax) * s.scaleX;
 				float ly = ((i < 2) ? -ay : h - ay) * s.scaleY;
-				cx[i] = s.x + lx * cos - ly * sin;
-				cy[i] = s.y + lx * sin + ly * cos;
+				cx[i] = s.x + ox + lx * cos - ly * sin;
+				cy[i] = s.y + oy + lx * sin + ly * cos;
 			}
 			batch.drawLine(white, cx[0], cy[0], cx[1], cy[1], t, 0.35f, 0.6f, 1f, 0.9f);
 			batch.drawLine(white, cx[1], cy[1], cx[3], cy[3], t, 0.35f, 0.6f, 1f, 0.9f);
@@ -274,6 +283,6 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		}
 
 		// Anchor point — orange dot
-		batch.drawLine(white, s.x - 3f, s.y, s.x + 3f, s.y, 3f, 1f, 0.6f, 0f, 1f);
+		batch.drawLine(white, s.x + ox - 3f, s.y + oy, s.x + ox + 3f, s.y + oy, 3f, 1f, 0.6f, 0f, 1f);
 	}
 }

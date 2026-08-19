@@ -73,12 +73,19 @@ static const NSTimeInterval kTapTimeout = 0.3;
  *  screenFixed sprites (HUD buttons) follow the finger 1:1. */
 - (float)toSpriteSpaceX:(TGSprite *)s x:(float)wx
 {
-	return s.screenFixed ? [_scene worldToScreenX:wx] : wx;
+	if (s.screenFixed) {
+		return [_scene worldToScreenX:wx];
+	}
+	// parallax sprites render shifted by the unapplied camera travel
+	return (s.scrollFactor != 1.0f) ? wx - (1.0f - s.scrollFactor) * _scene.cameraX : wx;
 }
 
 - (float)toSpriteSpaceY:(TGSprite *)s y:(float)wy
 {
-	return s.screenFixed ? [_scene worldToScreenY:wy] : wy;
+	if (s.screenFixed) {
+		return [_scene worldToScreenY:wy];
+	}
+	return (s.scrollFactor != 1.0f) ? wy - (1.0f - s.scrollFactor) * _scene.cameraY : wy;
 }
 
 static float distanceBetween(float x0, float y0, float x1, float y1)

@@ -19,12 +19,16 @@ traffic in the loop.
       camera moves for cutscene beats, instead of following an invisible
       sprite; fires a `pancomplete`-style event and hands control back
       to `follow` if one is active.
-- [ ] Per-sprite parallax: `scrollFactor` (0..1, default 1) scales how
-      much camera movement applies to a sprite — parallax backgrounds
+- [x] Per-sprite parallax: `scrollFactor` (default 1) scales how much
+      camera travel (and shake) moves a sprite — parallax backgrounds
       as one property instead of hand-scrolled layers (Phaser
-      scrollFactor / Godot CanvasLayer equivalent). Pure projection
-      math; `screenFixed` is the existing 0 case. Touch mapping must
-      account for it.
+      scrollFactor / Godot CanvasLayer equivalent). Implemented as a
+      draw-time position offset by the unapplied share of the camera
+      translation (zoom stays anchored on the view center, no batch
+      flush per layer, no projection switch); touch maps back in
+      hitTest/toSpriteSpace, debug overlays shift with the art.
+      Rendering + touch only — x/y, physics and collisions stay in
+      world coordinates. camera.js demos it.
 
 ## 2. Sprite color & blending
 
@@ -155,12 +159,15 @@ traffic in the loop.
 
 ## 10. Game clock
 
-- [ ] Native timers on the game clock: `gameView.after(ms)` /
-      `gameView.every(ms)` returning a cancelable handle that fires a
-      discrete `timer` event — they scale with `timeScale` and freeze at
-      `0`, unlike `setTimeout` (Phaser time events / Godot Timer;
-      skate juggles three JS timers and cleans them up by hand on
-      close).
+- [x] Native timers on the game clock: `gameView.after(ms, callback)` /
+      `gameView.every(ms, callback)` return an id for `cancelTimer(id)`
+      — they scale with `timeScale`, freeze at `0` and pause with the
+      render loop, unlike `setTimeout` (Phaser time events / Godot
+      Timer). Ticked inside Scene.update with the scaled dt; callbacks
+      cross the bridge only on expiry (callAsync), or a `timer` event
+      with the id fires when no callback was given. Repeating timers
+      fire at most once per frame and restart their interval after a
+      stall instead of bursting. timescale.js demos the freeze.
 
 ## Developer experience (sprinkle in between)
 

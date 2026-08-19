@@ -80,6 +80,97 @@ public class Scene
 		pendingShakeStrength = strength;
 	}
 
+	// --- Game-clock timers ------------------------------------------------
+	// Ticked with the timeScale-scaled dt, so they slow down with the scene
+	// and freeze at timeScale 0 — unlike JS setTimeout. Added from the JS
+	// thread, fired from the GL thread through the listener (discrete,
+	// never per frame).
+
+	/** Receives expired timer ids on the GL thread. */
+	public interface TimerListener {
+		void onTimer(int id, boolean repeats);
+	}
+
+	public volatile TimerListener timerListener;
+
+	private static final class GameTimer
+	{
+		final int id;
+		final float interval; // seconds, game time
+		final boolean repeats;
+		float remaining;
+
+		GameTimer(int id, float interval, boolean repeats)
+		{
+			this.id = id;
+			this.interval = interval;
+			this.repeats = repeats;
+			this.remaining = interval;
+		}
+	}
+
+	private final List<GameTimer> timers = new ArrayList<>();
+	private int nextTimerId = 1;
+
+	/** Schedules a timer on the game clock; returns its cancel id. */
+	public int addTimer(float seconds, boolean repeats)
+	{
+		synchronized (timers) {
+			GameTimer timer = new GameTimer(nextTimerId++, Math.max(0.001f, seconds), repeats);
+			timers.add(timer);
+			return timer.id;
+		}
+	}
+
+	public void cancelTimer(int id)
+	{
+		synchronized (timers) {
+			for (Iterator<GameTimer> it = timers.iterator(); it.hasNext();) {
+				if (it.next().id == id) {
+					it.remove();
+					return;
+				}
+			}
+		}
+	}
+
+	/** Ticks timers with scaled dt; fires listeners outside the lock. */
+	private void updateTimers(float dt)
+	{
+		if (dt <= 0f) {
+			return; // frozen (timeScale 0) — game time stands still
+		}
+		List<GameTimer> fired = null;
+		synchronized (timers) {
+			for (Iterator<GameTimer> it = timers.iterator(); it.hasNext();) {
+				GameTimer timer = it.next();
+				timer.remaining -= dt;
+				if (timer.remaining <= 0f) {
+					if (fired == null) {
+						fired = new ArrayList<>();
+					}
+					fired.add(timer);
+					if (timer.repeats) {
+						// at most one fire per frame; after a long stall,
+						// restart the interval instead of bursting
+						timer.remaining += timer.interval;
+						if (timer.remaining < 0f) {
+							timer.remaining = timer.interval;
+						}
+					} else {
+						it.remove();
+					}
+				}
+			}
+		}
+		TimerListener listener = timerListener;
+		if (fired != null && listener != null) {
+			for (GameTimer timer : fired) {
+				listener.onTimer(timer.id, timer.repeats);
+			}
+		}
+	}
+
 	/** World x of the visible rect's left edge (accounts for zoom). */
 	public float viewOriginX()
 	{
@@ -583,6 +674,7 @@ public class Scene
 			rope.update(dt);
 		}
 		skidTrail.update(dt);
+		updateTimers(dt);
 		wrapSprites(list);
 		resolveSolids(list);
 		checkCollisions(list);

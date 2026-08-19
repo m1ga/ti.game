@@ -146,6 +146,12 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float _pixelOriginX;
 	float _pixelOriginY;
 	float _pixelScale;
+	// Camera travel + shake this frame — parallax sprites (scrollFactor
+	// != 1) draw offset by the unapplied share of it, which equals
+	// scaling the camera translation by scrollFactor without touching
+	// the projection (no batch flush per parallax layer).
+	float _cameraTravelX;
+	float _cameraTravelY;
 }
 
 - (instancetype)init
@@ -181,6 +187,8 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	 originX:(float)originX
 	 originY:(float)originY
 	screenScale:(float)screenScale
+	 travelX:(float)travelX
+	 travelY:(float)travelY
 {
 	_projection = projectionMatrix;
 	_screenProjection = screenProjectionMatrix;
@@ -188,6 +196,8 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	_pixelOriginX = originX;
 	_pixelOriginY = originY;
 	_pixelScale = MAX(0.0001f, screenScale);
+	_cameraTravelX = travelX;
+	_cameraTravelY = travelY;
 	_quadCount = 0;
 	_currentTexture = -1;
 	_activeProgram = 0;
@@ -254,6 +264,18 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	_activeProgram = p;
 }
 
+- (float)parallaxX:(TGSprite *)s
+{
+	return (!s.screenFixed && s.scrollFactor != 1.0f)
+		? s.x + (1.0f - s.scrollFactor) * _cameraTravelX : s.x;
+}
+
+- (float)parallaxY:(TGSprite *)s
+{
+	return (!s.screenFixed && s.scrollFactor != 1.0f)
+		? s.y + (1.0f - s.scrollFactor) * _cameraTravelY : s.y;
+}
+
 - (void)ensureCapacity:(GLint)texture
 {
 	if (texture != _currentTexture) {
@@ -293,8 +315,8 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float sx = s.scaleX;
 	float sy = s.scaleY;
 	float alpha = MAX(0.0f, MIN(1.0f, s.opacity));
-	float x = s.x;
-	float y = s.y;
+	float x = [self parallaxX:s];
+	float y = [self parallaxY:s];
 	if (s.pixelSnap) {
 		x = snapToPixel(s, x, _pixelOriginX, _pixelScale);
 		y = snapToPixel(s, y, _pixelOriginY, _pixelScale);
@@ -416,8 +438,8 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float sx = s.scaleX;
 	float sy = s.scaleY;
 	float alpha = MAX(0.0f, MIN(1.0f, s.opacity));
-	float x = s.x;
-	float y = s.y;
+	float x = [self parallaxX:s];
+	float y = [self parallaxY:s];
 	if (s.pixelSnap) {
 		x = snapToPixel(s, x, _pixelOriginX, _pixelScale);
 		y = snapToPixel(s, y, _pixelOriginY, _pixelScale);

@@ -10,6 +10,10 @@
 // - a ball bounces on an invisible floor (gravity + restitution)
 // - the buttons at the bottom set timeScale to 1, 0.5, 0.1 or 0 —
 //   watch animation frames, physics and particles all slow together
+// - two clocks: GAME counts via gameView.every(1000, ...) on the game
+//   clock, so it slows and freezes with the buttons; REAL counts via
+//   setInterval and keeps ticking — use after()/every() for spawn
+//   waves and respawn delays so pausing really pauses them
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -22,6 +26,13 @@ module.exports = function () {
 		theme: 'Theme.Titanium.DayNight.NoTitleBar'
 	});
 	var gameView = Game.createGameView({ backgroundColor: '#1c2340' });
+	var realTimer = null;
+	win.addEventListener('close', function () {
+		if (realTimer !== null) {
+			clearInterval(realTimer);
+			realTimer = null;
+		}
+	});
 
 	var dogSheet = Game.createSpriteSheet({ image: 'assets/dog.png', frameWidth: 16, frameHeight: 16, smoothing: false });
 	var ballSheet = Game.createSpriteSheet({ image: 'assets/ball.png', frameWidth: 64, frameHeight: 64 });
@@ -99,6 +110,42 @@ module.exports = function () {
 			startScale: 1.2,
 			endScale: 0.4
 		}));
+
+		// --- Game clock vs wall clock ------------------------------------
+
+		var UNIT = Math.max(1, Math.round(W / 200));
+		var gameSeconds = 0;
+		var realSeconds = 0;
+		var gameClock = Game.createText({
+			text: 'GAME 0s',
+			x: W * 0.28,
+			y: H * 0.12,
+			scale: UNIT,
+			tintColor: '#4dff88',
+			zIndex: 10
+		});
+		var realClock = Game.createText({
+			text: 'REAL 0s',
+			x: W * 0.72,
+			y: H * 0.12,
+			scale: UNIT,
+			tintColor: '#ff8a80',
+			zIndex: 10
+		});
+		gameView.add(gameClock);
+		gameView.add(realClock);
+
+		// every() ticks on the game clock — ½× makes it a 2 s second,
+		// ⏸ stops it entirely; the JS interval doesn't care
+		gameView.every(1000, function () {
+			gameSeconds++;
+			gameClock.text = 'GAME ' + gameSeconds + 's';
+			gameClock.flash('#fff', 120);
+		});
+		realTimer = setInterval(function () { // the wall-clock counterexample
+			realSeconds++;
+			realClock.text = 'REAL ' + realSeconds + 's';
+		}, 1000);
 
 		// --- timeScale buttons -------------------------------------------
 

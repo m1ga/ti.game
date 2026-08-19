@@ -134,8 +134,12 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		[self ensureSheetLoadedOnce:rope.sheet];
 	}
 
+	// Camera travel (position + shake, without the zoom-centering term)
+	// — the share of it that parallax sprites give back at draw time
 	[_batch begin:_projection screenProjection:_screenProjection
-		  originX:left originY:top screenScale:scale];
+		  originX:left originY:top screenScale:scale
+		  travelX:_scene.cameraX + _scene.shakeOffsetX
+		  travelY:_scene.cameraY + _scene.shakeOffsetY];
 	// Skid marks slot between background (zIndex <= 0, e.g. the track)
 	// and foreground sprites (the car), so they overlay the road but
 	// stay under whatever drives across them. Emitters merge into the
@@ -214,11 +218,16 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	[_batch setScreenSpace:s.screenFixed]; // overlay in the sprite's own space
 	GLuint white = [_textures whiteTexture];
 	float t = 1.5f; // half line thickness
+	// Parallax sprites render shifted — shift the overlay with the art
+	float ox = [_batch parallaxX:s] - s.x;
+	float oy = [_batch parallaxY:s] - s.y;
 
 	// Collision shape — green (AABB, or circle for circleHitbox)
 	if (s.circleHitbox) {
 		float center[2];
 		[s hitCenter:center];
+		center[0] += ox;
+		center[1] += oy;
 		float r = [s hitRadius];
 		int segments = 20;
 		for (int i = 0; i < segments; i++) {
@@ -231,8 +240,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		}
 	} else {
 		[s computeAABB:_debugAabb];
-		float minX = _debugAabb[0], minY = _debugAabb[1];
-		float maxX = _debugAabb[2], maxY = _debugAabb[3];
+		float minX = _debugAabb[0] + ox, minY = _debugAabb[1] + oy;
+		float maxX = _debugAabb[2] + ox, maxY = _debugAabb[3] + oy;
 		[_batch drawLine:white fromX:minX y:minY toX:maxX y:minY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
 		[_batch drawLine:white fromX:maxX y:minY toX:maxX y:maxY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
 		[_batch drawLine:white fromX:maxX y:maxY toX:minX y:maxY halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
@@ -254,8 +263,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		for (int i = 0; i < 4; i++) {
 			float lx = (((i & 1) == 0) ? -ax : w - ax) * s.scaleX;
 			float ly = ((i < 2) ? -ay : h - ay) * s.scaleY;
-			cx[i] = s.x + lx * cosr - ly * sinr;
-			cy[i] = s.y + lx * sinr + ly * cosr;
+			cx[i] = s.x + ox + lx * cosr - ly * sinr;
+			cy[i] = s.y + oy + lx * sinr + ly * cosr;
 		}
 		[_batch drawLine:white fromX:cx[0] y:cy[0] toX:cx[1] y:cy[1] halfThickness:t r:0.35f g:0.6f b:1.0f a:0.9f];
 		[_batch drawLine:white fromX:cx[1] y:cy[1] toX:cx[3] y:cy[3] halfThickness:t r:0.35f g:0.6f b:1.0f a:0.9f];
@@ -264,7 +273,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 
 	// Anchor point — orange dot
-	[_batch drawLine:white fromX:s.x - 3.0f y:s.y toX:s.x + 3.0f y:s.y halfThickness:3.0f r:1.0f g:0.6f b:0.0f a:1.0f];
+	[_batch drawLine:white fromX:s.x + ox - 3.0f y:s.y + oy toX:s.x + ox + 3.0f y:s.y + oy halfThickness:3.0f r:1.0f g:0.6f b:0.0f a:1.0f];
 }
 
 @end

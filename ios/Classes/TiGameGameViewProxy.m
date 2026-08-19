@@ -9,15 +9,21 @@
 #import "TiGameSpriteProxy.h"
 #import <float.h>
 
+@interface TiGameGameViewProxy () <TGSceneTimerListener>
+@end
+
 @implementation TiGameGameViewProxy {
 	NSDictionary *_cameraBoundsDict;
 	NSString *_cameraTint;
+	NSMutableDictionary<NSNumber *, KrollCallback *> *_timerCallbacks; // guarded by @synchronized(_timerCallbacks)
 }
 
 - (instancetype)init
 {
 	if (self = [super init]) {
 		_scene = [[TGScene alloc] init];
+		_timerCallbacks = [NSMutableDictionary dictionary];
+		_scene.timerListener = self;
 	}
 	return self;
 }
@@ -339,6 +345,74 @@
 - (void)stopFollow:(id)unused
 {
 	self.scene.followTarget = nil;
+}
+
+#pragma mark Game-clock timers
+
+/**
+ * gameView.after(ms, callback): runs the callback once after `ms` of
+ * game time — it stretches with slow motion and freezes at timeScale 0,
+ * unlike setTimeout. Returns an id for cancelTimer(). Without a
+ * callback, the view fires a 'timer' event with the id.
+ */
+- (NSNumber *)after:(id)args
+{
+	return @([self addGameTimer:args repeats:NO]);
+}
+
+/** gameView.every(ms, callback): like after(), repeating until cancelled. */
+- (NSNumber *)every:(id)args
+{
+	return @([self addGameTimer:args repeats:YES]);
+}
+
+- (void)cancelTimer:(id)args
+{
+	id first = [args isKindOfClass:[NSArray class]] ? [args firstObject] : args;
+	int timerId = [TiUtils intValue:first def:0];
+	[self.scene cancelTimer:timerId];
+	@synchronized (_timerCallbacks) {
+		[_timerCallbacks removeObjectForKey:@(timerId)];
+	}
+}
+
+- (int)addGameTimer:(id)args repeats:(BOOL)repeats
+{
+	float ms = 0.0f;
+	KrollCallback *callback = nil;
+	if ([args isKindOfClass:[NSArray class]]) {
+		ms = [TiUtils floatValue:[args firstObject] def:0];
+		if ([args count] > 1 && [args[1] isKindOfClass:[KrollCallback class]]) {
+			callback = args[1];
+		}
+	} else {
+		ms = [TiUtils floatValue:args def:0];
+	}
+	int timerId = [self.scene addTimer:ms / 1000.0f repeats:repeats];
+	if (callback != nil) {
+		@synchronized (_timerCallbacks) {
+			_timerCallbacks[@(timerId)] = callback;
+		}
+	}
+	return timerId;
+}
+
+/** Render thread — both dispatch paths hand off to the JS thread. */
+- (void)onTimer:(int)timerId repeats:(BOOL)repeats
+{
+	KrollCallback *callback;
+	@synchronized (_timerCallbacks) {
+		callback = _timerCallbacks[@(timerId)];
+		if (!repeats && callback != nil) {
+			[_timerCallbacks removeObjectForKey:@(timerId)];
+		}
+	}
+	if (callback != nil) {
+		[self _fireEventToListener:@"timer" withObject:@{ @"id": @(timerId) }
+						  listener:callback thisObject:nil];
+	} else if ([self _hasListeners:@"timer"]) {
+		[self fireEvent:@"timer" withObject:@{ @"id": @(timerId) }];
+	}
 }
 
 /**

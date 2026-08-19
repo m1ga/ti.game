@@ -316,6 +316,16 @@ Notes:
   world space automatically (zoom included), so taps and drags work
   while scrolled; overlaid Titanium controls are screen-fixed and
   unaffected.
+- **Parallax**: `scrollFactor` on any sprite scales how much camera
+  travel moves it — `0.5` makes a background layer scroll at half
+  speed, `0` pins it to the view (still zooming, unlike `screenFixed`).
+  One property instead of hand-scrolled layers; depth comes free with a
+  moving camera.
+- **Game-clock timers**: `gameView.after(ms, cb)` / `every(ms, cb)`
+  run on the same clock as the engine — delays stretch under
+  `timeScale` slow motion and freeze at `0`, and they pause with the
+  render loop, unlike `setTimeout`. Spawn waves, AI decision ticks and
+  respawn delays belong here so a paused game doesn't keep spawning.
 - **Camera effects**: `cameraEffect` (`'none'`/`'tint'`/`'glitch'`)
   applies a fullscreen shader pass to the whole rendered scene —
   `'tint'` multiplies with `cameraTint` (night vision, flashback,
@@ -523,7 +533,7 @@ a feature set — find the one closest to your game and start there:
 | `pointclick.js` | Adventure scene: tap-to-walk via distance-sized tweens, verb-coin icons on a hotspot, JS hit-testing vs. view taps, `ySort` depth |
 | `particles.js` | Emitter playground: continuous spark fountain, tap-for-fireworks bursts, smoke trail following a dragged sprite |
 | `rhythm.js` | DDR-style note catcher: pooled notes on native velocity, `press`-event pads, timing-based good/bad sounds, tinted hit bursts, miss trigger zone |
-| `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground |
+| `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground, `scrollFactor` parallax (1.35x cloud shadows, a scrollFactor-0 sun pinned to the view) |
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
 | `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
 | `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` vs `'multiply'` vs `'screen'` (the multiply/screen rows sit on a bright meadow strip, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
@@ -533,7 +543,7 @@ a feature set — find the one closest to your game and start there:
 | `raycast.js` | Raycast playground: a guard's line-of-sight beam blocked by a draggable crate (beam shortens to `hit.distance` and turns red), a ledge-probing walker that turns before the platform edge, and a tap-fired turret hitscan that flashes `hit.sprite` and reports group + distance |
 | `zones.js` | `collision`/`collisionend` lifecycle: a water pool that tints the hero while he's inside, a pressure plate holding a door open exactly while the ball rests on it, and a remove-ball button showing that deleting a contact partner still fires the exit |
 | `demoscene.js` | Old-school cracktro: per-character sine text scroller on rotated copies of one closed `followPath` loop, additive copper bars bobbing on circle paths (constant speed on a circle = perfect sine), glowing floating logo, tween-scrolled `tileRepeat` starfield, looping chiptune on the music backend |
-| `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going |
+| `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going; a GAME clock on `gameView.every(1000, ...)` freezes with the scene while a REAL `setInterval` clock keeps ticking |
 
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
@@ -571,13 +581,17 @@ Run them with `ti build -p android` from `android/` (executes
 | `stopFollow()` | Stop following; the camera stays where it is |
 | `shake({ strength, duration })` | Camera shake: `strength` px (default 12), `duration` ms (default 400) — offsets only the projection, so follow/bounds/touches are unaffected |
 | `raycast(x0, y0, x1, y1, groups)` | One-shot nearest-hit query along the segment against visible sprites whose `collisionGroup` is in `groups` (omit for any tagged sprite). Returns `null` for a clear ray, else `{ x, y, distance, group, sprite, normal: { x, y } }`. Rect hitboxes use their AABB, circle hitboxes intersect exactly; a ray starting inside a hitbox reports it at distance 0. For discrete checks — line of sight on an AI timer, ledge/ground probes, tap hitscan — not per-frame JS polling |
+| `after(ms, callback)` | Runs the callback once after `ms` of **game time**: the delay stretches with slow motion and freezes at `timeScale: 0`, unlike `setTimeout`. Returns an id for `cancelTimer()`. Without a callback, the view fires a `timer` event with the id instead |
+| `every(ms, callback)` | Like `after()`, repeating every `ms` of game time until cancelled (at most once per frame). Returns an id for `cancelTimer()` |
+| `cancelTimer(id)` | Cancels a timer from `after()`/`every()` |
 | `cameraEffect` | Fullscreen shader over the whole scene: `'none'` (default), `'tint'`, `'glitch'` |
 | `cameraTint` | Color for the `'tint'` effect, e.g. `'#4f8'` |
 | `cameraEffectIntensity` | Effect strength 0..1 (tint mix / glitch amount; default 1) |
 | `debug` | Draw collision shapes for every sprite |
 
-Events: `press`, `tap`, `release` (any touch; payload `x`, `y`) and
-`resize` (payload `width`, `height`).
+Events: `press`, `tap`, `release` (any touch; payload `x`, `y`),
+`resize` (payload `width`, `height`) and `timer` (payload `id` — only
+for `after()`/`every()` calls made without a callback).
 
 ### SpriteSheet
 
@@ -610,6 +624,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `visible` | false hides the sprite and removes it from touch and collision |
 | `pixelSnap` | Snap only the rendered anchor to the framebuffer pixel grid (default false); physics and live `x`/`y` stay subpixel floats |
 | `screenFixed` | `x`/`y` become surface coordinates; camera position, zoom and shake are ignored (HUDs, on-screen buttons) — touch maps back automatically |
+| `scrollFactor` | Parallax: how much camera travel (and shake) moves this sprite — `1` (default) normal world sprite, `0.5` half-speed background layer, `0` pinned to the view but still zooming around the view center (unlike `screenFixed`). Rendering and touch mapping only: `x`/`y`, physics and collisions stay in plain world coordinates |
 | `zIndex` | Draw order (higher = in front) |
 | `ySort` | Within the same `zIndex`, sort by bottom edge — top-down depth (see below) |
 | `flipX`, `flipY` | Mirror the drawn frame only — position, anchor, physics and hit testing are unaffected, unlike negative scale |

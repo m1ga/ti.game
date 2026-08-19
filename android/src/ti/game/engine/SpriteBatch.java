@@ -107,6 +107,12 @@ public class SpriteBatch
 	private float pixelOriginX;
 	private float pixelOriginY;
 	private float pixelScale = 1f;
+	// Camera travel + shake this frame — parallax sprites (scrollFactor
+	// != 1) draw offset by the unapplied share of it, which equals
+	// scaling the camera translation by scrollFactor without touching
+	// the projection (no batch flush per parallax layer).
+	private float cameraTravelX;
+	private float cameraTravelY;
 
 	public SpriteBatch()
 	{
@@ -151,7 +157,8 @@ public class SpriteBatch
 	}
 
 	public void begin(float[] projectionMatrix, float[] screenProjectionMatrix,
-					  float originX, float originY, float screenScale)
+					  float originX, float originY, float screenScale,
+					  float travelX, float travelY)
 	{
 		projection = projectionMatrix;
 		screenProjection = screenProjectionMatrix;
@@ -159,6 +166,8 @@ public class SpriteBatch
 		pixelOriginX = originX;
 		pixelOriginY = originY;
 		pixelScale = Math.max(0.0001f, screenScale);
+		cameraTravelX = travelX;
+		cameraTravelY = travelY;
 		quadCount = 0;
 		currentTexture = -1;
 		activeProgram = 0;
@@ -306,8 +315,8 @@ public class SpriteBatch
 		float sx = s.scaleX;
 		float sy = s.scaleY;
 		float alpha = Math.max(0f, Math.min(1f, s.opacity));
-		float x = s.x;
-		float y = s.y;
+		float x = parallaxX(s);
+		float y = parallaxY(s);
 		if (s.pixelSnap) {
 			x = snapToPixel(s, x, pixelOriginX);
 			y = snapToPixel(s, y, pixelOriginY);
@@ -397,6 +406,20 @@ public class SpriteBatch
 		}
 	}
 
+	/** Draw-time x for parallax: the sprite keeps (1 - scrollFactor) of the
+	 *  camera travel, i.e. only scrollFactor of it moves the sprite. */
+	public float parallaxX(Sprite s)
+	{
+		return (!s.screenFixed && s.scrollFactor != 1f)
+			? s.x + (1f - s.scrollFactor) * cameraTravelX : s.x;
+	}
+
+	public float parallaxY(Sprite s)
+	{
+		return (!s.screenFixed && s.scrollFactor != 1f)
+			? s.y + (1f - s.scrollFactor) * cameraTravelY : s.y;
+	}
+
 	private float snapToPixel(Sprite s, float value, float origin)
 	{
 		if (s.screenFixed) {
@@ -438,8 +461,8 @@ public class SpriteBatch
 		float sx = s.scaleX;
 		float sy = s.scaleY;
 		float alpha = Math.max(0f, Math.min(1f, s.opacity));
-		float x = s.x;
-		float y = s.y;
+		float x = parallaxX(s);
+		float y = parallaxY(s);
 		if (s.pixelSnap) {
 			x = snapToPixel(s, x, pixelOriginX);
 			y = snapToPixel(s, y, pixelOriginY);

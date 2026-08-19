@@ -58,6 +58,13 @@
 // Touch input maps back automatically.
 @property (atomic, assign) BOOL screenFixed;
 
+// Parallax: how much camera travel (and shake) moves this sprite —
+// 1 = normal world sprite, 0.5 = half-speed background layer, 0 =
+// pinned to the view (but still zooming around the view center,
+// unlike screenFixed). Affects rendering and touch mapping only;
+// x/y, physics and collisions stay in plain world coordinates.
+@property (atomic, assign) float scrollFactor;
+
 // Tint: multiplies the frame's colors (white = art unchanged) — damage
 // flashes, team colors, day/night shading. Parsed 0..1 channels.
 @property (atomic, assign) float tintR;

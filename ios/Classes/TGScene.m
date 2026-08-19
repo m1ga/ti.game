@@ -14,6 +14,17 @@ static float bottomEdge(TGSprite *s)
 	return s.y + [s drawHeight] * fabsf(s.scaleY) * (1.0f - s.anchorY);
 }
 
+/** One game-clock timer (twin of Scene.GameTimer). */
+@interface TGGameTimer : NSObject
+@property (nonatomic, assign) int timerId;
+@property (nonatomic, assign) float interval; // seconds, game time
+@property (nonatomic, assign) BOOL repeats;
+@property (nonatomic, assign) float remaining;
+@end
+
+@implementation TGGameTimer
+@end
+
 @implementation TGScene {
 	NSMutableArray<TGSprite *> *_sprites;
 	NSMutableArray<TGParticleEmitter *> *_emitters; // guarded by @synchronized(_sprites)
@@ -32,6 +43,9 @@ static float bottomEdge(TGSprite *s)
 	float _centerA[2];
 	float _centerB[2];
 	float _sweptResult[2]; // entry time in 0..1, entry axis (0 = x, 1 = y)
+
+	NSMutableArray<TGGameTimer *> *_timers; // guarded by @synchronized(_timers)
+	int _nextTimerId;                       // guarded by @synchronized(_timers)
 }
 
 - (instancetype)init
@@ -53,8 +67,77 @@ static float bottomEdge(TGSprite *s)
 		_followRightFraction = 0.65f;
 		_pendingShakeStrength = -1.0f;
 		_bgAlpha = 1.0f;
+		_timers = [NSMutableArray array];
+		_nextTimerId = 1;
 	}
 	return self;
+}
+
+// --- Game-clock timers --------------------------------------------------
+
+- (int)addTimer:(float)seconds repeats:(BOOL)repeats
+{
+	@synchronized (_timers) {
+		TGGameTimer *timer = [[TGGameTimer alloc] init];
+		timer.timerId = _nextTimerId++;
+		timer.interval = MAX(0.001f, seconds);
+		timer.repeats = repeats;
+		timer.remaining = timer.interval;
+		[_timers addObject:timer];
+		return timer.timerId;
+	}
+}
+
+- (void)cancelTimer:(int)timerId
+{
+	@synchronized (_timers) {
+		for (TGGameTimer *timer in _timers) {
+			if (timer.timerId == timerId) {
+				[_timers removeObject:timer];
+				return;
+			}
+		}
+	}
+}
+
+/** Ticks timers with scaled dt; fires the listener outside the lock. */
+- (void)updateTimers:(float)dt
+{
+	if (dt <= 0.0f) {
+		return; // frozen (timeScale 0) — game time stands still
+	}
+	NSMutableArray<TGGameTimer *> *fired = nil;
+	@synchronized (_timers) {
+		for (NSUInteger i = 0; i < _timers.count; ) {
+			TGGameTimer *timer = _timers[i];
+			timer.remaining -= dt;
+			if (timer.remaining <= 0.0f) {
+				if (fired == nil) {
+					fired = [NSMutableArray array];
+				}
+				[fired addObject:timer];
+				if (timer.repeats) {
+					// at most one fire per frame; after a long stall,
+					// restart the interval instead of bursting
+					timer.remaining += timer.interval;
+					if (timer.remaining < 0.0f) {
+						timer.remaining = timer.interval;
+					}
+					i++;
+				} else {
+					[_timers removeObjectAtIndex:i];
+				}
+			} else {
+				i++;
+			}
+		}
+	}
+	id<TGSceneTimerListener> listener = self.timerListener;
+	if (fired != nil && listener != nil) {
+		for (TGGameTimer *timer in fired) {
+			[listener onTimer:timer.timerId repeats:timer.repeats];
+		}
+	}
 }
 
 - (void)recomputeYSort
@@ -345,6 +428,7 @@ static float bottomEdge(TGSprite *s)
 		[rope update:dt];
 	}
 	[self.skidTrail update:dt];
+	[self updateTimers:dt];
 	[self wrapSprites:list];
 	[self resolveSolids:list];
 	[self checkCollisions:list];

@@ -295,6 +295,20 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.screenFixed);
 }
 
+/** Parallax: how much camera travel moves this sprite — 1 = normal,
+ *  0.5 = half-speed background layer, 0 = pinned to the view (but
+ *  still zooming, unlike screenFixed). Rendering and touch only;
+ *  x/y, physics and collisions stay in world coordinates. */
+- (void)setScrollFactor:(id)value
+{
+	self.sprite.scrollFactor = [TiUtils floatValue:value def:1.0f];
+}
+
+- (NSNumber *)scrollFactor
+{
+	return @(self.sprite.scrollFactor);
+}
+
 - (void)setZIndex:(id)value
 {
 	self.sprite.zIndex = [TiUtils intValue:value def:0];

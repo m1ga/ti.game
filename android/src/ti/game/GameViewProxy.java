@@ -6,8 +6,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.appcelerator.kroll.KrollDict;
+import org.appcelerator.kroll.KrollFunction;
 import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.TiConvert;
@@ -29,10 +31,17 @@ import ti.game.engine.Sprite;
  */
 @Kroll.proxy(creatableInModule = TiGameModule.class)
 public class GameViewProxy extends TiViewProxy
+	implements Scene.TimerListener
 {
 	private final Scene scene = new Scene();
 	private TiGameView gameView;
 	private int maxFps = 0;
+	private final ConcurrentHashMap<Integer, KrollFunction> timerCallbacks = new ConcurrentHashMap<>();
+
+	public GameViewProxy()
+	{
+		scene.timerListener = this;
+	}
 
 	@Override
 	public TiUIView createView(Activity activity)
@@ -375,6 +384,59 @@ public class GameViewProxy extends TiViewProxy
 	public void stopFollow()
 	{
 		scene.followTarget = null;
+	}
+
+	// --- Game-clock timers ------------------------------------------------
+
+	/**
+	 * gameView.after(ms, callback): runs the callback once after `ms` of
+	 * game time — it stretches with slow motion and freezes at
+	 * timeScale 0, unlike setTimeout. Returns an id for cancelTimer().
+	 * Without a callback, the view fires a 'timer' event with the id.
+	 */
+	@Kroll.method
+	public int after(float ms, @Kroll.argument(optional = true) Object callback)
+	{
+		return addGameTimer(ms, callback, false);
+	}
+
+	/** gameView.every(ms, callback): like after(), repeating until cancelled. */
+	@Kroll.method
+	public int every(float ms, @Kroll.argument(optional = true) Object callback)
+	{
+		return addGameTimer(ms, callback, true);
+	}
+
+	@Kroll.method
+	public void cancelTimer(int id)
+	{
+		scene.cancelTimer(id);
+		timerCallbacks.remove(id);
+	}
+
+	private int addGameTimer(float ms, Object callback, boolean repeats)
+	{
+		int id = scene.addTimer(ms / 1000f, repeats);
+		if (callback instanceof KrollFunction) {
+			timerCallbacks.put(id, (KrollFunction) callback);
+		}
+		return id;
+	}
+
+	/** GL thread — callAsync/fireEvent both hand off to the JS thread. */
+	@Override
+	public void onTimer(int id, boolean repeats)
+	{
+		KrollFunction callback = repeats ? timerCallbacks.get(id) : timerCallbacks.remove(id);
+		if (callback != null) {
+			KrollDict data = new KrollDict();
+			data.put("id", id);
+			callback.callAsync(getKrollObject(), new Object[] { data });
+		} else if (hasListeners("timer")) {
+			KrollDict data = new KrollDict();
+			data.put("id", id);
+			fireEvent("timer", data);
+		}
 	}
 
 	/**

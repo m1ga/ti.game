@@ -13,6 +13,10 @@
 // - 🎛 cycles fullscreen camera effects (cameraEffect): a green
 //   night-vision tint, then a glitch filter — the whole scene renders
 //   into an offscreen texture and back through the effect shader
+// - parallax via scrollFactor: cloud shadows drift over the world at
+//   1.35x camera speed (closer to the camera than the ground), and a
+//   sun glow sits at scrollFactor 0 — pinned to the view like a HUD,
+//   but still part of the zooming world (unlike screenFixed)
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -31,6 +35,8 @@ module.exports = function () {
 	var groundSheet = Game.createSpriteSheet({ image: 'assets/ground.png', frameWidth: 64, frameHeight: 64, repeat: true });
 	var treeSheet = Game.createSpriteSheet({ image: 'assets/oak.png', frameWidth: 128, frameHeight: 160, smoothing: false });
 	var playerSheet = Game.createSpriteSheet({ image: 'assets/adventurer.png', frameWidth: 32, frameHeight: 48, smoothing: false });
+	var cloudSheet = Game.createSpriteSheet({ image: 'assets/clouds.png', frameWidth: 512, frameHeight: 128 });
+	var sparkSheet = Game.createSpriteSheet({ image: 'assets/spark.png', frameWidth: 16, frameHeight: 16 });
 
 	var initialized = false;
 	gameView.addEventListener('resize', function (e) {
@@ -78,6 +84,45 @@ module.exports = function () {
 				ySort: true
 			}));
 		});
+
+		// --- Parallax: scrollFactor instead of hand-scrolled layers ------
+
+		// Cloud shadows above the world: closer to the camera than the
+		// ground, so they pan FASTER than 1:1 (scrollFactor > 1). The
+		// slow velocityX drift is ordinary world movement on top.
+		[
+			[0.2, 0.25, 0.5], [0.7, 0.15, 0.4], [0.45, 0.6, 0.55],
+			[0.9, 0.7, 0.45], [0.15, 0.85, 0.5]
+		].forEach(function (c) {
+			gameView.add(Game.createSprite({
+				sheet: cloudSheet,
+				x: WORLD_W * c[0],
+				y: WORLD_H * c[1],
+				width: W * c[2] * 2,
+				height: W * c[2] * 0.5,
+				opacity: 0.35,
+				scrollFactor: 1.35,
+				velocityX: W * 0.01,
+				touchEnabled: false,
+				zIndex: 20
+			}));
+		});
+
+		// Sun glow at scrollFactor 0: pinned to the view like a HUD, but
+		// still zooming around the view center (screenFixed wouldn't)
+		gameView.add(Game.createSprite({
+			sheet: sparkSheet,
+			x: W * 0.85,
+			y: H * 0.1,
+			width: W * 0.2,
+			height: W * 0.2,
+			tintColor: '#ffd54a',
+			blend: 'add',
+			opacity: 0.8,
+			scrollFactor: 0,
+			touchEnabled: false,
+			zIndex: 19
+		}));
 
 		var player = Game.createSprite({
 			sheet: playerSheet,

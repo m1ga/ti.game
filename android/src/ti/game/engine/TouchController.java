@@ -212,12 +212,19 @@ public class TouchController implements View.OnTouchListener
 
 	private float toSpriteSpaceX(Sprite s, float wx)
 	{
-		return s.screenFixed ? scene.worldToScreenX(wx) : wx;
+		if (s.screenFixed) {
+			return scene.worldToScreenX(wx);
+		}
+		// parallax sprites render shifted by the unapplied camera travel
+		return (s.scrollFactor != 1f) ? wx - (1f - s.scrollFactor) * scene.cameraX : wx;
 	}
 
 	private float toSpriteSpaceY(Sprite s, float wy)
 	{
-		return s.screenFixed ? scene.worldToScreenY(wy) : wy;
+		if (s.screenFixed) {
+			return scene.worldToScreenY(wy);
+		}
+		return (s.scrollFactor != 1f) ? wy - (1f - s.scrollFactor) * scene.cameraY : wy;
 	}
 
 	private void drag(Gesture g, float tx, float ty, long now)

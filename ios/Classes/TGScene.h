@@ -8,6 +8,11 @@
 @class TGSkidTrail;
 @class TGSprite;
 
+/** Receives expired game-clock timer ids on the render thread. */
+@protocol TGSceneTimerListener <NSObject>
+- (void)onTimer:(int)timerId repeats:(BOOL)repeats;
+@end
+
 /**
  * The native scene graph: an ordered list of sprites plus background color.
  * Shared between the main thread (add/remove, property writes, touch
@@ -65,6 +70,18 @@
 
 /** Kicks off (or restarts) a camera shake. strength px, duration s. */
 - (void)shakeWithStrength:(float)strength duration:(float)duration;
+
+// --- Game-clock timers --------------------------------------------------
+// Ticked with the timeScale-scaled dt, so they slow down with the scene
+// and freeze at timeScale 0 — unlike JS setTimeout. Added from the main
+// thread, fired from the render thread through the listener (discrete,
+// never per frame).
+
+@property (atomic, weak) id<TGSceneTimerListener> timerListener;
+
+/** Schedules a timer on the game clock; returns its cancel id. */
+- (int)addTimer:(float)seconds repeats:(BOOL)repeats;
+- (void)cancelTimer:(int)timerId;
 
 /** World position of the visible rect's left/top edge (accounts for zoom). */
 - (float)viewOriginX;

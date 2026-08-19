@@ -42,6 +42,13 @@ public class Sprite
 	// Touch input maps back automatically.
 	public volatile boolean screenFixed = false;
 
+	// Parallax: how much camera travel (and shake) moves this sprite —
+	// 1 = normal world sprite, 0.5 = half-speed background layer, 0 =
+	// pinned to the view (but still zooming around the view center,
+	// unlike screenFixed). Affects rendering and touch mapping only;
+	// x/y, physics and collisions stay in plain world coordinates.
+	public volatile float scrollFactor = 1f;
+
 	// Tint: multiplies the frame's colors (white = art unchanged) — damage
 	// flashes, team colors, day/night shading. Parsed 0..1 channels.
 	public volatile float tintR = 1f;
@@ -627,12 +634,21 @@ public class Sprite
 			return false;
 		}
 		// Screen-fixed sprites live in surface coordinates; the touch
-		// arrives in world space, so map it back before testing.
+		// arrives in world space, so map it back before testing. Parallax
+		// sprites render shifted by the unapplied part of the camera
+		// travel — shift the touch the same way (shake is already absent
+		// from touch mapping).
 		if (screenFixed) {
 			Scene sc = scene;
 			if (sc != null) {
 				px = sc.worldToScreenX(px);
 				py = sc.worldToScreenY(py);
+			}
+		} else if (scrollFactor != 1f) {
+			Scene sc = scene;
+			if (sc != null) {
+				px -= (1f - scrollFactor) * sc.cameraX;
+				py -= (1f - scrollFactor) * sc.cameraY;
 			}
 		}
 		float w = drawWidth();

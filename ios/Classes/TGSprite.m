@@ -63,6 +63,7 @@ static _Atomic int TGIdleSequence = 0;
 		_touchEnabled = YES;
 		_carryRiders = YES;
 		_hitboxScale = 1.0f;
+		_scrollFactor = 1.0f;
 		_enginePower = 600.0f;
 		_maxSpeed = 500.0f;
 		_turnRate = 200.0f;
@@ -498,12 +499,21 @@ static _Atomic int TGIdleSequence = 0;
 		return NO;
 	}
 	// Screen-fixed sprites live in surface coordinates; the touch
-	// arrives in world space, so map it back before testing.
+	// arrives in world space, so map it back before testing. Parallax
+	// sprites render shifted by the unapplied part of the camera
+	// travel — shift the touch the same way (shake is already absent
+	// from touch mapping).
 	if (self.screenFixed) {
 		TGScene *sc = self.scene;
 		if (sc != nil) {
 			px = [sc worldToScreenX:px];
 			py = [sc worldToScreenY:py];
+		}
+	} else if (self.scrollFactor != 1.0f) {
+		TGScene *sc = self.scene;
+		if (sc != nil) {
+			px -= (1.0f - self.scrollFactor) * sc.cameraX;
+			py -= (1.0f - self.scrollFactor) * sc.cameraY;
 		}
 	}
 	float w = [self drawWidth];
