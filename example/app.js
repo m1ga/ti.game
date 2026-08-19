@@ -20,6 +20,7 @@
 //   Path & chain: native followPath circuits + play(name, { then }) chains
 //   Raycast: line of sight, ledge probes and tap hitscan via gameView.raycast
 //   Zones: collision/collisionend lifecycle — water tint, pressure-plate door
+//   Demoscene: sine text scroller, copper bars, starfield + chiptune loop
 
 var demos = [
 	{ title: 'Basic demo', start: require('/basic') },
@@ -44,7 +45,8 @@ var demos = [
 	{ title: 'Swept collision', start: require('/swept') },
 	{ title: 'Trigger zones', start: require('/zones') },
 	{ title: 'Path & chain', start: require('/path') },
-	{ title: 'Raycast', start: require('/raycast') }
+	{ title: 'Raycast', start: require('/raycast') },
+	{ title: 'Demoscene', start: require('/demoscene') }
 ];
 
 var win = Ti.UI.createWindow({
