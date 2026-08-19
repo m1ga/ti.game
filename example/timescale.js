@@ -81,7 +81,7 @@ module.exports = function () {
 		var ball = Game.createSprite({
 			sheet: ballSheet,
 			x: W * 0.75,
-			y: H * 0.2,
+			y: H * 0.3, // bounce apex stays below the REAL clock
 			width: BALL,
 			height: BALL,
 			zIndex: 5,
@@ -119,7 +119,7 @@ module.exports = function () {
 		var gameClock = Game.createText({
 			text: 'GAME 0s',
 			x: W * 0.28,
-			y: H * 0.12,
+			y: H * 0.2, // below the hint label
 			scale: UNIT,
 			tintColor: '#4dff88',
 			zIndex: 10
@@ -127,7 +127,7 @@ module.exports = function () {
 		var realClock = Game.createText({
 			text: 'REAL 0s',
 			x: W * 0.72,
-			y: H * 0.12,
+			y: H * 0.2, // below the hint label
 			scale: UNIT,
 			tintColor: '#ff8a80',
 			zIndex: 10
@@ -187,8 +187,8 @@ module.exports = function () {
 			textAlign: 'center',
 			shadowColor: '#000',
 			shadowOffset: { x: 0, y: 1 },
-			top: 44,
-			left: 70,
+			top: 90, // below the Back button
+			left: 20,
 			right: 20
 		}));
 	}
@@ -197,8 +197,13 @@ module.exports = function () {
 	// Back — return to the launcher
 	var backButton = Ti.UI.createButton({
 		title: 'Back',
-		top: 40,
-		left: 20
+		top: Ti.Platform.osname === 'android' ? 10 : 40,
+		left: 10,
+		color: '#fff',
+		backgroundColor: '#000',
+		borderColor: '#fff',
+		borderWidth: 1,
+		font: { fontSize: 12 }
 	});
 	backButton.addEventListener('click', function () {
 		win.close();

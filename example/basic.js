@@ -1,5 +1,5 @@
 // ti.game basic demo — sprite sheet animation, drag & drop, gestures, tweens.
-// Uses hero.jpg (4 columns x 2 rows of 64x64 frames) from assets/:
+// Uses hero.png (4 columns x 2 rows of 64x64 frames) from assets/:
 // frames 0-3 walk, 4-6 jump, 7 ghost.
 //
 // Exports a start function; the demo opens its own window each time.
@@ -19,73 +19,96 @@ module.exports = function () {
 	});
 
 	var sheet = Game.createSpriteSheet({
-		image: 'assets/hero.jpg',
+		image: 'assets/hero.png',
 		frameWidth: 64,
 		frameHeight: 64
-		// or TexturePacker: image: 'assets/hero.png', atlas: 'assets/hero.json'
+		// or TexturePacker: image + atlas: 'assets/hero.json' instead of the grid
 	});
 
-	var hero = Game.createSprite({
-		sheet: sheet,
-		x: 200,
-		y: 300,
-		draggable: true,
-		pinchable: true,
-		rotatable: true,
-		animations: {
-			walk: { frames: [0, 1, 2, 3], fps: 12, loop: true },
-			jump: { frames: [4, 5, 6], fps: 10, loop: false }
+	var initialized = false;
+	gameView.addEventListener('resize', function (e) {
+		if (!initialized) {
+			initialized = true;
+			init(e.width, e.height);
 		}
 	});
 
-	hero.play('walk');
+	function init(W, H) {
 
-	hero.addEventListener('tap', function () {
-		hero.play('jump');
-	});
+		var HERO = Math.round(W * 0.35);
+		var GHOST = Math.round(W * 0.28);
 
-	hero.addEventListener('animationcomplete', function (e) {
-		// non-looping animation finished — go back to walking
-		if (e.animation === 'jump') {
-			hero.play('walk');
-		}
-	});
-
-	hero.addEventListener('dragend', function (e) {
-		// already moved natively; e.x / e.y is the final position
-		Ti.API.info('hero dropped at ' + e.x + ', ' + e.y);
-	});
-
-	// A second, non-interactive sprite driven by native tweens
-	var ghost = Game.createSprite({
-		sheet: sheet,
-		x: 100,
-		y: 120,
-		frame: 7,
-		opacity: 0.6,
-		zIndex: -1
-	});
-
-	ghost.addEventListener('complete', function () {
-		// ping-pong between two corners forever
-		ghost.animate({
-			x: (ghost.x < 200) ? 300 : 100,
-			rotation: ghost.rotation + 360,
-			duration: 1500,
-			easing: Game.EASE_IN_OUT
+		var hero = Game.createSprite({
+			sheet: sheet,
+			x: W / 2,
+			y: H / 2,
+			width: HERO,
+			height: HERO,
+			draggable: true,
+			pinchable: true,
+			rotatable: true,
+			animations: {
+				walk: { frames: [0, 1, 2, 3], fps: 12, loop: true },
+				jump: { frames: [4, 5, 6], fps: 10, loop: false }
+			}
 		});
-	});
 
-	// Arrays cross the bridge once and enter the native scene together.
-	gameView.add([hero, ghost]);
-	ghost.animate({ x: 300, rotation: 360, duration: 1500, easing: Game.EASE_IN_OUT });
+		hero.play('walk');
+
+		hero.addEventListener('tap', function () {
+			hero.play('jump');
+		});
+
+		hero.addEventListener('animationcomplete', function (e) {
+			// non-looping animation finished — go back to walking
+			if (e.animation === 'jump') {
+				hero.play('walk');
+			}
+		});
+
+		hero.addEventListener('dragend', function (e) {
+			// already moved natively; e.x / e.y is the final position
+			Ti.API.info('hero dropped at ' + e.x + ', ' + e.y);
+		});
+
+		// A second, non-interactive sprite driven by native tweens
+		var ghost = Game.createSprite({
+			sheet: sheet,
+			x: W * 0.25,
+			y: H * 0.28,
+			width: GHOST,
+			height: GHOST,
+			frame: 7,
+			opacity: 0.6,
+			zIndex: -1
+		});
+
+		ghost.addEventListener('complete', function () {
+			// ping-pong between the two sides forever
+			ghost.animate({
+				x: (ghost.x < W / 2) ? W * 0.75 : W * 0.25,
+				rotation: ghost.rotation + 360,
+				duration: 1500,
+				easing: Game.EASE_IN_OUT
+			});
+		});
+
+		// Arrays cross the bridge once and enter the native scene together.
+		gameView.add([hero, ghost]);
+		ghost.animate({ x: W * 0.75, rotation: 360, duration: 1500, easing: Game.EASE_IN_OUT });
+	}
 
 	win.add(gameView);
 	// Back — return to the launcher
 	var backButton = Ti.UI.createButton({
 		title: 'Back',
-		top: 40,
-		left: 20
+		top: Ti.Platform.osname === 'android' ? 10 : 40,
+		left: 10,
+		color: '#fff',
+		backgroundColor: '#000',
+		borderColor: '#fff',
+		borderWidth: 1,
+		font: { fontSize: 12 }
 	});
 	backButton.addEventListener('click', function () {
 		win.close();

@@ -160,7 +160,7 @@ module.exports = function () {
 				top: topPercent + '%'
 			}));
 		}
-		label('followPath: loop + rotate + smoothing', 3);
+		label('followPath: loop + rotate + smoothing', 12); // below the Back button
 		label("tap the guard: play('hop', { then: 'walk' })", 39);
 		label('tap the bird: chain flap → flap → idle', 64);
 		label('tap the ground: one-shot path + pathcomplete', 92);
@@ -170,8 +170,13 @@ module.exports = function () {
 	// Back — return to the launcher
 	var backButton = Ti.UI.createButton({
 		title: 'Back',
-		top: 40,
-		left: 20
+		top: Ti.Platform.osname === 'android' ? 10 : 40,
+		left: 10,
+		color: '#fff',
+		backgroundColor: '#000',
+		borderColor: '#fff',
+		borderWidth: 1,
+		font: { fontSize: 12 }
 	});
 	backButton.addEventListener('click', function () {
 		win.close();

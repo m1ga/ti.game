@@ -181,7 +181,7 @@ module.exports = function () {
 			font: { fontSize: 30, fontWeight: 'bold' },
 			shadowColor: '#000',
 			shadowOffset: { x: 0, y: 2 },
-			top: 40
+			top: 90 // below the Back button
 		});
 		var statusLabel = Ti.UI.createLabel({
 			text: '',
@@ -189,7 +189,7 @@ module.exports = function () {
 			font: { fontSize: 26, fontWeight: 'bold' },
 			shadowColor: '#000',
 			shadowOffset: { x: 0, y: 2 },
-			top: 90,
+			top: 140, // below the score
 			visible: false
 		});
 
@@ -256,8 +256,13 @@ module.exports = function () {
 	// Back — return to the launcher
 	var backButton = Ti.UI.createButton({
 		title: 'Back',
-		top: 40,
-		left: 20
+		top: Ti.Platform.osname === 'android' ? 10 : 40,
+		left: 10,
+		color: '#fff',
+		backgroundColor: '#000',
+		borderColor: '#fff',
+		borderWidth: 1,
+		font: { fontSize: 12 }
 	});
 	backButton.addEventListener('click', function () {
 		win.close();

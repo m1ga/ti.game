@@ -108,7 +108,8 @@
 		[self setFrameData:[TGSpriteSheet buildGridFramesWithImageWidth:imageWidth
 															imageHeight:imageHeight
 															 frameWidth:_gridFrameWidth
-															frameHeight:_gridFrameHeight]];
+															frameHeight:_gridFrameHeight
+																  inset:self.smoothing]];
 	}
 	atomic_store_explicit(&_textureId,
 		(GLint)[textures upload:image smoothing:self.smoothing repeat:self.repeat],
@@ -121,13 +122,25 @@
 	atomic_store_explicit(&_loadFailed, false, memory_order_release);
 }
 
+/**
+ * Grid frame UVs. With `inset` (linear-filtered sheets), interior frame
+ * edges pull in by half a texel so magnified edge samples can't blend
+ * in the neighboring frame (1px ghost lines, the next row's heads
+ * showing at the bottom). Exterior edges stay at the texture border —
+ * CLAMP_TO_EDGE covers them, and full-texture tileRepeat frames must
+ * keep the exact 0..1 range to wrap seamlessly. NEAREST sheets skip
+ * the inset: they can't bleed, and pixel art at 1:1 needs exact UVs.
+ */
 + (NSData *)buildGridFramesWithImageWidth:(int)imageWidth
 							  imageHeight:(int)imageHeight
 							   frameWidth:(int)frameWidth
 							  frameHeight:(int)frameHeight
+									inset:(BOOL)inset
 {
 	int cols = MAX(1, imageWidth / frameWidth);
 	int rows = MAX(1, imageHeight / frameHeight);
+	float halfX = 0.5f / imageWidth;
+	float halfY = 0.5f / imageHeight;
 	NSMutableData *data = [NSMutableData dataWithLength:sizeof(TGFrame) * cols * rows];
 	TGFrame *frames = (TGFrame *)data.mutableBytes;
 	int i = 0;
@@ -138,6 +151,20 @@
 			f.v0 = (row * frameHeight) / (float)imageHeight;
 			f.u1 = ((col + 1) * frameWidth) / (float)imageWidth;
 			f.v1 = ((row + 1) * frameHeight) / (float)imageHeight;
+			if (inset) {
+				if (col > 0) {
+					f.u0 += halfX;
+				}
+				if (col < cols - 1) {
+					f.u1 -= halfX;
+				}
+				if (row > 0) {
+					f.v0 += halfY;
+				}
+				if (row < rows - 1) {
+					f.v1 -= halfY;
+				}
+			}
 			f.width = frameWidth;
 			f.height = frameHeight;
 			frames[i++] = f;

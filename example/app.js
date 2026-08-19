@@ -89,7 +89,11 @@ demos.forEach(function (demo, index) {
 	var button = Ti.UI.createButton({
 		title: demo.title,
 		left: '3%',
-		width: '46%'
+		width: '46%',
+		color: '#fff',
+		backgroundColor: '#000',
+		borderColor: '#fff',
+		borderWidth: 1
 	});
 	button.addEventListener('click', function () {
 		demo.start();

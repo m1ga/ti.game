@@ -61,9 +61,12 @@ typedef struct {
 /** Drops the GL texture reference after context loss so it reloads. */
 - (void)invalidateTexture;
 
+/** Grid frame UVs; `inset` pulls interior edges in by half a texel
+ *  (linear-filtered sheets) so magnified edges don't bleed neighbors. */
 + (NSData *)buildGridFramesWithImageWidth:(int)imageWidth
 							  imageHeight:(int)imageHeight
 							   frameWidth:(int)frameWidth
-							  frameHeight:(int)frameHeight;
+							  frameHeight:(int)frameHeight
+									inset:(BOOL)inset;
 
 @end

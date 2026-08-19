@@ -115,7 +115,8 @@ public class SpriteSheet
 			return;
 		}
 		if (frames.length == 0 && gridFrameWidth > 0 && gridFrameHeight > 0) {
-			setFrames(buildGridFrames(bitmap.getWidth(), bitmap.getHeight(), gridFrameWidth, gridFrameHeight));
+			setFrames(buildGridFrames(bitmap.getWidth(), bitmap.getHeight(),
+				gridFrameWidth, gridFrameHeight, smoothing));
 		}
 		textureId = textures.upload(bitmap, smoothing, repeat);
 		bitmap.recycle();
@@ -128,10 +129,22 @@ public class SpriteSheet
 		loadFailed = false;
 	}
 
-	public static Frame[] buildGridFrames(int imageWidth, int imageHeight, int frameWidth, int frameHeight)
+	/**
+	 * Grid frame UVs. With `inset` (linear-filtered sheets), interior frame
+	 * edges pull in by half a texel so magnified edge samples can't blend
+	 * in the neighboring frame (1px ghost lines, the next row's heads
+	 * showing at the bottom). Exterior edges stay at the texture border —
+	 * CLAMP_TO_EDGE covers them, and full-texture tileRepeat frames must
+	 * keep the exact 0..1 range to wrap seamlessly. NEAREST sheets skip
+	 * the inset: they can't bleed, and pixel art at 1:1 needs exact UVs.
+	 */
+	public static Frame[] buildGridFrames(int imageWidth, int imageHeight,
+										  int frameWidth, int frameHeight, boolean inset)
 	{
 		int cols = Math.max(1, imageWidth / frameWidth);
 		int rows = Math.max(1, imageHeight / frameHeight);
+		float halfX = 0.5f / imageWidth;
+		float halfY = 0.5f / imageHeight;
 		Frame[] result = new Frame[cols * rows];
 		int i = 0;
 		for (int row = 0; row < rows; row++) {
@@ -140,6 +153,20 @@ public class SpriteSheet
 				float v0 = (row * frameHeight) / (float) imageHeight;
 				float u1 = ((col + 1) * frameWidth) / (float) imageWidth;
 				float v1 = ((row + 1) * frameHeight) / (float) imageHeight;
+				if (inset) {
+					if (col > 0) {
+						u0 += halfX;
+					}
+					if (col < cols - 1) {
+						u1 -= halfX;
+					}
+					if (row > 0) {
+						v0 += halfY;
+					}
+					if (row < rows - 1) {
+						v1 -= halfY;
+					}
+				}
 				result[i++] = new Frame(u0, v0, u1, v1, frameWidth, frameHeight);
 			}
 		}
