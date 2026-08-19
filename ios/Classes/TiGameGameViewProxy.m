@@ -341,6 +341,43 @@
 	self.scene.followTarget = nil;
 }
 
+/**
+ * gameView.raycast(x0, y0, x1, y1, groups): one-shot nearest-hit query
+ * along the segment, against visible sprites whose collisionGroup is in
+ * `groups` (omit for any tagged sprite). Returns null for a clear ray,
+ * else { x, y, distance, group, sprite, normal: { x, y } }. Line of
+ * sight, ground probes, hitscan weapons — a discrete query, not
+ * something to poll every frame from JS.
+ */
+- (id)raycast:(id)args
+{
+	NSArray *list = [args isKindOfClass:[NSArray class]] ? args : @[];
+	float x0 = (list.count > 0) ? [TiUtils floatValue:list[0] def:0] : 0.0f;
+	float y0 = (list.count > 1) ? [TiUtils floatValue:list[1] def:0] : 0.0f;
+	float x1 = (list.count > 2) ? [TiUtils floatValue:list[2] def:0] : 0.0f;
+	float y1 = (list.count > 3) ? [TiUtils floatValue:list[3] def:0] : 0.0f;
+	NSMutableSet<NSString *> *groups = nil;
+	if (list.count > 4 && [list[4] isKindOfClass:[NSArray class]]) {
+		groups = [NSMutableSet set];
+		for (id group in (NSArray *)list[4]) {
+			[groups addObject:[TiUtils stringValue:group]];
+		}
+	}
+	float out[5];
+	TGSprite *hit = [self.scene raycastFromX:x0 y:y0 toX:x1 y:y1 groups:groups out:out];
+	if (hit == nil) {
+		return [NSNull null];
+	}
+	return @{
+		@"x": @(out[0]),
+		@"y": @(out[1]),
+		@"distance": @(out[2]),
+		@"normal": @{ @"x": @(out[3]), @"y": @(out[4]) },
+		@"group": (hit.collisionGroup != nil) ? hit.collisionGroup : [NSNull null],
+		@"sprite": (hit.proxy != nil) ? hit.proxy : [NSNull null]
+	};
+}
+
 /** Manually pause the render loop (also happens on app resign-active). */
 - (void)pause:(id)unused
 {

@@ -55,8 +55,13 @@ traffic in the loop.
       for both collision events and solid blocking (clamped to the
       impact point, then resolved by the normal static pass); the swept
       demo compares both lanes side by side.
-- [ ] `gameView.raycast(x0, y0, x1, y1, groups)` one-shot query —
-      line-of-sight, ground probes.
+- [x] `gameView.raycast(x0, y0, x1, y1, groups)` one-shot query —
+      line-of-sight, ground probes. Nearest hit as { x, y, distance,
+      group, sprite, normal } or null; slab test on rect AABBs, exact
+      ray/circle for circle hitboxes; thread-safe for JS-initiated
+      calls (own scratch, no GL-thread buffers). Discrete queries only
+      (timers, taps) — not per-frame JS polling. raycast.js demos
+      line of sight, ledge probes and tap hitscan.
 - [ ] Slopes (platformer terrain) — only if terrain games become a goal.
 
 ## 4. Tile maps

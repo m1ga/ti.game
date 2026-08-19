@@ -296,6 +296,10 @@ Notes:
   `carryRiders: false` on the solid opts out — for world-scroll terrain
   that moves while the player is meant to stay put (the skate demo's
   raised road scrolls left under a skater with a fixed x).
+- **Raycasts**: `gameView.raycast(x0, y0, x1, y1, groups)` answers
+  "what's the first thing on this line?" without any collision setup on
+  the asking side — the targets just need a `collisionGroup`. See the
+  GameView method table for the result shape.
 - **Drift is emergent** in `carMode`: lateral grip is finite, so hard
   cornering at speed keeps sideways momentum. Lower `grip` = more drift.
   `skidMarks: true` leaves fading rubber trails while drifting
@@ -526,6 +530,7 @@ a feature set — find the one closest to your game and start there:
 | `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
 | `swept.js` | Swept AABB comparison: two lanes fire identical bullets at a thin wall with rising speed — the `swept: false` lane starts tunneling straight through, the `swept: true` lane never misses |
 | `path.js` | Path & chain: a ship on a smoothed looping circuit (`rotate: true`), a guard patrolling a sharp rectangle while its walk loop plays, tap-to-chain (`play('hop', { then: 'walk' })`, array chains on the bird), and a dog running one-shot zig-zag paths to taps with `pathcomplete` |
+| `raycast.js` | Raycast playground: a guard's line-of-sight beam blocked by a draggable crate (beam shortens to `hit.distance` and turns red), a ledge-probing walker that turns before the platform edge, and a tap-fired turret hitscan that flashes `hit.sprite` and reports group + distance |
 | `zones.js` | `collision`/`collisionend` lifecycle: a water pool that tints the hero while he's inside, a pressure plate holding a door open exactly while the ball rests on it, and a remove-ball button showing that deleting a contact partner still fires the exit |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going |
 
@@ -564,6 +569,7 @@ Run them with `ti build -p android` from `android/` (executes
 | `follow(sprite, options)` | Native dead-zone camera follow. Vertical: `topMargin`/`bottomMargin` (fractions of the visible height, defaults 0.33/0.7), clamped to `maxY` (default 0). Horizontal: enabled by `leftMargin`/`rightMargin` (defaults 0.35/0.65). `smoothing` (0..1, default 0 = snap) eases by that fraction of the remaining distance per 1/60 s |
 | `stopFollow()` | Stop following; the camera stays where it is |
 | `shake({ strength, duration })` | Camera shake: `strength` px (default 12), `duration` ms (default 400) — offsets only the projection, so follow/bounds/touches are unaffected |
+| `raycast(x0, y0, x1, y1, groups)` | One-shot nearest-hit query along the segment against visible sprites whose `collisionGroup` is in `groups` (omit for any tagged sprite). Returns `null` for a clear ray, else `{ x, y, distance, group, sprite, normal: { x, y } }`. Rect hitboxes use their AABB, circle hitboxes intersect exactly; a ray starting inside a hitbox reports it at distance 0. For discrete checks — line of sight on an AI timer, ledge/ground probes, tap hitscan — not per-frame JS polling |
 | `cameraEffect` | Fullscreen shader over the whole scene: `'none'` (default), `'tint'`, `'glitch'` |
 | `cameraTint` | Color for the `'tint'` effect, e.g. `'#4f8'` |
 | `cameraEffectIntensity` | Effect strength 0..1 (tint mix / glitch amount; default 1) |

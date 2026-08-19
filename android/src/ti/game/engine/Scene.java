@@ -358,6 +358,16 @@ public class Scene
 	private boolean sweptHit(float cx, float cy, float dx, float dy,
 							 float minX, float minY, float maxX, float maxY)
 	{
+		return segmentVsAabb(cx, cy, dx, dy, minX, minY, maxX, maxY, sweptResult);
+	}
+
+	/** The slab test itself, writing {entry time, entry axis} into result —
+	 *  static so raycast() can run it from the JS thread with its own
+	 *  buffer, never racing the GL thread's sweptResult. */
+	private static boolean segmentVsAabb(float cx, float cy, float dx, float dy,
+										 float minX, float minY, float maxX, float maxY,
+										 float[] result)
+	{
 		float tmin = 0f;
 		float tmax = 1f;
 		float axis = 0f;
@@ -406,9 +416,104 @@ public class Scene
 				return false;
 			}
 		}
-		sweptResult[0] = tmin;
-		sweptResult[1] = axis;
+		result[0] = tmin;
+		result[1] = axis;
 		return true;
+	}
+
+	/**
+	 * One-shot segment query from (x0, y0) to (x1, y1) against every
+	 * visible sprite carrying a collisionGroup in `groups` (null or empty
+	 * = any tagged sprite). Returns the nearest hit sprite with
+	 * {x, y, distance, normalX, normalY} written into `out`, or null for
+	 * a clear ray. Rect hitboxes use the slab test on their AABB, circle
+	 * hitboxes an exact ray/circle intersection; screenFixed sprites are
+	 * skipped (they live in surface, not world, coordinates). A ray that
+	 * starts inside a hitbox reports that sprite at distance 0.
+	 *
+	 * Safe from any thread — it's meant for discrete JS-initiated checks
+	 * (line of sight on an AI timer, ground probes, hitscan weapons), not
+	 * per-frame polling, and allocates its own scratch instead of sharing
+	 * the GL thread's buffers.
+	 */
+	public Sprite raycast(float x0, float y0, float x1, float y1,
+						  Set<String> groups, float[] out)
+	{
+		float dx = x1 - x0;
+		float dy = y1 - y0;
+		float rayLength = (float) Math.hypot(dx, dy);
+		float[] box = new float[4];
+		float[] center = new float[2];
+		float[] entry = new float[2];
+		float bestT = Float.MAX_VALUE;
+		Sprite best = null;
+		float bestNormalX = 0f;
+		float bestNormalY = 0f;
+		for (Sprite s : snapshot()) {
+			String group = s.collisionGroup;
+			if (group == null || !s.visible || s.screenFixed
+					|| (groups != null && !groups.isEmpty() && !groups.contains(group))) {
+				continue;
+			}
+			if (s.circleHitbox) {
+				// Ray vs circle: solve |P0 + t*d - C|^2 = r^2 for the
+				// smallest t in [0, 1]
+				s.hitCenter(center);
+				float r = s.hitRadius();
+				float fx = x0 - center[0];
+				float fy = y0 - center[1];
+				float t;
+				if (fx * fx + fy * fy <= r * r) {
+					t = 0f; // started inside
+				} else {
+					float a = dx * dx + dy * dy;
+					float b = 2f * (fx * dx + fy * dy);
+					float c = fx * fx + fy * fy - r * r;
+					float disc = b * b - 4f * a * c;
+					if (a < 1e-6f || disc < 0f) {
+						continue;
+					}
+					t = (-b - (float) Math.sqrt(disc)) / (2f * a);
+					if (t < 0f || t > 1f) {
+						continue;
+					}
+				}
+				if (t < bestT) {
+					bestT = t;
+					best = s;
+					float hx = x0 + dx * t;
+					float hy = y0 + dy * t;
+					float nl = (float) Math.hypot(hx - center[0], hy - center[1]);
+					bestNormalX = (nl > 1e-6f) ? (hx - center[0]) / nl : 0f;
+					bestNormalY = (nl > 1e-6f) ? (hy - center[1]) / nl : 0f;
+				}
+			} else {
+				s.computeAABB(box);
+				if (!segmentVsAabb(x0, y0, dx, dy, box[0], box[1], box[2], box[3], entry)) {
+					continue;
+				}
+				if (entry[0] < bestT) {
+					bestT = entry[0];
+					best = s;
+					if (entry[1] == 0f) {
+						bestNormalX = (dx > 0f) ? -1f : (dx < 0f) ? 1f : 0f;
+						bestNormalY = 0f;
+					} else {
+						bestNormalX = 0f;
+						bestNormalY = (dy > 0f) ? -1f : (dy < 0f) ? 1f : 0f;
+					}
+				}
+			}
+		}
+		if (best == null) {
+			return null;
+		}
+		out[0] = x0 + dx * bestT;
+		out[1] = y0 + dy * bestT;
+		out[2] = rayLength * bestT;
+		out[3] = bestNormalX;
+		out[4] = bestNormalY;
+		return best;
 	}
 
 	/**

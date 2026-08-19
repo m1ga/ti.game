@@ -18,6 +18,7 @@
 //   Text: bitmap-font labels in the GL scene — HUD, world signs, text buttons
 //   Swept: fast bullets vs a thin wall — swept: true stops the tunneling
 //   Path & chain: native followPath circuits + play(name, { then }) chains
+//   Raycast: line of sight, ledge probes and tap hitscan via gameView.raycast
 //   Zones: collision/collisionend lifecycle — water tint, pressure-plate door
 
 var demos = [
@@ -42,7 +43,8 @@ var demos = [
 	{ title: 'Text', start: require('/text') },
 	{ title: 'Swept collision', start: require('/swept') },
 	{ title: 'Trigger zones', start: require('/zones') },
-	{ title: 'Path & chain', start: require('/path') }
+	{ title: 'Path & chain', start: require('/path') },
+	{ title: 'Raycast', start: require('/raycast') }
 ];
 
 var win = Ti.UI.createWindow({

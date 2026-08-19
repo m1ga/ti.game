@@ -3,8 +3,11 @@ package ti.game;
 import android.app.Activity;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.TiConvert;
@@ -47,7 +50,7 @@ public class GameViewProxy extends TiViewProxy
 	}
 
 	@Override
-	public void handleCreationDict(org.appcelerator.kroll.KrollDict options)
+	public void handleCreationDict(KrollDict options)
 	{
 		super.handleCreationDict(options);
 		if (options.containsKey("debug")) {
@@ -246,7 +249,7 @@ public class GameViewProxy extends TiViewProxy
 	 * Each call resets unspecified options to their defaults.
 	 */
 	@Kroll.method
-	public void follow(SpriteProxy spriteProxy, @Kroll.argument(optional = true) org.appcelerator.kroll.KrollDict options)
+	public void follow(SpriteProxy spriteProxy, @Kroll.argument(optional = true) KrollDict options)
 	{
 		if (spriteProxy == null) {
 			scene.followTarget = null;
@@ -293,7 +296,7 @@ public class GameViewProxy extends TiViewProxy
 	 * projection so follow/bounds/touches are unaffected.
 	 */
 	@Kroll.method
-	public void shake(@Kroll.argument(optional = true) org.appcelerator.kroll.KrollDict options)
+	public void shake(@Kroll.argument(optional = true) KrollDict options)
 	{
 		float strength = 12f;
 		float duration = 400f;
@@ -342,7 +345,7 @@ public class GameViewProxy extends TiViewProxy
 	 * null removes the bounds. Applied every frame, also without follow.
 	 */
 	@Kroll.setProperty
-	public void setCameraBounds(org.appcelerator.kroll.KrollDict bounds)
+	public void setCameraBounds(KrollDict bounds)
 	{
 		cameraBoundsDict = bounds;
 		if (bounds == null) {
@@ -361,17 +364,61 @@ public class GameViewProxy extends TiViewProxy
 	}
 
 	@Kroll.getProperty
-	public org.appcelerator.kroll.KrollDict getCameraBounds()
+	public KrollDict getCameraBounds()
 	{
 		return cameraBoundsDict;
 	}
 
-	private org.appcelerator.kroll.KrollDict cameraBoundsDict;
+	private KrollDict cameraBoundsDict;
 
 	@Kroll.method
 	public void stopFollow()
 	{
 		scene.followTarget = null;
+	}
+
+	/**
+	 * gameView.raycast(x0, y0, x1, y1, groups): one-shot nearest-hit query
+	 * along the segment, against visible sprites whose collisionGroup is
+	 * in `groups` (omit for any tagged sprite). Returns null for a clear
+	 * ray, else { x, y, distance, group, sprite, normal: { x, y } }.
+	 * Line of sight, ground probes, hitscan weapons — a discrete query,
+	 * not something to poll every frame from JS.
+	 */
+	@Kroll.method
+	public KrollDict raycast(float x0, float y0, float x1, float y1,
+							 @Kroll.argument(optional = true) Object[] groups)
+	{
+		// Kroll binds a trailing Object[] parameter as varargs, so a JS
+		// groups array arrives wrapped as the single first element —
+		// unwrap it (raycast(..., ['a', 'b']) and raycast(..., 'a', 'b')
+		// both work).
+		if (groups != null && groups.length == 1 && groups[0] instanceof Object[]) {
+			groups = (Object[]) groups[0];
+		}
+		Set<String> groupSet = null;
+		if (groups != null && groups.length > 0) {
+			groupSet = new HashSet<>();
+			for (Object group : groups) {
+				groupSet.add(TiConvert.toString(group));
+			}
+		}
+		float[] out = new float[5];
+		Sprite hit = scene.raycast(x0, y0, x1, y1, groupSet, out);
+		if (hit == null) {
+			return null;
+		}
+		KrollDict data = new KrollDict();
+		data.put("x", out[0]);
+		data.put("y", out[1]);
+		data.put("distance", out[2]);
+		KrollDict normal = new KrollDict();
+		normal.put("x", out[3]);
+		normal.put("y", out[4]);
+		data.put("normal", normal);
+		data.put("group", hit.collisionGroup);
+		data.put("sprite", hit.proxy);
+		return data;
 	}
 
 	@Kroll.getProperty

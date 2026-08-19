@@ -562,6 +562,16 @@ static float bottomEdge(TGSprite *s)
 - (BOOL)sweptHitFromX:(float)cx y:(float)cy dx:(float)dx dy:(float)dy
 				 minX:(float)minX minY:(float)minY maxX:(float)maxX maxY:(float)maxY
 {
+	return TGSegmentVsAabb(cx, cy, dx, dy, minX, minY, maxX, maxY, _sweptResult);
+}
+
+/** The slab test itself, writing {entry time, entry axis} into result —
+ *  a plain function so raycast can run it from the main thread with its
+ *  own buffer, never racing the render thread's _sweptResult. */
+static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
+							float minX, float minY, float maxX, float maxY,
+							float *result)
+{
 	float tmin = 0.0f;
 	float tmax = 1.0f;
 	float axis = 0.0f;
@@ -610,9 +620,89 @@ static float bottomEdge(TGSprite *s)
 			return NO;
 		}
 	}
-	_sweptResult[0] = tmin;
-	_sweptResult[1] = axis;
+	result[0] = tmin;
+	result[1] = axis;
 	return YES;
+}
+
+- (TGSprite *)raycastFromX:(float)x0 y:(float)y0 toX:(float)x1 y:(float)y1
+					groups:(NSSet<NSString *> *)groups out:(float *)out
+{
+	float dx = x1 - x0;
+	float dy = y1 - y0;
+	float rayLength = hypotf(dx, dy);
+	float box[4];
+	float center[2];
+	float entry[2];
+	float bestT = FLT_MAX;
+	TGSprite *best = nil;
+	float bestNormalX = 0.0f;
+	float bestNormalY = 0.0f;
+	for (TGSprite *s in [self snapshot]) {
+		NSString *group = s.collisionGroup;
+		if (group == nil || !s.visible || s.screenFixed
+				|| (groups != nil && groups.count > 0 && ![groups containsObject:group])) {
+			continue;
+		}
+		if (s.circleHitbox) {
+			// Ray vs circle: solve |P0 + t*d - C|^2 = r^2 for the
+			// smallest t in [0, 1]
+			[s hitCenter:center];
+			float r = [s hitRadius];
+			float fx = x0 - center[0];
+			float fy = y0 - center[1];
+			float t;
+			if (fx * fx + fy * fy <= r * r) {
+				t = 0.0f; // started inside
+			} else {
+				float a = dx * dx + dy * dy;
+				float b = 2.0f * (fx * dx + fy * dy);
+				float c = fx * fx + fy * fy - r * r;
+				float disc = b * b - 4.0f * a * c;
+				if (a < 1e-6f || disc < 0.0f) {
+					continue;
+				}
+				t = (-b - sqrtf(disc)) / (2.0f * a);
+				if (t < 0.0f || t > 1.0f) {
+					continue;
+				}
+			}
+			if (t < bestT) {
+				bestT = t;
+				best = s;
+				float hx = x0 + dx * t;
+				float hy = y0 + dy * t;
+				float nl = hypotf(hx - center[0], hy - center[1]);
+				bestNormalX = (nl > 1e-6f) ? (hx - center[0]) / nl : 0.0f;
+				bestNormalY = (nl > 1e-6f) ? (hy - center[1]) / nl : 0.0f;
+			}
+		} else {
+			[s computeAABB:box];
+			if (!TGSegmentVsAabb(x0, y0, dx, dy, box[0], box[1], box[2], box[3], entry)) {
+				continue;
+			}
+			if (entry[0] < bestT) {
+				bestT = entry[0];
+				best = s;
+				if (entry[1] == 0.0f) {
+					bestNormalX = (dx > 0.0f) ? -1.0f : (dx < 0.0f) ? 1.0f : 0.0f;
+					bestNormalY = 0.0f;
+				} else {
+					bestNormalX = 0.0f;
+					bestNormalY = (dy > 0.0f) ? -1.0f : (dy < 0.0f) ? 1.0f : 0.0f;
+				}
+			}
+		}
+	}
+	if (best == nil) {
+		return nil;
+	}
+	out[0] = x0 + dx * bestT;
+	out[1] = y0 + dy * bestT;
+	out[2] = rayLength * bestT;
+	out[3] = bestNormalX;
+	out[4] = bestNormalY;
+	return best;
 }
 
 /**

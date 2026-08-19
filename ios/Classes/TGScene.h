@@ -137,4 +137,20 @@
 /** Topmost sprite under the point (front to back), or nil. */
 - (TGSprite *)hitTestX:(float)x y:(float)y;
 
+/**
+ * One-shot segment query from (x0, y0) to (x1, y1) against every visible
+ * sprite carrying a collisionGroup in `groups` (nil or empty = any tagged
+ * sprite). Returns the nearest hit sprite with {x, y, distance, normalX,
+ * normalY} written into `out` (5 floats), or nil for a clear ray. Rect
+ * hitboxes use the slab test on their AABB, circle hitboxes an exact
+ * ray/circle intersection; screenFixed sprites are skipped. A ray that
+ * starts inside a hitbox reports that sprite at distance 0.
+ *
+ * Safe from any thread — meant for discrete JS-initiated checks (line of
+ * sight on an AI timer, ground probes, hitscan weapons), not per-frame
+ * polling; it uses its own scratch, never the render thread's buffers.
+ */
+- (TGSprite *)raycastFromX:(float)x0 y:(float)y0 toX:(float)x1 y:(float)y1
+					groups:(NSSet<NSString *> *)groups out:(float *)out;
+
 @end
