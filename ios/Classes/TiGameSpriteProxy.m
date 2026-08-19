@@ -203,16 +203,18 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return _tintColor;
 }
 
-/** 'add' = additive blending — the sprite brightens the backdrop instead
- *  of covering it (glows, lasers, fire); anything else = normal. */
+/** 'add' brightens the backdrop instead of covering it (glows, lasers,
+ *  fire), 'multiply' darkens it (shadows, stains), 'screen' lightens it
+ *  softly without blowing out to white (fog, soft light); anything else
+ *  = normal alpha blending. */
 - (void)setBlend:(id)value
 {
-	self.sprite.additiveBlend = [@"add" isEqualToString:[TiUtils stringValue:value]];
+	self.sprite.blendMode = TGBlendModeFromString([TiUtils stringValue:value]);
 }
 
 - (NSString *)blend
 {
-	return self.sprite.additiveBlend ? @"add" : @"normal";
+	return TGBlendModeName(self.sprite.blendMode);
 }
 
 /** Glow tint, e.g. '#ffd54a'; visible once glowBlur > 0. */

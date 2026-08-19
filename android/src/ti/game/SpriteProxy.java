@@ -16,6 +16,7 @@ import java.util.Set;
 import ti.game.engine.Animation;
 import ti.game.engine.Easing;
 import ti.game.engine.Sprite;
+import ti.game.engine.SpriteBatch;
 import ti.game.engine.Tween;
 
 /**
@@ -463,19 +464,20 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		return tintColor;
 	}
 
-	/** 'add' = additive blending — the sprite brightens the backdrop
-	 *  instead of covering it (glows, lasers, fire); anything else =
-	 *  normal alpha blending. */
+	/** 'add' brightens the backdrop instead of covering it (glows,
+	 *  lasers, fire), 'multiply' darkens it (shadows, stains), 'screen'
+	 *  lightens it softly without blowing out to white (fog, soft
+	 *  light); anything else = normal alpha blending. */
 	@Kroll.setProperty
 	public void setBlend(String value)
 	{
-		sprite.additiveBlend = "add".equals(value);
+		sprite.blendMode = SpriteBatch.blendModeFromString(value);
 	}
 
 	@Kroll.getProperty
 	public String getBlend()
 	{
-		return sprite.additiveBlend ? "add" : "normal";
+		return SpriteBatch.blendModeName(sprite.blendMode);
 	}
 
 	/** Damage/invincibility flash: fills the sprite's silhouette with

@@ -7,6 +7,21 @@
 
 @class TGSprite;
 
+/** Blend modes, all on premultiplied colors. Sprites/emitters carry one
+ *  of these; the batcher flushes once per mode change. */
+typedef NS_ENUM(NSInteger, TGBlendMode) {
+	TGBlendModeNormal = 0,   // (ONE, ONE_MINUS_SRC_ALPHA)
+	TGBlendModeAdd = 1,      // (ONE, ONE) — brighten
+	TGBlendModeMultiply = 2, // (DST_COLOR, ONE_MINUS_SRC_ALPHA) — darken
+	TGBlendModeScreen = 3,   // (ONE, ONE_MINUS_SRC_COLOR) — soft lighten
+};
+
+/** JS-facing name → TGBlendMode; unknown strings = normal. */
+TGBlendMode TGBlendModeFromString(NSString *value);
+
+/** TGBlendMode → JS-facing name. */
+NSString *TGBlendModeName(TGBlendMode mode);
+
 /**
  * ES 2.0 sprite batcher: accumulates quads and issues one draw call per
  * texture change (or when full). Vertices are (x, y, u, v, r, g, b, a) with
@@ -32,10 +47,12 @@
  *  pending batch on change, like a texture or blend switch. */
 - (void)setScreenSpace:(BOOL)fixed;
 
-/** Additive = (ONE, ONE) on premultiplied colors: quads brighten the
- *  backdrop instead of covering it (glows, fire, lasers). Flushes the
- *  pending batch on change, so mode switches cost one draw call. */
-- (void)setAdditiveBlend:(BOOL)additive;
+/** Switches the glBlendFunc for a TGBlendMode (all assume premultiplied
+ *  colors): add brightens the backdrop (glows, fire, lasers), multiply
+ *  darkens it (shadows, stains), screen lightens it softly without
+ *  blowing out to white (fog, soft light). Flushes the pending batch on
+ *  change, so mode switches cost one draw call. */
+- (void)setBlendMode:(TGBlendMode)mode;
 
 /** Axis-aligned textured quad with a straight-alpha tint color —
  *  the particle path (premultiplied internally, like drawLine). */

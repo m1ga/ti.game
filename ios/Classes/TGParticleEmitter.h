@@ -2,9 +2,9 @@
 //  ti.game — engine (iOS twin of android/src/ti/game/engine/ParticleEmitter.java)
 //
 #import <Foundation/Foundation.h>
+#import "TGSpriteBatch.h" // TGBlendMode
 
 @class TGSprite;
-@class TGSpriteBatch;
 @class TGSpriteSheet;
 
 /**
@@ -43,9 +43,9 @@
 @property (atomic, assign) float tintR;
 @property (atomic, assign) float tintG;
 @property (atomic, assign) float tintB;
-// Additive blending: particles brighten the backdrop instead of
-// covering it (fire, sparks, magic). One batch flush per mode change.
-@property (atomic, assign) BOOL additiveBlend;
+// Blend mode: add brightens (fire, sparks, magic), multiply darkens,
+// screen lightens softly. One batch flush per mode change.
+@property (atomic, assign) TGBlendMode blendMode;
 @property (atomic, assign) BOOL emitting;
 @property (atomic, strong) TGSprite *target;    // follow this sprite instead of x/y
 @property (atomic, assign) int maxParticles;    // clamped to [1, 1000]

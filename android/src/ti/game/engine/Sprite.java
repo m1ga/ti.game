@@ -57,10 +57,11 @@ public class Sprite
 	public volatile float flashDuration = 0f;  // seconds
 	public volatile float flashRemaining = 0f; // seconds
 
-	// Additive blending (glows, fire, lasers): the sprite's colors add
-	// onto the backdrop instead of covering it. The batcher flushes once
-	// per blend-mode change, so group additive sprites by zIndex.
-	public volatile boolean additiveBlend = false;
+	// Blend mode (SpriteBatch.BLEND_*): add for glows/fire/lasers,
+	// multiply for shadows/darkening, screen for soft light. The batcher
+	// flushes once per blend-mode change, so group same-blend sprites by
+	// zIndex.
+	public volatile int blendMode = SpriteBatch.BLEND_NORMAL;
 
 	// Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
 	// frame draws behind the sprite (selection highlights, power-ups).

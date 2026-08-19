@@ -16,6 +16,13 @@ import java.nio.FloatBuffer;
  */
 public class SpriteBatch
 {
+	// Blend modes, all on premultiplied colors. Sprites/emitters carry one
+	// of these; the batcher flushes once per mode change.
+	public static final int BLEND_NORMAL = 0;   // (ONE, ONE_MINUS_SRC_ALPHA)
+	public static final int BLEND_ADD = 1;      // (ONE, ONE) — brighten
+	public static final int BLEND_MULTIPLY = 2; // (DST_COLOR, ONE_MINUS_SRC_ALPHA) — darken
+	public static final int BLEND_SCREEN = 3;   // (ONE, ONE_MINUS_SRC_COLOR) — soft lighten
+
 	private static final int MAX_QUADS = 1000;
 	private static final int FLOATS_PER_VERTEX = 8; // x, y, u, v, r, g, b, a
 	private static final int VERTICES_PER_QUAD = 6; // two triangles
@@ -87,7 +94,7 @@ public class SpriteBatch
 	private final FloatBuffer buffer;
 	private int quadCount = 0;
 	private int currentTexture = -1;
-	private boolean additiveBlend = false;
+	private int blendMode = BLEND_NORMAL;
 
 	private int program = 0;
 	private int glowProgram = 0;
@@ -155,7 +162,7 @@ public class SpriteBatch
 		quadCount = 0;
 		currentTexture = -1;
 		activeProgram = 0;
-		additiveBlend = false;
+		blendMode = BLEND_NORMAL;
 		useProgram(program);
 		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
 		GLES20.glEnable(GLES20.GL_BLEND);
@@ -163,19 +170,67 @@ public class SpriteBatch
 	}
 
 	/**
-	 * Additive = (ONE, ONE) on premultiplied colors: quads brighten the
-	 * backdrop instead of covering it (glows, fire, lasers). Flushes the
+	 * Switches the glBlendFunc for one of the BLEND_* modes (all assume
+	 * premultiplied colors): add brightens the backdrop (glows, fire,
+	 * lasers), multiply darkens it (shadows, stains), screen lightens it
+	 * softly without blowing out to white (fog, soft light). Flushes the
 	 * pending batch on change, so mode switches cost one draw call.
 	 */
-	public void setAdditiveBlend(boolean additive)
+	public void setBlendMode(int mode)
 	{
-		if (additive == additiveBlend) {
+		if (mode == blendMode) {
 			return;
 		}
 		flush();
-		GLES20.glBlendFunc(GLES20.GL_ONE,
-			additive ? GLES20.GL_ONE : GLES20.GL_ONE_MINUS_SRC_ALPHA);
-		additiveBlend = additive;
+		switch (mode) {
+			case BLEND_ADD:
+				GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE);
+				break;
+			case BLEND_MULTIPLY:
+				// dst * (src + 1 - srcA): multiplies where the sprite is
+				// opaque, leaves the backdrop alone where it's transparent
+				GLES20.glBlendFunc(GLES20.GL_DST_COLOR, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+				break;
+			case BLEND_SCREEN:
+				// src + dst * (1 - src): inverse-multiply, converges on
+				// white instead of overshooting like add does
+				GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_COLOR);
+				break;
+			default:
+				GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+				break;
+		}
+		blendMode = mode;
+	}
+
+	/** JS-facing name → BLEND_* constant; unknown strings = normal. */
+	public static int blendModeFromString(String value)
+	{
+		if ("add".equals(value)) {
+			return BLEND_ADD;
+		}
+		if ("multiply".equals(value)) {
+			return BLEND_MULTIPLY;
+		}
+		if ("screen".equals(value)) {
+			return BLEND_SCREEN;
+		}
+		return BLEND_NORMAL;
+	}
+
+	/** BLEND_* constant → JS-facing name. */
+	public static String blendModeName(int mode)
+	{
+		switch (mode) {
+			case BLEND_ADD:
+				return "add";
+			case BLEND_MULTIPLY:
+				return "multiply";
+			case BLEND_SCREEN:
+				return "screen";
+			default:
+				return "normal";
+		}
 	}
 
 	/**
@@ -238,7 +293,7 @@ public class SpriteBatch
 			return;
 		}
 		setScreenSpace(s.screenFixed);
-		setAdditiveBlend(s.additiveBlend);
+		setBlendMode(s.blendMode);
 		ensureCapacity(sheet.textureId());
 
 		float w = s.drawWidth();
@@ -372,7 +427,7 @@ public class SpriteBatch
 			return;
 		}
 		setScreenSpace(s.screenFixed);
-		setAdditiveBlend(s.additiveBlend);
+		setBlendMode(s.blendMode);
 		int texture = sheet.textureId();
 
 		float ax = s.anchorX * layout.width;
@@ -481,7 +536,7 @@ public class SpriteBatch
 	public void drawSegment(int texture, SpriteSheet.Frame f, float x0, float y0,
 							float x1, float y1, float halfWidth, float alpha)
 	{
-		setAdditiveBlend(false); // ropes always alpha-blend
+		setBlendMode(BLEND_NORMAL); // ropes always alpha-blend
 		float dx = x1 - x0;
 		float dy = y1 - y0;
 		float len = (float) Math.sqrt(dx * dx + dy * dy);
@@ -506,7 +561,7 @@ public class SpriteBatch
 	public void drawLine(int texture, float x0, float y0, float x1, float y1,
 						 float halfThickness, float r, float g, float b, float a)
 	{
-		setAdditiveBlend(false); // debug overlays and skid marks always alpha-blend
+		setBlendMode(BLEND_NORMAL); // debug overlays and skid marks always alpha-blend
 		float dx = x1 - x0;
 		float dy = y1 - y0;
 		float len = (float) Math.sqrt(dx * dx + dy * dy);

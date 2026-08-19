@@ -1,9 +1,12 @@
-// ti.game blend & flash demo — additive blending and damage flashes.
+// ti.game blend & flash demo — blend modes and damage flashes.
 //
-// - two rows of overlapping spark sprites with red/green/blue tints:
-//   the top row draws with normal alpha blending (overlaps cover each
-//   other), the bottom row with blend: 'add' (overlaps sum and bloom
-//   toward white) — same art, same tints, only the blend differs
+// - four rows of overlapping spark sprites with red/green/blue tints,
+//   identical except for the blend property: 'normal' (overlaps cover),
+//   'add' (overlaps sum and bloom toward white), 'multiply' (darkens
+//   what's behind — the bright meadow strip goes shadowy) and 'screen'
+//   (lightens softly, converging on white instead of blowing out)
+// - the multiply/screen rows sit on a bright meadow strip, because
+//   multiply over a near-black backdrop would just go black
 // - the sparks drift on the native idle wobble, so the overlaps shift
 //   and mix live with zero JS in the loop
 // - a row of ships shows sprite.flash(color, duration): tap one to
@@ -25,6 +28,7 @@ module.exports = function () {
 
 	var sparkSheet = Game.createSpriteSheet({ image: 'assets/spark.png', frameWidth: 16, frameHeight: 16 });
 	var shipSheet = Game.createSpriteSheet({ image: 'assets/ship.png', frameWidth: 64, frameHeight: 64 });
+	var meadowSheet = Game.createSpriteSheet({ image: 'assets/meadow.png', frameWidth: 270, frameHeight: 480, smoothing: false });
 
 	var blinkTimer = null;
 	win.addEventListener('close', function () {
@@ -44,9 +48,20 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var SPARK = Math.round(W * 0.3);
-		var SHIP = Math.round(W * 0.2);
+		var SPARK = Math.round(W * 0.24);
+		var SHIP = Math.round(W * 0.16);
 		var TINTS = ['#f44', '#4f4', '#48f'];
+
+		// Bright meadow strip behind the multiply/screen rows — multiply
+		// over the near-black window background would just go black
+		gameView.add(Game.createSprite({
+			sheet: meadowSheet,
+			x: W * 0.5,
+			y: H * 0.59,
+			width: W,
+			height: H * 0.36,
+			zIndex: -1
+		}));
 
 		// --- Blend rows: identical except for the blend property ----------
 
@@ -69,8 +84,10 @@ module.exports = function () {
 				}));
 			});
 		}
-		sparkRow(H * 0.24, 'normal');
-		sparkRow(H * 0.46, 'add');
+		sparkRow(H * 0.14, 'normal');
+		sparkRow(H * 0.30, 'add');
+		sparkRow(H * 0.50, 'multiply');
+		sparkRow(H * 0.68, 'screen');
 
 		// --- Flash row: tap a ship, watch the silhouette overlay fade -----
 
@@ -83,7 +100,7 @@ module.exports = function () {
 			var ship = Game.createSprite({
 				sheet: shipSheet,
 				x: W * (0.25 + index * 0.25),
-				y: H * 0.72,
+				y: H * 0.88,
 				width: SHIP,
 				height: SHIP,
 				zIndex: 10
@@ -113,9 +130,11 @@ module.exports = function () {
 				top: topPercent + '%'
 			}));
 		}
-		label("blend: 'normal' — overlaps cover", 12);
-		label("blend: 'add' — overlaps bloom", 34);
-		label('tap a ship to flash(color, duration)', 58);
+		label("blend: 'normal' — overlaps cover", 4);
+		label("blend: 'add' — overlaps bloom", 20);
+		label("blend: 'multiply' — darkens the backdrop", 41);
+		label("blend: 'screen' — soft lighten, no blowout", 59);
+		label('tap a ship to flash(color, duration)', 78);
 	}
 
 	win.add(gameView);

@@ -5,6 +5,34 @@
 #import "TGTextSprite.h"
 #import <math.h>
 
+TGBlendMode TGBlendModeFromString(NSString *value)
+{
+	if ([@"add" isEqualToString:value]) {
+		return TGBlendModeAdd;
+	}
+	if ([@"multiply" isEqualToString:value]) {
+		return TGBlendModeMultiply;
+	}
+	if ([@"screen" isEqualToString:value]) {
+		return TGBlendModeScreen;
+	}
+	return TGBlendModeNormal;
+}
+
+NSString *TGBlendModeName(TGBlendMode mode)
+{
+	switch (mode) {
+		case TGBlendModeAdd:
+			return @"add";
+		case TGBlendModeMultiply:
+			return @"multiply";
+		case TGBlendModeScreen:
+			return @"screen";
+		default:
+			return @"normal";
+	}
+}
+
 static const int kMaxQuads = 1000;
 static const int kFloatsPerVertex = 8; // x, y, u, v, r, g, b, a
 static const int kVerticesPerQuad = 6; // two triangles
@@ -104,7 +132,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float *_vertices;
 	int _quadCount;
 	GLint _currentTexture;
-	BOOL _additiveBlend;
+	TGBlendMode _blendMode;
 
 	GLuint _program;
 	GLuint _glowProgram;
@@ -163,21 +191,38 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	_quadCount = 0;
 	_currentTexture = -1;
 	_activeProgram = 0;
-	_additiveBlend = NO;
+	_blendMode = TGBlendModeNormal;
 	[self useProgram:_program];
 	glActiveTexture(GL_TEXTURE0);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-- (void)setAdditiveBlend:(BOOL)additive
+- (void)setBlendMode:(TGBlendMode)mode
 {
-	if (additive == _additiveBlend) {
+	if (mode == _blendMode) {
 		return;
 	}
 	[self flush];
-	glBlendFunc(GL_ONE, additive ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
-	_additiveBlend = additive;
+	switch (mode) {
+		case TGBlendModeAdd:
+			glBlendFunc(GL_ONE, GL_ONE);
+			break;
+		case TGBlendModeMultiply:
+			// dst * (src + 1 - srcA): multiplies where the sprite is
+			// opaque, leaves the backdrop alone where it's transparent
+			glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA);
+			break;
+		case TGBlendModeScreen:
+			// src + dst * (1 - src): inverse-multiply, converges on
+			// white instead of overshooting like add does
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+			break;
+		default:
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+			break;
+	}
+	_blendMode = mode;
 }
 
 - (void)setScreenSpace:(BOOL)fixed
@@ -235,7 +280,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 		return;
 	}
 	[self setScreenSpace:s.screenFixed];
-	[self setAdditiveBlend:s.additiveBlend];
+	[self setBlendMode:s.blendMode];
 	[self ensureCapacity:[sheet textureId]];
 
 	float w = [s drawWidth];
@@ -360,7 +405,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 		return;
 	}
 	[self setScreenSpace:s.screenFixed];
-	[self setAdditiveBlend:s.additiveBlend];
+	[self setBlendMode:s.blendMode];
 	GLint texture = [sheet textureId];
 
 	float ax = s.anchorX * layout.width;
@@ -472,7 +517,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 				toX:(float)x1 y:(float)y1
 		  halfWidth:(float)halfWidth alpha:(float)alpha
 {
-	[self setAdditiveBlend:NO]; // ropes always alpha-blend
+	[self setBlendMode:TGBlendModeNormal]; // ropes always alpha-blend
 	float dx = x1 - x0;
 	float dy = y1 - y0;
 	float len = sqrtf(dx * dx + dy * dy);
@@ -495,7 +540,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
    halfThickness:(float)halfThickness
 			   r:(float)r g:(float)g b:(float)b a:(float)a
 {
-	[self setAdditiveBlend:NO]; // debug overlays and skid marks always alpha-blend
+	[self setBlendMode:TGBlendModeNormal]; // debug overlays and skid marks always alpha-blend
 	float dx = x1 - x0;
 	float dy = y1 - y0;
 	float len = sqrtf(dx * dx + dy * dy);

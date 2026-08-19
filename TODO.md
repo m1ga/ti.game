@@ -29,9 +29,12 @@ traffic in the loop.
       sprite instead of stretching — `repeat: true` on the sheet,
       `tileRepeat: true|'x'|'y'` on the sprite (skate street/skyline and
       raised road use it). Power-of-two textures only on ES 2.0.
-- [ ] More blend modes: `blend: 'multiply'` (shadows, darkening) and
+- [x] More blend modes: `blend: 'multiply'` (shadows, darkening) and
       `'screen'` (soft light) — more glBlendFunc cases behind the
-      existing per-sprite/emitter blend switching.
+      existing per-sprite/emitter blend switching; premultiplied-alpha
+      funcs (DST_COLOR, ONE_MINUS_SRC_ALPHA) / (ONE, ONE_MINUS_SRC_COLOR)
+      so transparent texels leave the backdrop alone. The blend demo shows
+      all four modes over a bright meadow strip.
 
 ## 3. Collision staples
 

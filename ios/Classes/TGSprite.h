@@ -2,6 +2,7 @@
 //  ti.game — engine (iOS twin of android/src/ti/game/engine/Sprite.java)
 //
 #import <Foundation/Foundation.h>
+#import "TGSpriteBatch.h" // TGBlendMode
 
 @class TGAnimation;
 @class TGScene;
@@ -70,10 +71,10 @@
 @property (atomic, assign) float flashDuration;  // seconds
 @property (atomic, assign) float flashRemaining; // seconds
 
-// Additive blending (glows, fire, lasers): the sprite's colors add
-// onto the backdrop instead of covering it. The batcher flushes once
-// per blend-mode change, so group additive sprites by zIndex.
-@property (atomic, assign) BOOL additiveBlend;
+// Blend mode: add for glows/fire/lasers, multiply for shadows/darkening,
+// screen for soft light. The batcher flushes once per blend-mode change,
+// so group same-blend sprites by zIndex.
+@property (atomic, assign) TGBlendMode blendMode;
 
 // Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
 // frame draws behind the sprite (selection highlights, power-ups).

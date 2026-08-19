@@ -8,6 +8,7 @@ import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.util.TiConvert;
 
 import ti.game.engine.ParticleEmitter;
+import ti.game.engine.SpriteBatch;
 
 /**
  * JS-facing particle emitter:
@@ -385,18 +386,19 @@ public class EmitterProxy extends KrollProxy
 		}
 	}
 
-	/** 'add' = additive blending — particles brighten instead of cover
-	 *  (fire, sparks, magic); anything else = normal alpha blending. */
+	/** 'add' = particles brighten instead of cover (fire, sparks,
+	 *  magic), 'multiply' darkens (smoke, dust), 'screen' lightens
+	 *  softly; anything else = normal alpha blending. */
 	@Kroll.setProperty
 	public void setBlend(String value)
 	{
-		emitter.additiveBlend = "add".equals(value);
+		emitter.blendMode = SpriteBatch.blendModeFromString(value);
 	}
 
 	@Kroll.getProperty
 	public String getBlend()
 	{
-		return emitter.additiveBlend ? "add" : "normal";
+		return SpriteBatch.blendModeName(emitter.blendMode);
 	}
 
 	/** Color.parseColor can't handle Titanium's '#rgb' shorthand. */

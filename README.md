@@ -29,7 +29,8 @@ identical on both platforms.
 - Fullscreen camera effects (`cameraEffect`) — tint and glitch shader
   passes over the whole rendered scene; sprite glow highlights
   (`glowColor`/`glowBlur`), per-sprite color tinting (`tintColor`),
-  damage flashes (`flash()`) and additive blending (`blend: 'add'`)
+  damage flashes (`flash()`) and blend modes (`blend:
+  'add'`/`'multiply'`/`'screen'`)
 - Bitmap-font text sprites (`createText`) — HUD scores and labels inside
   the GL scene with a built-in pixel font, BMFont/AngelCode or monospace
   grid fonts (`createFont`); `screenFixed` pins any sprite to the surface
@@ -176,16 +177,18 @@ sources instead of discovering them in a profiler:
 
 - *Texture switches* — sprites drawn back-to-back from different sheets.
   One shared atlas = one batch.
-- *Blend mode changes* — every `'normal'` ↔ `'add'` transition in draw
-  order flushes. Alternating additive and normal sprites degrades toward
-  one draw call per sprite; group additive sprites into their own
-  `zIndex` band so each frame switches twice, not constantly.
+- *Blend mode changes* — every transition between blend modes
+  (`'normal'`/`'add'`/`'multiply'`/`'screen'`) in draw order flushes.
+  Alternating blend modes sprite-by-sprite degrades toward one draw call
+  per sprite; group same-blend sprites into their own `zIndex` band so
+  each frame switches a handful of times, not constantly.
 - *Glow and flash* — each glowing sprite switches to the silhouette
   shader and back: **2 extra draw calls per glowing sprite per frame**
   (plus 2 more while a `flash()` runs), even on a shared texture. A few
   highlights are free; putting a glow on every coin in a level is not.
 - *Ropes, skid marks and debug overlays* always draw with normal
-  blending, so interleaving them with additive content flushes too.
+  blending, so interleaving them with non-normal blend content flushes
+  too.
 
 **Collision cost** is O(colliders × candidates) per frame — each sprite
 with `collidesWith`/`solidWith` is tested against sprites carrying a
@@ -507,7 +510,7 @@ a feature set — find the one closest to your game and start there:
 | `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground |
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
 | `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
-| `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` (overlaps bloom, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
+| `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` vs `'multiply'` vs `'screen'` (the multiply/screen rows sit on a bright meadow strip, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
 | `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
 | `swept.js` | Swept AABB comparison: two lanes fire identical bullets at a thin wall with rising speed — the `swept: false` lane starts tunneling straight through, the `swept: true` lane never misses |
 | `zones.js` | `collision`/`collisionend` lifecycle: a water pool that tints the hero while he's inside, a pressure plate holding a door open exactly while the ball rests on it, and a remove-ball button showing that deleting a contact partner still fires the exit |
@@ -685,7 +688,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `glowColor` | Glow tint, e.g. `'#ffc94d'` — a tinted, blurred silhouette drawn behind the sprite (selection highlights, power-ups); follows shape, rotation and opacity |
 | `glowBlur` | Glow blur radius in px; `0` = off. An active glow costs 2 extra draw calls per sprite per frame (shader switches) — fine for a few highlights, not for every coin on screen |
 | `glowOpacity` | Halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur |
-| `blend` | `'normal'`/`'add'` — additive blending brightens the backdrop instead of covering it (glows, fire, lasers); costs one batch flush per mode change, so group additive sprites by `zIndex` |
+| `blend` | `'normal'`/`'add'`/`'multiply'`/`'screen'` — `add` brightens the backdrop instead of covering it (glows, fire, lasers), `multiply` darkens it (shadows, stains), `screen` lightens softly without blowing out to white (fog, soft light); costs one batch flush per mode change, so group same-blend sprites by `zIndex` |
 
 #### Methods
 
@@ -768,7 +771,7 @@ All properties are live.
 | Group | Properties |
 |---|---|
 | Placement | `x`, `y`, `target` (sprite to follow, null to detach), `offsetX`, `offsetY`, `zIndex` |
-| Look | `sheet`, `frame`, `size` (base px width; 0 = frame size), `tint`, `blend` (`'normal'`/`'add'` — additive particles brighten instead of cover: fire, sparks, magic), `startScale`/`endScale`, `startOpacity`/`endOpacity` |
+| Look | `sheet`, `frame`, `size` (base px width; 0 = frame size), `tint`, `blend` (`'normal'`/`'add'`/`'multiply'`/`'screen'` — additive particles brighten instead of cover: fire, sparks, magic; multiply darkens: smoke, dust; screen lightens softly), `startScale`/`endScale`, `startOpacity`/`endOpacity` |
 | Motion | `speed` (px/s, randomized 50–100%), `angle` (0 = up, clockwise), `spread` (degrees), `gravity` (px/s²), `lifetime` (ms) |
 | Emission | `rate` (particles/s), `emitting`, `maxParticles` (default 200, max 1000) |
 
