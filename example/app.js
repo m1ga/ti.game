@@ -17,6 +17,7 @@
 //   Flip: flipX/flipY from movement — patrols turn around, tap flips gravity
 //   Text: bitmap-font labels in the GL scene — HUD, world signs, text buttons
 //   Swept: fast bullets vs a thin wall — swept: true stops the tunneling
+//   Path & chain: native followPath circuits + play(name, { then }) chains
 //   Zones: collision/collisionend lifecycle — water tint, pressure-plate door
 
 var demos = [
@@ -40,7 +41,8 @@ var demos = [
 	{ title: 'Time scale', start: require('/timescale') },
 	{ title: 'Text', start: require('/text') },
 	{ title: 'Swept collision', start: require('/swept') },
-	{ title: 'Trigger zones', start: require('/zones') }
+	{ title: 'Trigger zones', start: require('/zones') },
+	{ title: 'Path & chain', start: require('/path') }
 ];
 
 var win = Ti.UI.createWindow({

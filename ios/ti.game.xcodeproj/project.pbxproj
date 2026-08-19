@@ -63,6 +63,8 @@
 		A1B2C3D40F04000000000000 /* TiGameSpriteSheetProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40F02000000000000 /* TiGameSpriteSheetProxy.m */; };
 		A1B2C3D41003000000000000 /* TGParticleEmitter.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41001000000000000 /* TGParticleEmitter.h */; };
 		A1B2C3D41004000000000000 /* TGParticleEmitter.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41002000000000000 /* TGParticleEmitter.m */; };
+		A1B2C3D42203000000000000 /* TGPath.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42201000000000000 /* TGPath.h */; };
+		A1B2C3D42204000000000000 /* TGPath.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42202000000000000 /* TGPath.m */; };
 		A1B2C3D41603000000000000 /* TGPostEffect.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41601000000000000 /* TGPostEffect.h */; };
 		A1B2C3D41604000000000000 /* TGPostEffect.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41602000000000000 /* TGPostEffect.m */; };
 		A1B2C3D41103000000000000 /* TGRope.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41101000000000000 /* TGRope.h */; };
@@ -141,6 +143,8 @@
 		A1B2C3D40F02000000000000 /* TiGameSpriteSheetProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameSpriteSheetProxy.m"; path = "Classes/TiGameSpriteSheetProxy.m"; sourceTree = "<group>"; };
 		A1B2C3D41001000000000000 /* TGParticleEmitter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGParticleEmitter.h"; path = "Classes/TGParticleEmitter.h"; sourceTree = "<group>"; };
 		A1B2C3D41002000000000000 /* TGParticleEmitter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGParticleEmitter.m"; path = "Classes/TGParticleEmitter.m"; sourceTree = "<group>"; };
+		A1B2C3D42201000000000000 /* TGPath.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGPath.h"; path = "Classes/TGPath.h"; sourceTree = "<group>"; };
+		A1B2C3D42202000000000000 /* TGPath.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGPath.m"; path = "Classes/TGPath.m"; sourceTree = "<group>"; };
 		A1B2C3D41601000000000000 /* TGPostEffect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGPostEffect.h"; path = "Classes/TGPostEffect.h"; sourceTree = "<group>"; };
 		A1B2C3D41602000000000000 /* TGPostEffect.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGPostEffect.m"; path = "Classes/TGPostEffect.m"; sourceTree = "<group>"; };
 		A1B2C3D41101000000000000 /* TGRope.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGRope.h"; path = "Classes/TGRope.h"; sourceTree = "<group>"; };
@@ -243,6 +247,8 @@
 				A1B2C3D40F02000000000000 /* TiGameSpriteSheetProxy.m */,
 				A1B2C3D41001000000000000 /* TGParticleEmitter.h */,
 				A1B2C3D41002000000000000 /* TGParticleEmitter.m */,
+				A1B2C3D42201000000000000 /* TGPath.h */,
+				A1B2C3D42202000000000000 /* TGPath.m */,
 				A1B2C3D41601000000000000 /* TGPostEffect.h */,
 				A1B2C3D41602000000000000 /* TGPostEffect.m */,
 				A1B2C3D41101000000000000 /* TGRope.h */,
@@ -293,6 +299,7 @@
 				24DD6CF91134B3F500162E58 /* TiGameModule.h in Headers */,
 				24DE9E1111C5FE74003F90F6 /* TiGameModuleAssets.h in Headers */,
 				A1B2C3D41003000000000000 /* TGParticleEmitter.h in Headers */,
+				A1B2C3D42203000000000000 /* TGPath.h in Headers */,
 				A1B2C3D41603000000000000 /* TGPostEffect.h in Headers */,
 				A1B2C3D41103000000000000 /* TGRope.h in Headers */,
 				A1B2C3D41203000000000000 /* TGSound.h in Headers */,
@@ -394,6 +401,7 @@
 				24DD6CFA1134B3F500162E58 /* TiGameModule.m in Sources */,
 				24DE9E1211C5FE74003F90F6 /* TiGameModuleAssets.m in Sources */,
 				A1B2C3D41004000000000000 /* TGParticleEmitter.m in Sources */,
+				A1B2C3D42204000000000000 /* TGPath.m in Sources */,
 				A1B2C3D41604000000000000 /* TGPostEffect.m in Sources */,
 				A1B2C3D41104000000000000 /* TGRope.m in Sources */,
 				A1B2C3D41204000000000000 /* TGSound.m in Sources */,

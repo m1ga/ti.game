@@ -225,6 +225,16 @@ public class Sprite
 	private Animation currentAnimation;
 	private float animationTime = 0f;
 	private boolean playing = false;
+	// Chained follow-ups (play(name, { then: ... })): each queued name
+	// auto-plays as the previous non-looping animation finishes.
+	private final java.util.ArrayDeque<String> animationQueue = new java.util.ArrayDeque<>();
+
+	// Path following (followPath): a precomputed polyline walked at
+	// constant speed each frame; null = not following. The walk happens in
+	// update(), so path movement counts into frameDelta (path platforms
+	// carry riders) and composes with idle wobble like any other motion.
+	public volatile Path path;
+	private final float[] pathOut = new float[3];
 
 	// Active tweens, ticked by the render loop
 	private final CopyOnWriteArrayList<Tween> tweens = new CopyOnWriteArrayList<>();
@@ -239,6 +249,7 @@ public class Sprite
 	public interface SpriteEventListener {
 		void onAnimationComplete(Sprite sprite, String animationName);
 		void onTweenComplete(Sprite sprite);
+		void onPathComplete(Sprite sprite);
 		void onCollision(Sprite sprite, Sprite other);
 		void onCollisionEnd(Sprite sprite, Sprite other);
 		void onLand(Sprite sprite, Sprite solid);
@@ -269,9 +280,25 @@ public class Sprite
 
 	public synchronized boolean play(String name)
 	{
+		return play(name, null);
+	}
+
+	/** Plays `name` now and queues `then` names to auto-play as each
+	 *  non-looping animation finishes — a looping animation never
+	 *  finishes, so it ends the chain. Replaces any previous queue. */
+	public synchronized boolean play(String name, String[] then)
+	{
 		Animation a = animations.get(name);
 		if (a == null || a.frames.length == 0) {
 			return false;
+		}
+		animationQueue.clear();
+		if (then != null) {
+			for (String next : then) {
+				if (next != null) {
+					animationQueue.add(next);
+				}
+			}
 		}
 		currentAnimation = a;
 		animationTime = 0f;
@@ -283,6 +310,7 @@ public class Sprite
 	public synchronized void stop()
 	{
 		playing = false;
+		animationQueue.clear();
 	}
 
 	public synchronized String currentAnimationName()
@@ -349,6 +377,25 @@ public class Sprite
 		} else if (wrapShift < 0f && x > wrapX) {
 			x += wrapShift;
 			startX += wrapShift;
+		}
+		// Path following overrides the position absolutely; between the
+		// startX capture and the frameDelta computation, so path platforms
+		// still carry their riders.
+		Path p = path;
+		if (p != null) {
+			boolean finished = p.advance(dt, pathOut);
+			x = pathOut[0];
+			y = pathOut[1];
+			if (p.rotate) {
+				rotation = pathOut[2];
+			}
+			if (finished) {
+				path = null;
+				SpriteEventListener listener = eventListener;
+				if (listener != null) {
+					listener.onPathComplete(this);
+				}
+			}
 		}
 		float flashLeft = flashRemaining;
 		if (flashLeft > 0f) {
@@ -528,8 +575,24 @@ public class Sprite
 			if (a.loop) {
 				frameIndex = frameIndex % a.frames.length;
 			} else {
-				frame = (a.endFrame >= 0) ? a.endFrame : a.frames[a.frames.length - 1];
-				playing = false;
+				// Chained follow-up (play(name, { then })): start the next
+				// queued animation instead of holding the end frame.
+				Animation next = null;
+				while (!animationQueue.isEmpty()) {
+					Animation candidate = animations.get(animationQueue.poll());
+					if (candidate != null && candidate.frames.length > 0) {
+						next = candidate;
+						break;
+					}
+				}
+				if (next != null) {
+					currentAnimation = next;
+					animationTime = 0f;
+					frame = next.frames[0];
+				} else {
+					frame = (a.endFrame >= 0) ? a.endFrame : a.frames[a.frames.length - 1];
+					playing = false;
+				}
 				SpriteEventListener listener = eventListener;
 				if (listener != null) {
 					listener.onAnimationComplete(this, a.name);

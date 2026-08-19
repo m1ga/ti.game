@@ -1,5 +1,6 @@
 #import "TGSprite.h"
 #import "TGAnimation.h"
+#import "TGPath.h"
 #import "TGScene.h"
 #import "TGSkidTrail.h"
 #import "TGSpriteSheet.h"
@@ -29,6 +30,12 @@ static _Atomic int TGIdleSequence = 0;
 	float _animationTime;
 	BOOL _playing;
 	atomic_bool _animationActive;
+	// Chained follow-ups (play:then:): each queued name auto-plays as
+	// the previous non-looping animation finishes.
+	NSMutableArray<NSString *> *_animationQueue;
+
+	// Path follow scratch buffer (render thread only)
+	float _pathOut[3];
 
 	// Active tweens, guarded by @synchronized(_tweens)
 	NSMutableArray<TGTween *> *_tweens;
@@ -67,6 +74,7 @@ static _Atomic int TGIdleSequence = 0;
 		_idlePhase = atomic_fetch_add(&TGIdleSequence, 1) * 1.7f;
 		_colliding = [NSMutableSet set];
 		_animations = [NSMutableDictionary dictionary];
+		_animationQueue = [NSMutableArray array];
 		_tweens = [NSMutableArray array];
 		atomic_init(&_animationActive, false);
 	}
@@ -102,10 +110,19 @@ static _Atomic int TGIdleSequence = 0;
 
 - (BOOL)play:(NSString *)name
 {
+	return [self play:name then:nil];
+}
+
+- (BOOL)play:(NSString *)name then:(NSArray<NSString *> *)chain
+{
 	@synchronized (self) {
 		TGAnimation *a = _animations[name];
 		if (a == nil || a.frameCount == 0) {
 			return NO;
+		}
+		[_animationQueue removeAllObjects];
+		if (chain != nil) {
+			[_animationQueue addObjectsFromArray:chain];
 		}
 		_currentAnimation = a;
 		_animationTime = 0.0f;
@@ -120,6 +137,7 @@ static _Atomic int TGIdleSequence = 0;
 {
 	@synchronized (self) {
 		_playing = NO;
+		[_animationQueue removeAllObjects];
 		atomic_store_explicit(&_animationActive, false, memory_order_release);
 	}
 }
@@ -202,6 +220,25 @@ static _Atomic int TGIdleSequence = 0;
 	} else if (wrapShift < 0.0f && self.x > self.wrapX) {
 		self.x += wrapShift;
 		startX += wrapShift;
+	}
+	// Path following overrides the position absolutely; between the
+	// startX capture and the frameDelta computation, so path platforms
+	// still carry their riders.
+	TGPath *p = self.path;
+	if (p != nil) {
+		BOOL pathFinished = [p advance:dt out:_pathOut];
+		self.x = _pathOut[0];
+		self.y = _pathOut[1];
+		if (p.rotate) {
+			self.rotation = _pathOut[2];
+		}
+		if (pathFinished) {
+			self.path = nil;
+			id<TGSpriteEventListener> pathListener = self.eventListener;
+			if (pathListener != nil) {
+				[pathListener spritePathComplete:self];
+			}
+		}
 	}
 	float flashLeft = self.flashRemaining;
 	if (flashLeft > 0.0f) {
@@ -390,10 +427,27 @@ static _Atomic int TGIdleSequence = 0;
 			if (a.loop) {
 				frameIndex = frameIndex % (NSInteger)a.frameCount;
 			} else {
-				self.frame = a.frames[a.frameCount - 1];
-				_playing = NO;
-				atomic_store_explicit(&_animationActive, false, memory_order_release);
 				finished = a;
+				// Chained follow-up (play:then:): start the next queued
+				// animation instead of holding the end frame.
+				TGAnimation *next = nil;
+				while (_animationQueue.count > 0) {
+					TGAnimation *candidate = _animations[_animationQueue[0]];
+					[_animationQueue removeObjectAtIndex:0];
+					if (candidate != nil && candidate.frameCount > 0) {
+						next = candidate;
+						break;
+					}
+				}
+				if (next != nil) {
+					_currentAnimation = next;
+					_animationTime = 0.0f;
+					self.frame = next.frames[0];
+				} else {
+					self.frame = a.frames[a.frameCount - 1];
+					_playing = NO;
+					atomic_store_explicit(&_animationActive, false, memory_order_release);
+				}
 			}
 		}
 		if (finished == nil) {

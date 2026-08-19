@@ -110,12 +110,17 @@ traffic in the loop.
 ## 9. Animation polish
 
 - [ ] Per-frame animation events (footsteps on frames 1 and 3).
-- [ ] Chaining: `play('attack', { then: 'idle' })` instead of juggling
-      `animationcomplete` handlers in JS.
-- [ ] Path following: `sprite.followPath([points], { speed, loop,
+- [x] Chaining: `play('attack', { then: 'idle' })` instead of juggling
+      `animationcomplete` handlers in JS — `then` takes a name or an
+      array; the queue plays out natively as each non-looping animation
+      finishes (a looping one ends the chain). path.js demos it.
+- [x] Path following: `sprite.followPath([points], { speed, loop,
       rotate })` with optional corner smoothing — enemy patrol routes
       and bullet arcs run natively, no per-frame bridge traffic
-      (Godot Path2D / Phaser PathFollower equivalent).
+      (Godot Path2D / Phaser PathFollower equivalent). `smoothing`
+      rounds corners via precomputed quadratic Beziers; non-looping
+      runs fire `pathcomplete`. Path movement feeds frameDelta, so
+      path-driven platforms carry riders. path.js demos it.
 
 ## Developer experience (sprinkle in between)
 

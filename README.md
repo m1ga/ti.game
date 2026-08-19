@@ -225,6 +225,18 @@ judge performance on device, not in the simulator.
   `frame` property. Non-looping animations fire `animationcomplete`; an
   optional `frame` in the definition is the sheet frame shown once the
   animation finishes (default: hold the last animation frame).
+  `play('attack', { then: 'idle' })` chains natively — each queued name
+  (a string or an array) plays as the previous non-looping animation
+  finishes, no `animationcomplete` juggling in JS.
+- **Path following**: `sprite.followPath(points, { speed, loop, rotate,
+  smoothing })` walks the sprite along the points (`{ x, y }` objects or
+  `[x, y]` pairs) natively at `speed` px/s — enemy patrol routes and
+  bullet arcs with zero per-frame bridge traffic. `loop` runs a closed
+  circuit, `rotate` turns the sprite to face along the path, `smoothing`
+  rounds corners with that radius in px (precomputed once, not per
+  frame). A non-looping run fires `pathcomplete` at the end;
+  `followPath(null)` stops in place. Path movement counts into the
+  frame delta, so a path-driven platform still carries its riders.
 - **Tweens**: `sprite.animate({ x, y, scale, rotation, opacity, glowOpacity,
   duration, delay, easing, frame })` (ms; easing from the `EASE_*` constants)
   animates natively and fires `complete`; an optional `frame` is the sheet
@@ -513,6 +525,7 @@ a feature set — find the one closest to your game and start there:
 | `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` vs `'multiply'` vs `'screen'` (the multiply/screen rows sit on a bright meadow strip, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
 | `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
 | `swept.js` | Swept AABB comparison: two lanes fire identical bullets at a thin wall with rising speed — the `swept: false` lane starts tunneling straight through, the `swept: true` lane never misses |
+| `path.js` | Path & chain: a ship on a smoothed looping circuit (`rotate: true`), a guard patrolling a sharp rectangle while its walk loop plays, tap-to-chain (`play('hop', { then: 'walk' })`, array chains on the bird), and a dog running one-shot zig-zag paths to taps with `pathcomplete` |
 | `zones.js` | `collision`/`collisionend` lifecycle: a water pool that tints the hero while he's inside, a pressure plate holding a door open exactly while the ball rests on it, and a remove-ball button showing that deleting a contact partner still fires the exit |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going |
 
@@ -694,8 +707,9 @@ mid-drag or mid-tween. All can be passed at creation.
 
 | Method | Description |
 |---|---|
-| `play(name)` | Start the named sheet animation; returns false for unknown names |
-| `stop()` | Stop the running sheet animation (the current frame stays) |
+| `play(name, options)` | Start the named sheet animation; returns false for unknown names. `options.then` (a name or array of names) chains natively: each queued animation plays as the previous non-looping one finishes — a looping animation ends the chain |
+| `stop()` | Stop the running sheet animation (the current frame stays); also drops any queued chain |
+| `followPath(points, options)` | Walk the sprite along `points` (`{x, y}` objects or `[x, y]` pairs) natively at `options.speed` px/s (default 100); `loop` = closed circuit, `rotate` = face along the path, `smoothing` = corner radius in px. Fires `pathcomplete` when a non-looping run ends; `followPath(null)` stops in place |
 | `animate(options)` | Native tween of `x`, `y`, `scale`/`scaleX`/`scaleY`, `rotation`, `opacity`, `glowOpacity` with `duration`/`delay` (ms) and `easing` (`EASE_*` constants); an optional `frame` is set once it finishes; fires `complete` |
 | `clearTweens()` | Cancel all running tweens (values stay where they are) |
 | `flash(color, duration)` | Fill the sprite's silhouette with `color` (default white) and fade it out over `duration` ms (default 150), all natively — the damage/invincibility flash a multiplicative `tintColor` can't do (white tint = no change) |
@@ -712,8 +726,9 @@ mid-drag or mid-tween. All can be passed at creation.
 | `dragend` | `x`, `y` | Finger lifted; sprite already moved natively |
 | `pinch` | `scaleX`, `scaleY` | While two-finger scaling |
 | `rotate` | `rotation` | While two-finger rotating |
-| `animationcomplete` | `animation` | Non-looping sheet animation finished |
+| `animationcomplete` | `animation` | Non-looping sheet animation finished (also fires per finished step of a `then` chain) |
 | `complete` | final transform values | Tween finished |
+| `pathcomplete` | `x`, `y` | Non-looping `followPath` run reached the end |
 | `collision` | `group`, `other`, `x`, `y` | Overlap with a `collidesWith` group began |
 | `collisionend` | `group`, `other`, `x`, `y` | That overlap ended (separation — also when the partner is removed or hidden) |
 | `land` | `x`, `y`, `other` (the solid), `group` | Landed on top of a `solidWith` solid |

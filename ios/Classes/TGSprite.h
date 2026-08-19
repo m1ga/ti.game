@@ -5,6 +5,7 @@
 #import "TGSpriteBatch.h" // TGBlendMode
 
 @class TGAnimation;
+@class TGPath;
 @class TGScene;
 @class TGSprite;
 @class TGSpriteSheet;
@@ -14,6 +15,7 @@
 @protocol TGSpriteEventListener <NSObject>
 - (void)spriteAnimationComplete:(TGSprite *)sprite animationName:(NSString *)animationName;
 - (void)spriteTweenComplete:(TGSprite *)sprite;
+- (void)spritePathComplete:(TGSprite *)sprite;
 - (void)sprite:(TGSprite *)sprite collidedWith:(TGSprite *)other;
 - (void)sprite:(TGSprite *)sprite separatedFrom:(TGSprite *)other;
 - (void)sprite:(TGSprite *)sprite landedOn:(TGSprite *)solid;
@@ -204,6 +206,12 @@
 @property (atomic, strong) TGSpriteSheet *sheet;
 @property (atomic, assign) int frame;
 
+// Path following (followPath): a precomputed polyline walked at
+// constant speed each frame; nil = not following. The walk happens in
+// update:, so path movement counts into frameDelta (path platforms
+// carry riders) and composes with idle wobble like any other motion.
+@property (atomic, strong) TGPath *path;
+
 // Set by TGScene add/remove; lets property setters mark z-order dirty
 @property (atomic, weak) TGScene *scene;
 
@@ -216,6 +224,10 @@
 
 - (void)addAnimation:(TGAnimation *)animation named:(NSString *)name;
 - (BOOL)play:(NSString *)name;
+/** Plays `name` now and queues `chain` names to auto-play as each
+ *  non-looping animation finishes — a looping animation never
+ *  finishes, so it ends the chain. Replaces any previous queue. */
+- (BOOL)play:(NSString *)name then:(NSArray<NSString *> *)chain;
 - (void)stopAnimation;
 - (NSString *)currentAnimationName;
 

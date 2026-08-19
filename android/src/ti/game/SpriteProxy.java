@@ -15,6 +15,7 @@ import java.util.Set;
 
 import ti.game.engine.Animation;
 import ti.game.engine.Easing;
+import ti.game.engine.Path;
 import ti.game.engine.Sprite;
 import ti.game.engine.SpriteBatch;
 import ti.game.engine.Tween;
@@ -1206,10 +1207,28 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 
 	// --- Sheet animation --------------------------------------------------
 
+	/** sprite.play('attack', { then: 'idle' }) chains natively: as each
+	 *  non-looping animation finishes, the next queued name plays without
+	 *  a round-trip through an animationcomplete handler. `then` accepts
+	 *  a name or an array of names; animationcomplete still fires per
+	 *  finished animation. */
 	@Kroll.method
-	public boolean play(String name)
+	public boolean play(String name, @Kroll.argument(optional = true) KrollDict options)
 	{
-		if (!sprite.play(name)) {
+		String[] then = null;
+		if (options != null && options.containsKey("then")) {
+			Object value = options.get("then");
+			if (value instanceof Object[]) {
+				Object[] raw = (Object[]) value;
+				then = new String[raw.length];
+				for (int i = 0; i < raw.length; i++) {
+					then[i] = TiConvert.toString(raw[i]);
+				}
+			} else if (value != null) {
+				then = new String[] { TiConvert.toString(value) };
+			}
+		}
+		if (!sprite.play(name, then)) {
 			Log.w(LCAT, "Unknown animation: " + name);
 			return false;
 		}
@@ -1289,6 +1308,60 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		sprite.clearTweens();
 	}
 
+	// --- Path following ---------------------------------------------------
+
+	/**
+	 * sprite.followPath(points, { speed, loop, rotate, smoothing }):
+	 * walks the sprite along the points (array of {x, y} objects or
+	 * [x, y] pairs) natively at `speed` px/s (default 100). `loop` runs
+	 * the path as a closed circuit; `rotate` turns the sprite to face
+	 * along the path (0 = up); `smoothing` rounds corners with that
+	 * radius in px. Fires 'pathcomplete' when a non-looping run ends.
+	 * followPath(null) stops following in place.
+	 */
+	@Kroll.method
+	public void followPath(Object points, @Kroll.argument(optional = true) KrollDict options)
+	{
+		if (!(points instanceof Object[])) {
+			sprite.path = null;
+			return;
+		}
+		Object[] list = (Object[]) points;
+		float[] xs = new float[list.length];
+		float[] ys = new float[list.length];
+		int count = 0;
+		for (Object point : list) {
+			if (point instanceof Map) {
+				Map<?, ?> map = (Map<?, ?>) point;
+				xs[count] = TiConvert.toFloat(map.get("x"), 0f);
+				ys[count] = TiConvert.toFloat(map.get("y"), 0f);
+				count++;
+			} else if (point instanceof Object[] && ((Object[]) point).length >= 2) {
+				Object[] pair = (Object[]) point;
+				xs[count] = TiConvert.toFloat(pair[0], 0f);
+				ys[count] = TiConvert.toFloat(pair[1], 0f);
+				count++;
+			}
+		}
+		if (count < 2) {
+			Log.w(LCAT, "followPath needs at least two points");
+			sprite.path = null;
+			return;
+		}
+		float speed = 100f;
+		boolean loop = false;
+		boolean rotate = false;
+		float smoothing = 0f;
+		if (options != null) {
+			speed = TiConvert.toFloat(options.get("speed"), 100f);
+			loop = TiConvert.toBoolean(options.get("loop"), false);
+			rotate = TiConvert.toBoolean(options.get("rotate"), false);
+			smoothing = TiConvert.toFloat(options.get("smoothing"), 0f);
+		}
+		sprite.path = Path.build(java.util.Arrays.copyOf(xs, count),
+			java.util.Arrays.copyOf(ys, count), smoothing, loop, rotate, speed);
+	}
+
 	// --- Native engine callbacks (GL thread; fireEvent is thread-safe) ----
 
 	@Override
@@ -1298,6 +1371,17 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			KrollDict data = new KrollDict();
 			data.put("animation", animationName);
 			fireEvent("animationcomplete", data);
+		}
+	}
+
+	@Override
+	public void onPathComplete(Sprite s)
+	{
+		if (hasListeners("pathcomplete")) {
+			KrollDict data = new KrollDict();
+			data.put("x", s.x);
+			data.put("y", s.y);
+			fireEvent("pathcomplete", data);
 		}
 	}
 

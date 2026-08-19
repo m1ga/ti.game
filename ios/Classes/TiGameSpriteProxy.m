@@ -1,5 +1,6 @@
 #import "TiGameSpriteProxy.h"
 #import "TGAnimation.h"
+#import "TGPath.h"
 #import "TGScene.h"
 #import "TGTween.h"
 #import "TiGameSpriteSheetProxy.h"
@@ -805,11 +806,29 @@ static NSSet<NSString *> *toGroupSet(id value)
 		}];
 }
 
+/** sprite.play('attack', { then: 'idle' }) chains natively: as each
+ *  non-looping animation finishes, the next queued name plays without
+ *  a round-trip through an animationcomplete handler. `then` accepts
+ *  a name or an array of names; animationcomplete still fires per
+ *  finished animation. */
 - (NSNumber *)play:(id)args
 {
-	ENSURE_SINGLE_ARG(args, NSString);
-	if (![self.sprite play:args]) {
-		NSLog(@"[WARN] Unknown animation: %@", args);
+	NSArray *list = [args isKindOfClass:[NSArray class]] ? args : @[ args ];
+	NSString *name = (list.count > 0) ? [TiUtils stringValue:list[0]] : nil;
+	NSMutableArray<NSString *> *chain = nil;
+	if (list.count > 1 && [list[1] isKindOfClass:[NSDictionary class]]) {
+		id then = ((NSDictionary *)list[1])[@"then"];
+		if ([then isKindOfClass:[NSArray class]]) {
+			chain = [NSMutableArray array];
+			for (id next in (NSArray *)then) {
+				[chain addObject:[TiUtils stringValue:next]];
+			}
+		} else if (then != nil) {
+			chain = [NSMutableArray arrayWithObject:[TiUtils stringValue:then]];
+		}
+	}
+	if (name == nil || ![self.sprite play:name then:chain]) {
+		NSLog(@"[WARN] Unknown animation: %@", name);
 		return @NO;
 	}
 	return @YES;
@@ -906,6 +925,56 @@ static NSSet<NSString *> *toGroupSet(id value)
 	[self.sprite clearTweens];
 }
 
+#pragma mark Path following
+
+/**
+ * sprite.followPath(points, { speed, loop, rotate, smoothing }):
+ * walks the sprite along the points (array of {x, y} objects or
+ * [x, y] pairs) natively at `speed` px/s (default 100). `loop` runs
+ * the path as a closed circuit; `rotate` turns the sprite to face
+ * along the path (0 = up); `smoothing` rounds corners with that
+ * radius in px. Fires 'pathcomplete' when a non-looping run ends.
+ * followPath(null) stops following in place.
+ */
+- (void)followPath:(id)args
+{
+	NSArray *list = [args isKindOfClass:[NSArray class]] ? args : @[];
+	id points = (list.count > 0) ? list[0] : nil;
+	if (![points isKindOfClass:[NSArray class]]) {
+		self.sprite.path = nil;
+		return;
+	}
+	NSArray *raw = points;
+	float *xs = malloc(sizeof(float) * MAX(raw.count, 1));
+	float *ys = malloc(sizeof(float) * MAX(raw.count, 1));
+	int count = 0;
+	for (id point in raw) {
+		if ([point isKindOfClass:[NSDictionary class]]) {
+			xs[count] = [TiUtils floatValue:((NSDictionary *)point)[@"x"] def:0];
+			ys[count] = [TiUtils floatValue:((NSDictionary *)point)[@"y"] def:0];
+			count++;
+		} else if ([point isKindOfClass:[NSArray class]] && ((NSArray *)point).count >= 2) {
+			xs[count] = [TiUtils floatValue:((NSArray *)point)[0] def:0];
+			ys[count] = [TiUtils floatValue:((NSArray *)point)[1] def:0];
+			count++;
+		}
+	}
+	if (count < 2) {
+		NSLog(@"[WARN] followPath needs at least two points");
+		self.sprite.path = nil;
+	} else {
+		NSDictionary *options = (list.count > 1 && [list[1] isKindOfClass:[NSDictionary class]])
+			? list[1] : nil;
+		self.sprite.path = [TGPath buildWithPointsX:xs y:ys count:count
+										  smoothing:[TiUtils floatValue:options[@"smoothing"] def:0]
+											   loop:[TiUtils boolValue:options[@"loop"] def:NO]
+											 rotate:[TiUtils boolValue:options[@"rotate"] def:NO]
+											  speed:[TiUtils floatValue:options[@"speed"] def:100]];
+	}
+	free(xs);
+	free(ys);
+}
+
 #pragma mark Native engine callbacks (render thread; fireEvent is thread-safe)
 
 - (void)spriteAnimationComplete:(TGSprite *)s animationName:(NSString *)animationName
@@ -913,6 +982,16 @@ static NSSet<NSString *> *toGroupSet(id value)
 	if ([self _hasListeners:@"animationcomplete"]) {
 		[self fireEvent:@"animationcomplete" withObject:@{
 			@"animation": (animationName != nil) ? animationName : [NSNull null]
+		}];
+	}
+}
+
+- (void)spritePathComplete:(TGSprite *)s
+{
+	if ([self _hasListeners:@"pathcomplete"]) {
+		[self fireEvent:@"pathcomplete" withObject:@{
+			@"x": @(s.x),
+			@"y": @(s.y)
 		}];
 	}
 }
