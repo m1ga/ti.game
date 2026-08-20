@@ -209,7 +209,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 }
 
 /**
- * Debug visualization: green = collision AABB (with hitboxScale),
+ * Debug visualization: green = collision AABB (with hitboxScale and the
+ * per-axis corrections),
  * blue = sprite/touch bounds (rotated), orange dot = anchor point.
  * Drawn after all sprites so overlays sit on top.
  */
@@ -249,7 +250,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 
 	// Sprite/touch bounds — blue, rotated (differs from AABB when rotated
-	// or when hitboxScale != 1)
+	// or when any of hitboxScale/hitboxScaleX/hitboxScaleY != 1)
 	float w = [s drawWidth];
 	float h = [s drawHeight];
 	if (w > 0.0f && h > 0.0f) {

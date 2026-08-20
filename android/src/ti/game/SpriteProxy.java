@@ -186,6 +186,12 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("hitboxScale")) {
 			sprite.hitboxScale = TiConvert.toFloat(options.get("hitboxScale"));
 		}
+		if (options.containsKey("hitboxScaleX")) {
+			sprite.hitboxScaleX = TiConvert.toFloat(options.get("hitboxScaleX"));
+		}
+		if (options.containsKey("hitboxScaleY")) {
+			sprite.hitboxScaleY = TiConvert.toFloat(options.get("hitboxScaleY"));
+		}
 		if (options.containsKey("hitboxShape")) {
 			setHitboxShape(TiConvert.toString(options.get("hitboxShape")));
 		}
@@ -1029,6 +1035,35 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setHitboxScale(float value)
 	{
 		sprite.hitboxScale = value;
+	}
+
+	/**
+	 * Per-axis corrections multiplied on top of hitboxScale (default 1), for
+	 * art whose useful part fills its frame by a different fraction on each
+	 * axis. Ignored by circle hitboxes, which have no axes.
+	 */
+	@Kroll.getProperty
+	public float getHitboxScaleX()
+	{
+		return sprite.hitboxScaleX;
+	}
+
+	@Kroll.setProperty
+	public void setHitboxScaleX(float value)
+	{
+		sprite.hitboxScaleX = value;
+	}
+
+	@Kroll.getProperty
+	public float getHitboxScaleY()
+	{
+		return sprite.hitboxScaleY;
+	}
+
+	@Kroll.setProperty
+	public void setHitboxScaleY(float value)
+	{
+		sprite.hitboxScaleY = value;
 	}
 
 	/** 'rect' (default) or 'circle' — balls and asteroids want circles. */

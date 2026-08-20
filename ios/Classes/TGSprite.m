@@ -63,6 +63,8 @@ static _Atomic int TGIdleSequence = 0;
 		_touchEnabled = YES;
 		_carryRiders = YES;
 		_hitboxScale = 1.0f;
+		_hitboxScaleX = 1.0f;
+		_hitboxScaleY = 1.0f;
 		_scrollFactor = 1.0f;
 		_enginePower = 600.0f;
 		_maxSpeed = 500.0f;
@@ -366,6 +368,7 @@ static _Atomic int TGIdleSequence = 0;
 {
 	float w = [self drawWidth] * fabsf(self.scaleX);
 	float h = [self drawHeight] * fabsf(self.scaleY);
+	// hitboxScaleX/Y are deliberately absent: a circle has no axes.
 	return MIN(w, h) * 0.5f * self.hitboxScale;
 }
 
@@ -392,8 +395,8 @@ static _Atomic int TGIdleSequence = 0;
 	float cosr = cosf(rad);
 	float sinr = sinf(rad);
 	float hitboxScale = self.hitboxScale;
-	float sx = self.scaleX * hitboxScale;
-	float sy = self.scaleY * hitboxScale;
+	float sx = self.scaleX * hitboxScale * self.hitboxScaleX;
+	float sy = self.scaleY * hitboxScale * self.hitboxScaleY;
 	float x = self.x;
 	float y = self.y;
 	out[0] = out[1] = FLT_MAX;
