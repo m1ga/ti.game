@@ -170,4 +170,20 @@
 - (TGSprite *)raycastFromX:(float)x0 y:(float)y0 toX:(float)x1 y:(float)y1
 					groups:(NSSet<NSString *> *)groups out:(float *)out;
 
+/**
+ * Grid A* path query (gameView.findPath): rasterizes the visible sprites
+ * whose collisionGroup is in `groups` (nil/empty = any tagged sprite)
+ * into a blocked/free grid inside the bounds rect, inflated by
+ * `clearance` px, and returns simplified waypoints as a flat
+ * {x0, y0, x1, y1, ...} NSNumber array, or nil when no route exists.
+ * Like raycast, a discrete JS-initiated query, safe from any thread.
+ */
+- (NSArray<NSNumber *> *)findPathFromX:(float)startX y:(float)startY
+								   toX:(float)goalX y:(float)goalY
+								groups:(NSSet<NSString *> *)groups
+							  cellSize:(float)cellSize clearance:(float)clearance
+								  minX:(float)minX minY:(float)minY
+								  maxX:(float)maxX maxY:(float)maxY
+							 diagonals:(BOOL)diagonals simplify:(BOOL)simplify;
+
 @end

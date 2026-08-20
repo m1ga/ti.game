@@ -452,6 +452,69 @@
 	};
 }
 
+/**
+ * gameView.findPath(from, to, options): grid A* over the visible sprites
+ * whose collisionGroup is in options.groups (omit for any tagged sprite).
+ * `from`/`to` are { x, y } world points; returns an array of { x, y }
+ * waypoints ready for sprite.followPath(), or null when no route exists.
+ * Options: cellSize (grid resolution in px, default 32), clearance
+ * (extra obstacle inflation in px — about half the walker's width keeps
+ * it from scraping corners), bounds ({ minX, minY, maxX, maxY } search
+ * rect, default the surface), diagonals (default true), simplify
+ * (line-of-sight waypoint reduction, default true). A blocked start or
+ * goal snaps to the nearest free cell a few cells out, so tapping an
+ * obstacle walks to its edge. A discrete query like raycast — run it on
+ * taps and AI timers, not per frame.
+ */
+- (id)findPath:(id)args
+{
+	NSArray *list = [args isKindOfClass:[NSArray class]] ? args : @[];
+	NSDictionary *from = (list.count > 0 && [list[0] isKindOfClass:[NSDictionary class]]) ? list[0] : nil;
+	NSDictionary *to = (list.count > 1 && [list[1] isKindOfClass:[NSDictionary class]]) ? list[1] : nil;
+	if (from == nil || to == nil) {
+		return [NSNull null];
+	}
+	NSDictionary *options = (list.count > 2 && [list[2] isKindOfClass:[NSDictionary class]]) ? list[2] : nil;
+	float cellSize = [TiUtils floatValue:options[@"cellSize"] def:32.0f];
+	float clearance = [TiUtils floatValue:options[@"clearance"] def:0.0f];
+	BOOL diagonals = [TiUtils boolValue:options[@"diagonals"] def:YES];
+	BOOL simplify = [TiUtils boolValue:options[@"simplify"] def:YES];
+	NSMutableSet<NSString *> *groups = nil;
+	if ([options[@"groups"] isKindOfClass:[NSArray class]]) {
+		groups = [NSMutableSet set];
+		for (id group in (NSArray *)options[@"groups"]) {
+			[groups addObject:[TiUtils stringValue:group]];
+		}
+	}
+	float minX = 0.0f;
+	float minY = 0.0f;
+	float maxX = self.scene.worldWidth;
+	float maxY = self.scene.worldHeight;
+	if ([options[@"bounds"] isKindOfClass:[NSDictionary class]]) {
+		NSDictionary *bounds = options[@"bounds"];
+		minX = [TiUtils floatValue:bounds[@"minX"] def:minX];
+		minY = [TiUtils floatValue:bounds[@"minY"] def:minY];
+		maxX = [TiUtils floatValue:bounds[@"maxX"] def:maxX];
+		maxY = [TiUtils floatValue:bounds[@"maxY"] def:maxY];
+	}
+	NSArray<NSNumber *> *points = [self.scene
+		findPathFromX:[TiUtils floatValue:from[@"x"] def:0.0f]
+					y:[TiUtils floatValue:from[@"y"] def:0.0f]
+				  toX:[TiUtils floatValue:to[@"x"] def:0.0f]
+					y:[TiUtils floatValue:to[@"y"] def:0.0f]
+			   groups:groups cellSize:cellSize clearance:clearance
+				 minX:minX minY:minY maxX:maxX maxY:maxY
+			diagonals:diagonals simplify:simplify];
+	if (points == nil) {
+		return [NSNull null];
+	}
+	NSMutableArray *result = [NSMutableArray arrayWithCapacity:points.count / 2];
+	for (NSUInteger i = 0; i + 1 < points.count; i += 2) {
+		[result addObject:@{ @"x": points[i], @"y": points[i + 1] }];
+	}
+	return result;
+}
+
 /** Manually pause the render loop (also happens on app resign-active). */
 - (void)pause:(id)unused
 {

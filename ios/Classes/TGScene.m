@@ -1,5 +1,6 @@
 #import "TGScene.h"
 #import "TGParticleEmitter.h"
+#import "TGPathfinder.h"
 #import "TGRope.h"
 #import "TGSkidTrail.h"
 #import "TGSprite.h"
@@ -787,6 +788,21 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	out[3] = bestNormalX;
 	out[4] = bestNormalY;
 	return best;
+}
+
+- (NSArray<NSNumber *> *)findPathFromX:(float)startX y:(float)startY
+								   toX:(float)goalX y:(float)goalY
+								groups:(NSSet<NSString *> *)groups
+							  cellSize:(float)cellSize clearance:(float)clearance
+								  minX:(float)minX minY:(float)minY
+								  maxX:(float)maxX maxY:(float)maxY
+							 diagonals:(BOOL)diagonals simplify:(BOOL)simplify
+{
+	return [TGPathfinder findInSprites:[self snapshot] groups:groups
+								startX:startX startY:startY goalX:goalX goalY:goalY
+							  cellSize:cellSize clearance:clearance
+								  minX:minX minY:minY maxX:maxX maxY:maxY
+							 diagonals:diagonals simplify:simplify];
 }
 
 /**

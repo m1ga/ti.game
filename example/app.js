@@ -9,7 +9,7 @@
 //   Asteroids: turn/thrust/shoot — Newtonian flight with screen wrapping
 //   Zelda: top-down tile level — solid house/water, depth-sorted trees
 //   Skate: endless skateboard runner — jump the walls and pits
-//   Point & click: adventure scene — walk by tapping, talk to the bird
+//   Point & click: adventure scene — tap to walk (A* around the tree), talk to the bird
 //   Particles: spark fountain, tap fireworks, smoke trail on a dragged ball
 //   Rhythm: DDR-style — catch falling gems on the beat pads
 //   Camera: dead-zone follow, bounds, zoom buttons and screen shake
@@ -21,6 +21,7 @@
 //   Raycast: line of sight, ledge probes and tap hitscan via gameView.raycast
 //   Zones: collision/collisionend lifecycle — water tint, pressure-plate door
 //   Demoscene: sine text scroller, copper bars, starfield + chiptune loop
+//   Maze: A* playground — tap to route through a maze, a hound re-paths to you
 
 var demos = [
 	{ title: 'Basic demo', start: require('/basic') },
@@ -46,7 +47,8 @@ var demos = [
 	{ title: 'Trigger zones', start: require('/zones') },
 	{ title: 'Path & chain', start: require('/path') },
 	{ title: 'Raycast', start: require('/raycast') },
-	{ title: 'Demoscene', start: require('/demoscene') }
+	{ title: 'Demoscene', start: require('/demoscene') },
+	{ title: 'Maze (A*)', start: require('/maze') }
 ];
 
 var win = Ti.UI.createWindow({

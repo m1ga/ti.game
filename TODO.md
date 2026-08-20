@@ -85,11 +85,16 @@ traffic in the loop.
       — fine at 16x12, dead at 200x200).
 - [ ] Collision layer: solid tiles feed the existing solidWith/collision
       systems without per-tile sprites.
-- [ ] A* pathfinding over the collision grid:
-      `gameView.findPath(from, to)` returns waypoints ready for
-      `followPath` — a discrete query like `raycast`, no per-frame JS
-      (Godot AStar2D / GameMaker mp_grid equivalent; point-&-click and
-      topdown walk straight lines today).
+- [x] A* pathfinding: `gameView.findPath(from, to, { cellSize, groups,
+      clearance, bounds, diagonals, simplify })` returns waypoints ready
+      for `followPath` — a discrete query like `raycast`, no per-frame
+      JS (Godot AStar2D / GameMaker mp_grid equivalent). Rasterizes the
+      `collisionGroup` sprites into a grid per query (no corner-cutting
+      diagonals, octile A*, line-of-sight waypoint simplification;
+      blocked start/goal snaps to the nearest free cell); when the
+      tilemap collision layer lands it should feed the same grid.
+      pointclick walks around the oak with it; maze.js is the full
+      showcase (route visualization, tap-to-walk, a re-pathing chaser).
 
 ## 5. Font rendering
 

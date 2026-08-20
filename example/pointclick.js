@@ -2,8 +2,10 @@
 //
 // - a pixel meadow with an oak on the left; a bird with a 3-frame idle
 //   animation (perch, blink, tail flick) sits in the canopy
-// - tap anywhere on the meadow and the player walks there (a linear
-//   tween sized by distance, walk animation while moving)
+// - tap anywhere on the meadow and the player walks there: findPath
+//   routes around the oak's trunk (an invisible obstacle box) and
+//   followPath walks the waypoints natively — tap behind the tree and
+//   the player circles it instead of clipping through
 // - tap the bird and a verb coin appears: a hand and a talk icon.
 //   Hand: "You can't take the bird" — Talk: "Tschirp tschirp"
 // - the player and the tree share a zIndex with `ySort`, so walking
@@ -74,6 +76,21 @@ module.exports = function () {
 			ySort: true
 		});
 		gameView.add(tree);
+
+		// The trunk as a pathfinding obstacle: an invisible box (opacity 0
+		// keeps it out of rendering and touch, but findPath and raycast
+		// still see it) around where the player's CENTER may not go — the
+		// canopy stays free, so walking behind the tree still works.
+		gameView.add(Game.createSprite({
+			sheet: treeSheet,
+			opacity: 0,
+			touchEnabled: false,
+			x: tree.x,
+			y: H * 0.62 - PLAYER_H / 2,
+			width: TREE_W * 0.35,
+			height: PLAYER_H * 0.8,
+			collisionGroup: 'obstacle'
+		}));
 
 		var bird = Game.createSprite({
 			sheet: birdSheet,
@@ -178,26 +195,37 @@ module.exports = function () {
 			say('Tschirp tschirp');
 		});
 
+		// The walkable floor in sprite-center coordinates (tap points are
+		// feet positions; the sprite walks by its center)
+		var WALK_BOUNDS = {
+			minX: W * 0.06,
+			minY: WALK_TOP - PLAYER_H / 2,
+			maxX: W * 0.94,
+			maxY: H * 0.95 - PLAYER_H / 2
+		};
+
 		function walkTo(x, y) {
-			var targetX = Math.min(Math.max(x, W * 0.06), W * 0.94);
-			var targetY = Math.min(Math.max(y, WALK_TOP), H * 0.95) - PLAYER_H / 2;
-			var distance = Math.sqrt(
-				Math.pow(targetX - player.x, 2) + Math.pow(targetY - player.y, 2));
-			if (distance < 4) {
+			var targetX = Math.min(Math.max(x, WALK_BOUNDS.minX), WALK_BOUNDS.maxX);
+			var targetY = Math.min(Math.max(y - PLAYER_H / 2, WALK_BOUNDS.minY), WALK_BOUNDS.maxY);
+			// A* around the trunk box; a tap on the tree snaps to its edge
+			var path = gameView.findPath(
+				{ x: player.x, y: player.y },
+				{ x: targetX, y: targetY },
+				{
+					cellSize: Math.round(W * 0.04),
+					groups: ['obstacle'],
+					clearance: PLAYER_W * 0.35,  // keep half a body off the trunk
+					bounds: WALK_BOUNDS
+				});
+			if (!path || path.length < 2) {
 				return;
 			}
-			player.scaleX = targetX < player.x ? -1 : 1;
-			player.clearTweens();
+			player.scaleX = path[1].x < player.x ? -1 : 1;
 			player.play('walk');
-			player.animate({
-				x: targetX,
-				y: targetY,
-				duration: distance / WALK_SPEED * 1000,
-				easing: Game.EASE_LINEAR
-			});
+			player.followPath(path, { speed: WALK_SPEED });
 		}
 
-		player.addEventListener('complete', function () {
+		player.addEventListener('pathcomplete', function () {
 			player.play('idle');
 		});
 

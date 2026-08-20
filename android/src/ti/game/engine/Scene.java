@@ -608,6 +608,23 @@ public class Scene
 	}
 
 	/**
+	 * Grid A* path query (gameView.findPath): rasterizes the visible
+	 * sprites whose collisionGroup is in `groups` (null/empty = any tagged
+	 * sprite) into a blocked/free grid inside the bounds rect, inflated by
+	 * `clearance` px, and returns simplified waypoints as a flat
+	 * {x0, y0, x1, y1, ...} array, or null when no route exists. Like
+	 * raycast(), a discrete JS-initiated query, safe from any thread.
+	 */
+	public float[] findPath(float startX, float startY, float goalX, float goalY,
+							Set<String> groups, float cellSize, float clearance,
+							float minX, float minY, float maxX, float maxY,
+							boolean diagonals, boolean simplify)
+	{
+		return Pathfinder.find(snapshot(), groups, startX, startY, goalX, goalY,
+			cellSize, clearance, minX, minY, maxX, maxY, diagonals, simplify);
+	}
+
+	/**
 	 * Path-of-travel overlap test for swept sprites: did the mover's box
 	 * cross the target's box at any point this frame? Relative motion, so
 	 * a fast target can't slip past a slow bullet either.

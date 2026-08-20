@@ -483,6 +483,73 @@ public class GameViewProxy extends TiViewProxy
 		return data;
 	}
 
+	/**
+	 * gameView.findPath(from, to, options): grid A* over the visible
+	 * sprites whose collisionGroup is in options.groups (omit for any
+	 * tagged sprite). `from`/`to` are { x, y } world points; returns an
+	 * array of { x, y } waypoints ready for sprite.followPath(), or null
+	 * when no route exists. Options: cellSize (grid resolution in px,
+	 * default 32), clearance (extra obstacle inflation in px — about half
+	 * the walker's width keeps it from scraping corners), bounds
+	 * ({ minX, minY, maxX, maxY } search rect, default the surface),
+	 * diagonals (default true), simplify (line-of-sight waypoint
+	 * reduction, default true). A blocked start or goal snaps to the
+	 * nearest free cell a few cells out, so tapping an obstacle walks to
+	 * its edge. A discrete query like raycast — run it on taps and AI
+	 * timers, not per frame.
+	 */
+	@Kroll.method
+	public Object[] findPath(KrollDict from, KrollDict to,
+							 @Kroll.argument(optional = true) KrollDict options)
+	{
+		if (from == null || to == null) {
+			return null;
+		}
+		float cellSize = 32f;
+		float clearance = 0f;
+		boolean diagonals = true;
+		boolean simplify = true;
+		Set<String> groupSet = null;
+		float minX = 0f;
+		float minY = 0f;
+		float maxX = scene.worldWidth;
+		float maxY = scene.worldHeight;
+		if (options != null) {
+			cellSize = TiConvert.toFloat(options.get("cellSize"), 32f);
+			clearance = TiConvert.toFloat(options.get("clearance"), 0f);
+			diagonals = TiConvert.toBoolean(options.get("diagonals"), true);
+			simplify = TiConvert.toBoolean(options.get("simplify"), true);
+			if (options.get("groups") instanceof Object[]) {
+				groupSet = new HashSet<>();
+				for (Object group : (Object[]) options.get("groups")) {
+					groupSet.add(TiConvert.toString(group));
+				}
+			}
+			KrollDict bounds = options.getKrollDict("bounds");
+			if (bounds != null) {
+				minX = TiConvert.toFloat(bounds.get("minX"), minX);
+				minY = TiConvert.toFloat(bounds.get("minY"), minY);
+				maxX = TiConvert.toFloat(bounds.get("maxX"), maxX);
+				maxY = TiConvert.toFloat(bounds.get("maxY"), maxY);
+			}
+		}
+		float[] points = scene.findPath(
+			TiConvert.toFloat(from.get("x"), 0f), TiConvert.toFloat(from.get("y"), 0f),
+			TiConvert.toFloat(to.get("x"), 0f), TiConvert.toFloat(to.get("y"), 0f),
+			groupSet, cellSize, clearance, minX, minY, maxX, maxY, diagonals, simplify);
+		if (points == null) {
+			return null;
+		}
+		Object[] result = new Object[points.length / 2];
+		for (int i = 0; i < result.length; i++) {
+			KrollDict point = new KrollDict();
+			point.put("x", points[i * 2]);
+			point.put("y", points[i * 2 + 1]);
+			result[i] = point;
+		}
+		return result;
+	}
+
 	@Kroll.getProperty
 	public float getCameraX()
 	{
