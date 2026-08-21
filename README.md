@@ -362,8 +362,17 @@ solids to *block*, collision events to *react*.
   ceilings (flappy, racing and volley demos all use these).
 - `hitboxScale` shrinks the collision box around the anchor — art rarely
   fills its frame, and slightly small hitboxes feel fairer.
+- `hitboxScaleX` / `hitboxScaleY` correct that per axis, multiplied on
+  top of `hitboxScale` (both default to 1). When a drawing fills its
+  frame by a different fraction on each axis there is no single number
+  to pick. `adventurer.png` is a 20x44 drawing in a 32x48 frame: `0.62`
+  matches his width but ends 7 px above his feet, `0.92` reaches the feet
+  but is 47% wider than he is. He needs `0.62` on X and `0.92` on Y.
+  Because they multiply, `hitboxScale` stays the overall adjustment and
+  these two are corrections on top of it.
 - `hitboxShape: 'circle'` makes the hitbox a circle (radius = half the
-  smaller drawn side × `hitboxScale`) — for balls and asteroids. Circle
+  smaller drawn side × `hitboxScale`; the per-axis scales are ignored,
+  since a circle has no axes) — for balls and asteroids. Circle
   sprites also resolve against solids along the contact normal, so a
   ball bounces off a corner diagonally instead of like a box (the volley
   ball and the asteroids use it), and their touch area is round.
@@ -682,6 +691,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `collisionGroup` | This sprite's group tag (what others test against) |
 | `collidesWith` | Groups that fire `collision`/`collisionend` events on overlap |
 | `hitboxScale` | Shrinks the hitbox around the anchor (default 1); slightly small hitboxes feel fairer |
+| `hitboxScaleX` / `hitboxScaleY` | Per-axis corrections multiplied on top of `hitboxScale` (default 1), for art that fills its frame by a different fraction on each axis; ignored by circle hitboxes |
 | `hitboxShape` | `'rect'` (default) or `'circle'` — circles also bounce off solid corners along the contact normal |
 | `swept` | Movement is collision-tested as a path (swept AABB) — fast bullets stop tunneling through thin targets and solids |
 | `debug` | Draw this sprite's collision shapes and anchor |
