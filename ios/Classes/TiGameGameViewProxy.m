@@ -49,6 +49,12 @@
 	return [self viewAttached] ? (TiGameGameView *)[self view] : nil;
 }
 
+- (void)viewWillDetach
+{
+	[[self gameView] shutdownRendering];
+	[super viewWillDetach];
+}
+
 #pragma mark Properties
 
 #pragma mark Fullscreen camera effects

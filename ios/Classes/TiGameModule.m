@@ -1,9 +1,23 @@
 #import "TiGameModule.h"
 #import "TGEasing.h"
+#import "TiGameGameView.h"
 
 @implementation TiGameModule
 
 #pragma mark Internal
+
+- (void)startup
+{
+	[super startup];
+	[TiGameGameView installLiveViewRestartHook];
+	[TiGameGameView activateRuntimeContext:self.pageContext];
+}
+
+- (void)contextWasShutdown:(id<TiEvaluator>)context
+{
+	[TiGameGameView shutdownViewsForRuntimeContext:context];
+	[super contextWasShutdown:context];
+}
 
 - (id)moduleGUID
 {
