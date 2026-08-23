@@ -31,6 +31,7 @@ public class TextSprite extends Sprite
 	private volatile int align = ALIGN_LEFT;
 	private volatile float letterSpacing = 0f; // extra px between glyphs
 	private volatile float lineSpacing = 1f;   // multiplier on font lineHeight
+	private volatile float maxWidth = 0f;      // wrap width in px, 0 = no wrap
 
 	/** Immutable glyph layout in local space (origin = text block top-left). */
 	public static final class Layout
@@ -97,6 +98,17 @@ public class TextSprite extends Sprite
 		layout = null;
 	}
 
+	public float maxWidth()
+	{
+		return maxWidth;
+	}
+
+	public void setMaxWidth(float value)
+	{
+		maxWidth = Math.max(0f, value);
+		layout = null;
+	}
+
 	public void setFont(BitmapFont value)
 	{
 		font = value;
@@ -144,16 +156,17 @@ public class TextSprite extends Sprite
 		}
 		float spacing = letterSpacing;
 		float lineStep = f.lineHeight * lineSpacing;
-		String[] lines = t.split("\n", -1);
+		List<String> lines = wrapLines(f, t, spacing);
+		int lineCount = lines.size();
 
 		// First pass: place every line at x = 0 and remember its width
 		List<float[]> quads = new ArrayList<>();
 		List<Integer> frames = new ArrayList<>();
-		int[] lineGlyphCount = new int[lines.length];
-		float[] lineWidth = new float[lines.length];
+		int[] lineGlyphCount = new int[lineCount];
+		float[] lineWidth = new float[lineCount];
 		float blockWidth = 0f;
-		for (int i = 0; i < lines.length; i++) {
-			String line = lines[i];
+		for (int i = 0; i < lineCount; i++) {
+			String line = lines.get(i);
 			float lineTop = i * lineStep;
 			float pen = 0f;
 			int prev = -1;
@@ -187,7 +200,7 @@ public class TextSprite extends Sprite
 		int alignment = align;
 		if (alignment != ALIGN_LEFT) {
 			int quadIndex = 0;
-			for (int i = 0; i < lines.length; i++) {
+			for (int i = 0; i < lineCount; i++) {
 				float shift = blockWidth - lineWidth[i];
 				if (alignment == ALIGN_CENTER) {
 					shift *= 0.5f;
@@ -209,7 +222,73 @@ public class TextSprite extends Sprite
 			flat[i * 4 + 3] = q[3];
 			frameIndices[i] = frames.get(i);
 		}
-		float blockHeight = (lines.length - 1) * lineStep + f.lineHeight;
+		float blockHeight = (lineCount - 1) * lineStep + f.lineHeight;
 		return new Layout(count, flat, frameIndices, blockWidth, blockHeight);
+	}
+
+	/**
+	 * Splits the text into layout lines: hard breaks on '\n', plus soft
+	 * breaks on word boundaries when maxWidth is set. Widths use the same
+	 * pen simulation as layout (kerning, letterSpacing, missing-glyph
+	 * advance), so a wrapped line never renders wider than it measured;
+	 * the spaces around a soft break are dropped. A single word wider
+	 * than maxWidth overflows rather than breaking mid-word.
+	 */
+	private List<String> wrapLines(BitmapFont f, String t, float spacing)
+	{
+		List<String> lines = new ArrayList<>();
+		float limit = maxWidth;
+		for (String hard : t.split("\n", -1)) {
+			if (limit <= 0f) {
+				lines.add(hard);
+				continue;
+			}
+			int start = 0;
+			int lastSpace = -1; // break candidate: last space after a word
+			boolean wordSeen = false;
+			float pen = 0f;
+			int prev = -1;
+			for (int c = 0; c < hard.length(); c++) {
+				int ch = hard.charAt(c);
+				BitmapFont.Glyph g = f.glyph(ch);
+				if (g == null) {
+					pen += f.missingAdvance() + spacing;
+					prev = -1;
+				} else {
+					if (prev >= 0) {
+						pen += f.kern(prev, ch);
+					}
+					pen += g.xAdvance + spacing;
+					prev = ch;
+				}
+				if (ch == ' ') {
+					if (wordSeen) {
+						lastSpace = c;
+					}
+				} else {
+					wordSeen = true;
+				}
+				if (pen - spacing > limit && lastSpace >= 0) {
+					int end = lastSpace;
+					while (end > start && hard.charAt(end - 1) == ' ') {
+						end--;
+					}
+					lines.add(hard.substring(start, end));
+					start = lastSpace + 1;
+					while (start < hard.length() && hard.charAt(start) == ' ') {
+						start++;
+					}
+					c = start - 1; // loop increment re-enters at the new start
+					lastSpace = -1;
+					wordSeen = false;
+					pen = 0f;
+					prev = -1;
+				}
+			}
+			if (start == 0 || start < hard.length()) {
+				lines.add(hard.substring(start));
+			}
+		}
+		return lines;
 	}
 }
