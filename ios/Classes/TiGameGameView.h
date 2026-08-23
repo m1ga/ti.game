@@ -14,7 +14,13 @@
 
 @property (nonatomic, readonly) TGSceneRenderer *renderer;
 
++ (void)installLiveViewRestartHook;
++ (void)activateRuntimeContext:(id<TiEvaluator>)context;
++ (void)shutdownAllViews;
++ (void)shutdownViewsForRuntimeContext:(id<TiEvaluator>)context;
+
 - (void)pauseRendering;
 - (void)resumeRendering;
+- (void)shutdownRendering;
 
 @end

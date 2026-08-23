@@ -4,16 +4,146 @@
 #import "TGSceneRenderer.h"
 #import "TGTouchController.h"
 #import "TiGameGameViewProxy.h"
+#import <objc/runtime.h>
+
+static NSHashTable<TiGameGameView *> *TGActiveGameViews;
+static __weak id<TiEvaluator> TGActiveRuntimeContext;
+static void (*TGOriginalRebootApp)(id, SEL);
+
+static void TGRebootAppWithGameViewShutdown(id app, SEL command)
+{
+	[TiGameGameView shutdownAllViews];
+	if (TGOriginalRebootApp != NULL) {
+		TGOriginalRebootApp(app, command);
+	}
+}
+
+@interface TiGameGameView ()
++ (BOOL)registerActiveView:(TiGameGameView *)view runtimeContext:(id<TiEvaluator>)context;
++ (void)unregisterActiveView:(TiGameGameView *)view;
+@end
 
 @implementation TiGameGameView {
 	TGGLView *_glView;
 	TGTouchController *_touchController;
+	__weak id<TiEvaluator> _runtimeContext;
+	BOOL _renderingShutdown;
+	BOOL _wasAttachedToWindow;
 	int _maxFps; // held until the GL view exists
+}
+
++ (void)initialize
+{
+	if (self == [TiGameGameView class]) {
+		TGActiveGameViews = [NSHashTable weakObjectsHashTable];
+	}
+}
+
++ (void)installLiveViewRestartHook
+{
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		Class tiAppClass = NSClassFromString(@"TiApp");
+		SEL rebootSelector = NSSelectorFromString(@"rebootApp");
+		Method rebootMethod = class_getInstanceMethod(tiAppClass, rebootSelector);
+		if (rebootMethod == NULL) {
+			return;
+		}
+		IMP implementation = method_getImplementation(rebootMethod);
+		if (implementation == (IMP)TGRebootAppWithGameViewShutdown) {
+			return;
+		}
+		TGOriginalRebootApp = (void (*)(id, SEL))implementation;
+		method_setImplementation(rebootMethod, (IMP)TGRebootAppWithGameViewShutdown);
+	});
+}
+
++ (void)activateRuntimeContext:(id<TiEvaluator>)context
+{
+	NSMutableArray<TiGameGameView *> *staleViews = [NSMutableArray array];
+	@synchronized(self) {
+		TGActiveRuntimeContext = context;
+		for (TiGameGameView *view in TGActiveGameViews) {
+			if (view->_runtimeContext != context) {
+				[staleViews addObject:view];
+			}
+		}
+		for (TiGameGameView *view in staleViews) {
+			[TGActiveGameViews removeObject:view];
+		}
+	}
+
+	// stopRendering joins the render thread; never hold the registry lock
+	// while waiting for it to finish.
+	for (TiGameGameView *view in staleViews) {
+		[view shutdownRendering];
+	}
+}
+
++ (void)shutdownAllViews
+{
+	[self shutdownViewsForRuntimeContext:nil];
+}
+
++ (void)shutdownViewsForRuntimeContext:(id<TiEvaluator>)context
+{
+	NSMutableArray<TiGameGameView *> *contextViews = [NSMutableArray array];
+	@synchronized(self) {
+		for (TiGameGameView *view in TGActiveGameViews) {
+			if (context == nil || view->_runtimeContext == context) {
+				[contextViews addObject:view];
+			}
+		}
+		for (TiGameGameView *view in contextViews) {
+			[TGActiveGameViews removeObject:view];
+		}
+		if (context == nil || TGActiveRuntimeContext == context) {
+			TGActiveRuntimeContext = nil;
+		}
+	}
+
+	for (TiGameGameView *view in contextViews) {
+		[view shutdownRendering];
+	}
+}
+
++ (BOOL)registerActiveView:(TiGameGameView *)view runtimeContext:(id<TiEvaluator>)context
+{
+	@synchronized(self) {
+		if (TGActiveRuntimeContext != nil && TGActiveRuntimeContext != context) {
+			return NO;
+		}
+		if (TGActiveRuntimeContext == nil) {
+			TGActiveRuntimeContext = context;
+		}
+		[TGActiveGameViews addObject:view];
+		return YES;
+	}
+}
+
++ (void)unregisterActiveView:(TiGameGameView *)view
+{
+	@synchronized(self) {
+		[TGActiveGameViews removeObject:view];
+	}
 }
 
 - (TGGLView *)glView
 {
 	if (_glView == nil) {
+		@synchronized(self) {
+			if (_renderingShutdown) {
+				return nil;
+			}
+		}
+		_runtimeContext = self.proxy.pageContext;
+		BOOL mayStartRendering = [TiGameGameView registerActiveView:self runtimeContext:_runtimeContext];
+		if (!mayStartRendering) {
+			@synchronized(self) {
+				_renderingShutdown = YES;
+			}
+			return nil;
+		}
 		TGScene *scene = ((TiGameGameViewProxy *)self.proxy).scene;
 		_renderer = [[TGSceneRenderer alloc] initWithScene:scene viewProxy:self.proxy];
 		_glView = [[TGGLView alloc] initWithFrame:self.bounds renderer:_renderer];
@@ -33,7 +163,7 @@
 
 - (void)dealloc
 {
-	[_glView stopRendering];
+	[self shutdownRendering];
 }
 
 - (void)frameSizeChanged:(CGRect)frame bounds:(CGRect)bounds
@@ -42,14 +172,65 @@
 	[TiUtils setView:[self glView] positionRect:bounds];
 }
 
+- (void)didMoveToWindow
+{
+	[super didMoveToWindow];
+	if (self.window != nil) {
+		_wasAttachedToWindow = YES;
+	} else if (_wasAttachedToWindow) {
+		// Normal view removal must not rely on dealloc; Titanium may retain
+		// the proxy hierarchy beyond the visible window's lifetime.
+		[self shutdownRendering];
+	}
+}
+
 - (void)pauseRendering
 {
-	[_glView pauseRendering];
+	@synchronized(self) {
+		if (!_renderingShutdown) {
+			[_glView pauseRendering];
+		}
+	}
 }
 
 - (void)resumeRendering
 {
-	[_glView resumeRendering];
+	@synchronized(self) {
+		if (!_renderingShutdown) {
+			[_glView resumeRendering];
+		}
+	}
+}
+
+- (void)shutdownRendering
+{
+	TGGLView *glView;
+	@synchronized(self) {
+		if (_renderingShutdown) {
+			return;
+		}
+		_renderingShutdown = YES;
+		glView = _glView;
+	}
+
+	[TiGameGameView unregisterActiveView:self];
+	[glView stopRendering];
+
+	void (^releaseViewResources)(void) = ^{
+		[glView removeFromSuperview];
+		@synchronized(self) {
+			if (_glView == glView) {
+				_glView = nil;
+				_touchController = nil;
+				_renderer = nil;
+			}
+		}
+	};
+	if ([NSThread isMainThread]) {
+		releaseViewResources();
+	} else {
+		dispatch_async(dispatch_get_main_queue(), releaseViewResources);
+	}
 }
 
 #pragma mark Properties

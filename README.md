@@ -200,6 +200,13 @@ negligible.
 engine; if JS only reacts to events and sets properties, you get native
 performance for free.
 
+**LiveView.** A LiveView reload replaces Titanium's JavaScript runtime. The
+module automatically retires every `GameView` render loop owned by the old
+runtime before the reloaded app creates a new one. Repeated reloads therefore
+keep a single native game loop instead of accumulating GL/render threads. Your
+app should still clear its own JavaScript timers and close unrelated resources
+when appropriate; no special cleanup is required for the `GameView` renderer.
+
 **iOS Simulator.** The simulator renders at a 1x logical drawable, because its
 translated OpenGL path is disproportionately expensive at a 3x Retina backing
 size. Real iPhone and iPad builds keep the device's native screen scale. Even

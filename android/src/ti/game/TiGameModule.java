@@ -34,6 +34,7 @@ public class TiGameModule extends KrollModule
 	public TiGameModule()
 	{
 		super();
+		TiGameView.beginRuntimeGeneration();
 	}
 
 	@Kroll.onAppCreate

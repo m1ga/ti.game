@@ -3,8 +3,15 @@ package ti.game;
 import android.app.Activity;
 import android.graphics.Color;
 import android.opengl.GLSurfaceView;
+import android.view.ViewGroup;
+import android.view.ViewParent;
+
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 
 import org.appcelerator.kroll.KrollDict;
+import org.appcelerator.kroll.common.TiMessenger;
+import org.appcelerator.titanium.TiApplication;
 import org.appcelerator.titanium.TiBaseActivity;
 import org.appcelerator.titanium.TiC;
 import org.appcelerator.titanium.TiLifecycle;
@@ -24,10 +31,62 @@ import ti.game.engine.TouchController;
  */
 public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycleEvent
 {
+	private static final Object activeViewsLock = new Object();
+	private static final ArrayList<WeakReference<TiGameView>> activeViews = new ArrayList<>();
+
 	private final GLSurfaceView glView;
 	private final SceneRenderer renderer;
 	private final Scene scene;
 	private final TouchController touchController;
+	private final TiBaseActivity lifecycleActivity;
+	private volatile boolean renderingShutdown;
+
+	/**
+	 * Titanium LiveView replaces the JS runtime without always releasing the
+	 * previous native view hierarchy. Java statics survive that soft restart,
+	 * so a new module generation can explicitly retire any old GL threads.
+	 */
+	static void beginRuntimeGeneration()
+	{
+		ArrayList<TiGameView> staleViews = new ArrayList<>();
+		synchronized (activeViewsLock) {
+			for (WeakReference<TiGameView> reference : activeViews) {
+				TiGameView view = reference.get();
+				if (view != null) {
+					staleViews.add(view);
+				}
+			}
+			activeViews.clear();
+		}
+
+		for (TiGameView view : staleViews) {
+			view.shutdownRendering();
+		}
+	}
+
+	private static void registerActiveView(TiGameView view)
+	{
+		synchronized (activeViewsLock) {
+			for (int i = activeViews.size() - 1; i >= 0; i--) {
+				if (activeViews.get(i).get() == null) {
+					activeViews.remove(i);
+				}
+			}
+			activeViews.add(new WeakReference<>(view));
+		}
+	}
+
+	private static void unregisterActiveView(TiGameView view)
+	{
+		synchronized (activeViewsLock) {
+			for (int i = activeViews.size() - 1; i >= 0; i--) {
+				TiGameView activeView = activeViews.get(i).get();
+				if (activeView == null || activeView == view) {
+					activeViews.remove(i);
+				}
+			}
+		}
+	}
 
 	public TiGameView(TiViewProxy proxy, Scene scene)
 	{
@@ -46,8 +105,12 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		setNativeView(glView);
 
 		if (activity instanceof TiBaseActivity) {
-			((TiBaseActivity) activity).addOnLifecycleEventListener(this);
+			lifecycleActivity = (TiBaseActivity) activity;
+			lifecycleActivity.addOnLifecycleEventListener(this);
+		} else {
+			lifecycleActivity = null;
 		}
+		registerActiveView(this);
 	}
 
 	public SceneRenderer getRenderer()
@@ -57,12 +120,60 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 
 	public void pauseRendering()
 	{
-		glView.onPause();
+		if (!renderingShutdown) {
+			glView.onPause();
+		}
 	}
 
 	public void resumeRendering()
 	{
-		glView.onResume();
+		if (!renderingShutdown) {
+			glView.onResume();
+		}
+	}
+
+	/** Stops and detaches the native surface exactly once. */
+	public void shutdownRendering()
+	{
+		synchronized (this) {
+			if (renderingShutdown) {
+				return;
+			}
+			renderingShutdown = true;
+		}
+
+		unregisterActiveView(this);
+		if (lifecycleActivity != null) {
+			lifecycleActivity.removeOnLifecycleEventListener(this);
+		}
+
+		Runnable detachSurface = new Runnable() {
+			@Override
+			public void run()
+			{
+				glView.setOnTouchListener(null);
+				ViewParent parent = glView.getParent();
+				if (parent instanceof ViewGroup) {
+					// GLSurfaceView stops its GLThread in onDetachedFromWindow().
+					((ViewGroup) parent).removeView(glView);
+				} else {
+					glView.onPause();
+				}
+			}
+		};
+
+		if (TiApplication.isUIThread()) {
+			detachSurface.run();
+		} else {
+			TiMessenger.postOnMain(detachSurface);
+		}
+	}
+
+	@Override
+	public void release()
+	{
+		shutdownRendering();
+		super.release();
 	}
 
 	// TiUIView installs its own OnTouchListener during processProperties
@@ -148,15 +259,19 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	@Override
 	public void onResume(Activity activity)
 	{
-		glView.onResume();
-		ti.game.engine.SoundEngine.notifyActivityResumed();
+		if (!renderingShutdown) {
+			glView.onResume();
+			ti.game.engine.SoundEngine.notifyActivityResumed();
+		}
 	}
 
 	@Override
 	public void onPause(Activity activity)
 	{
-		glView.onPause();
-		ti.game.engine.SoundEngine.notifyActivityPaused();
+		if (!renderingShutdown) {
+			glView.onPause();
+			ti.game.engine.SoundEngine.notifyActivityPaused();
+		}
 	}
 
 	@Override
@@ -172,5 +287,6 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	@Override
 	public void onDestroy(Activity activity)
 	{
+		shutdownRendering();
 	}
 }
