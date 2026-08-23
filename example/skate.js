@@ -352,6 +352,7 @@ module.exports = function () {
 			zIndex: 10,
 			gravity: GRAVITY,
 			hitboxScale: 0.9,
+			hitboxScaleX: 0.88, // the skater is narrower than he is tall — don't clip walls early
 			solidWith: ['ground', 'platform'],
 			collidesWith: ['wall', 'pit'],
 			animations: {

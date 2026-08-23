@@ -93,6 +93,10 @@ module.exports = function () {
 			width: W * 0.12, height: W * 0.18,
 			draggable: true,
 			collidesWith: ['water'],
+			// the drawing is 20x44 in its 32x48 frame — match it per axis so
+			// enter/exit fires when the hero actually touches the water
+			hitboxScaleX: 0.62,
+			hitboxScaleY: 0.92,
 			zIndex: 10
 		});
 		hero.addEventListener('collision', function (e) {

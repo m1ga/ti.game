@@ -171,6 +171,7 @@ module.exports = function () {
 			height: PIG_SIZE,
 			zIndex: 10,
 			hitboxScale: 0.7, // the art doesn't fill the frame; keep collisions fair
+			hitboxScaleY: 0.85, // and the pig is wider than he is tall
 			collidesWith: ['pipe', 'ground', 'score', 'ceiling'],
 			animations: {
 				fly: { frames: [0, 1, 2, 1], fps: 10, loop: true }

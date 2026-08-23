@@ -129,6 +129,10 @@ module.exports = function () {
 			velocityX: W * 0.15,
 			gravity: H * 2,
 			solidWith: ['solid'],
+			// the drawing is 20x44 in its 32x48 frame — match it per axis so
+			// the feet land on the floor (and the head on the ceiling)
+			hitboxScaleX: 0.62,
+			hitboxScaleY: 0.92,
 			animations: {
 				walk: { frames: [1, 2], fps: 6, loop: true }
 			}

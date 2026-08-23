@@ -123,6 +123,7 @@ module.exports = function () {
 				zIndex: 10,
 				gravity: GRAVITY,
 				hitboxScale: 0.85,
+				hitboxScaleX: 0.66, // the blob is 38px wide in its 64px frame but nearly full height
 				collisionGroup: 'player',
 				solidWith: ['floor', 'wall', 'net'],
 				animations: {

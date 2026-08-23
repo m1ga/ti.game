@@ -161,6 +161,7 @@ module.exports = function () {
 			zIndex: 10,
 			gravity: GRAVITY,
 			hitboxScale: 0.85,
+			hitboxScaleX: 0.66, // the blob is 38px wide in its 64px frame but nearly full height
 			solidWith: ['solid', 'trampoline'],
 			animations: {
 				idle: { frames: [0], fps: 1, loop: true },
