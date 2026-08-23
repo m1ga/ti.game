@@ -639,6 +639,31 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.hitboxScale);
 }
 
+/**
+ Per-axis corrections multiplied on top of hitboxScale (default 1), for art
+ whose useful part fills its frame by a different fraction on each axis.
+ Ignored by circle hitboxes, which have no axes.
+ */
+- (void)setHitboxScaleX:(id)value
+{
+	self.sprite.hitboxScaleX = [TiUtils floatValue:value def:1];
+}
+
+- (NSNumber *)hitboxScaleX
+{
+	return @(self.sprite.hitboxScaleX);
+}
+
+- (void)setHitboxScaleY:(id)value
+{
+	self.sprite.hitboxScaleY = [TiUtils floatValue:value def:1];
+}
+
+- (NSNumber *)hitboxScaleY
+{
+	return @(self.sprite.hitboxScaleY);
+}
+
 /** 'rect' (default) or 'circle' — balls and asteroids want circles. */
 - (void)setHitboxShape:(id)value
 {

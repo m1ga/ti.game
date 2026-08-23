@@ -133,6 +133,23 @@ public class Sprite
 	// art rarely fills its frame; smaller values make collisions feel fair.
 	public volatile float hitboxScale = 1f;
 
+	// Per-axis correction on top of hitboxScale, for art whose useful part
+	// fills its frame by a different fraction on each axis. example/assets/
+	// adventurer.png is a 20x44 drawing in a 32x48 frame, so no single scale
+	// describes him: 0.62 matches his width but ends 7 px above his feet,
+	// and 0.92 reaches the feet but is 47% wider than he is.
+	//
+	// They multiply hitboxScale rather than replace it, so hitboxScale stays
+	// the overall adjustment and these two are per-axis corrections on top of
+	// it -- the same relationship hitboxScale already has with scaleX/scaleY.
+	// Both default to 1, so a sprite that never sets them is unaffected and 0
+	// keeps meaning zero, as it does everywhere else in the engine.
+	//
+	// Ignored by circle hitboxes: a circle has no axes, so its radius keeps
+	// using hitboxScale alone.
+	public volatile float hitboxScaleX = 1f;
+	public volatile float hitboxScaleY = 1f;
+
 	// Swept AABB collision: the sprite's movement this frame is tested as
 	// a path, not just at the end position, so fast movers (bullets)
 	// can't tunnel through thin targets or solids between frames. Applies
@@ -527,6 +544,7 @@ public class Sprite
 	{
 		float w = drawWidth() * Math.abs(scaleX);
 		float h = drawHeight() * Math.abs(scaleY);
+		// hitboxScaleX/Y are deliberately absent: a circle has no axes.
 		return Math.min(w, h) * 0.5f * hitboxScale;
 	}
 
@@ -554,8 +572,8 @@ public class Sprite
 		double rad = Math.toRadians(rotation);
 		float cos = (float) Math.cos(rad);
 		float sin = (float) Math.sin(rad);
-		float sx = scaleX * hitboxScale;
-		float sy = scaleY * hitboxScale;
+		float sx = scaleX * hitboxScale * hitboxScaleX;
+		float sy = scaleY * hitboxScale * hitboxScaleY;
 		out[0] = out[1] = Float.MAX_VALUE;
 		out[2] = out[3] = -Float.MAX_VALUE;
 		for (int i = 0; i < 4; i++) {

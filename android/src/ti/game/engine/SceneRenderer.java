@@ -220,7 +220,8 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	private final float[] debugCenter = new float[2];
 
 	/**
-	 * Debug visualization: green = collision AABB (with hitboxScale),
+	 * Debug visualization: green = collision AABB (with hitboxScale and the
+	 * per-axis corrections),
 	 * blue = sprite/touch bounds (rotated), orange dot = anchor point.
 	 * Drawn after all sprites so overlays sit on top.
 	 */
@@ -258,8 +259,8 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			batch.drawLine(white, minX, maxY, minX, minY, t, 0.2f, 1f, 0.4f, 0.9f);
 		}
 
-		// Sprite/touch bounds — blue, rotated (differs from AABB when rotated
-		// or when hitboxScale != 1)
+		// Sprite/touch bounds — blue, rotated (differs from AABB when rotated,
+		// or when any of hitboxScale/hitboxScaleX/hitboxScaleY != 1)
 		float w = s.drawWidth();
 		float h = s.drawHeight();
 		if (w > 0f && h > 0f) {
