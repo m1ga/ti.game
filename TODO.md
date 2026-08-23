@@ -113,9 +113,13 @@ traffic in the loop.
 - [x] Bonus: `screenFixed` on any sprite — surface-coordinate rendering
       that ignores camera position/zoom/shake (touch maps back), so HUDs
       survive a scrolling camera without overlay views.
-- [ ] Word wrap: `maxWidth` on text sprites — glyph layout breaks lines
+- [x] Word wrap: `maxWidth` on text sprites — glyph layout breaks lines
       natively (on word boundaries, re-wraps on `text` updates, respects
       `align`), so dialog boxes stop needing hand-broken `\n` lines.
+      Measurement reuses the layout pen (kerning, letterSpacing), spaces
+      around a soft break are dropped, a word wider than `maxWidth`
+      overflows rather than breaking mid-word. text.js demos a dialog
+      box wrapping a live-updating string.
 
 ## 6. Input
 

@@ -50,6 +50,8 @@ typedef NS_ENUM(int, TGTextAlign) {
 - (void)setLetterSpacing:(float)letterSpacing;
 - (float)lineSpacing;   // multiplier on font lineHeight
 - (void)setLineSpacing:(float)lineSpacing;
+- (float)maxWidth;      // wrap width in px, 0 = no wrap
+- (void)setMaxWidth:(float)maxWidth;
 
 /** Sets the font and points the inherited sheet at its texture. */
 - (void)setTextFont:(TGBitmapFont *)font;

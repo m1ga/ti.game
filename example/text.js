@@ -6,6 +6,9 @@
 // - text objects ARE sprites: the title wobbles on idleAnimation with a
 //   glow, the score pops with a tween and flashes on change, the hint
 //   block is multi-line with align: 'center'
+// - word wrap: the pond dialog is one long string with maxWidth — the
+//   engine breaks lines on word boundaries and re-wraps every time the
+//   text changes (tap it to cycle messages)
 // - screenFixed: the HUD (score, title, RESET button) sticks to the
 //   surface while the camera follows the dragged ball around a world
 //   twice the screen size — the signposts are ordinary world-space text
@@ -72,6 +75,33 @@ module.exports = function () {
 			tintColor: '#5c6b8a',
 			zIndex: 2
 		}));
+
+		// --- word wrap: one long string, no hand-broken \n lines ---
+		// maxWidth is in font-space px (pre-scale), so the wrap width on
+		// screen is maxWidth * scale; assigning `text` re-wraps natively.
+
+		var WISDOM = [
+			'A WISE FROG ONCE SAID: THE POND LOOKS SMALL UNTIL YOU TRY TO HOP ACROSS IT IN A SINGLE JUMP.',
+			'EVERY MESSAGE HERE IS ONE LONG STRING - THE ENGINE BREAKS THE LINES, NOT THE SOURCE CODE.',
+			'A WORD LIKE ANTIDISESTABLISHMENTARIANISM OVERFLOWS INSTEAD OF BREAKING MID-WORD.'
+		];
+		var wisdomIndex = 0;
+		var dialog = Game.createText({
+			text: 'TAP FOR POND WISDOM',
+			maxWidth: Math.round(W * 0.55 / UNIT),
+			align: 'center',
+			x: WORLD_W / 2,
+			y: WORLD_H * 0.78,
+			scale: UNIT,
+			lineSpacing: 1.3,
+			tintColor: '#9ad1a5',
+			zIndex: 3
+		});
+		dialog.addEventListener('tap', function () {
+			dialog.text = WISDOM[wisdomIndex++ % WISDOM.length];
+			dialog.flash('#fff', 150);
+		});
+		gameView.add(dialog);
 
 		// --- the ball: drag it, camera follows, tap it to score ---
 

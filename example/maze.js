@@ -245,6 +245,8 @@ module.exports = function () {
 		var UNIT = Math.max(1, Math.round(TILE / 14));
 		gameView.add(Game.createText({
 			text: 'TAP A TILE - A* FINDS THE WAY',
+			maxWidth: Math.round(W * 0.9 / UNIT),
+			align: 'center',
 			screenFixed: true,
 			x: W / 2,
 			y: oy / 2,

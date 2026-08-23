@@ -52,6 +52,9 @@ public class TextProxy extends SpriteProxy
 		if (options.containsKey("lineSpacing")) {
 			textSprite.setLineSpacing(TiConvert.toFloat(options.get("lineSpacing")));
 		}
+		if (options.containsKey("maxWidth")) {
+			textSprite.setMaxWidth(TiConvert.toFloat(options.get("maxWidth"), 0f));
+		}
 	}
 
 	@Kroll.setProperty
@@ -134,6 +137,19 @@ public class TextProxy extends SpriteProxy
 	public float getLineSpacing()
 	{
 		return textSprite.lineSpacing();
+	}
+
+	/** Wrap width in px — lines break on word boundaries (0 = no wrap). */
+	@Kroll.setProperty
+	public void setMaxWidth(float value)
+	{
+		textSprite.setMaxWidth(value);
+	}
+
+	@Kroll.getProperty
+	public float getMaxWidth()
+	{
+		return textSprite.maxWidth();
 	}
 
 	@Override
