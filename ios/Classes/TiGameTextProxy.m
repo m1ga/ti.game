@@ -110,4 +110,15 @@
 	return @([[self textSprite] lineSpacing]);
 }
 
+/** Wrap width in px — lines break on word boundaries (0 = no wrap). */
+- (void)setMaxWidth:(id)value
+{
+	[[self textSprite] setMaxWidth:[TiUtils floatValue:value def:0]];
+}
+
+- (NSNumber *)maxWidth
+{
+	return @([[self textSprite] maxWidth]);
+}
+
 @end

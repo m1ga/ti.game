@@ -510,6 +510,9 @@ var label = Game.createText({ font: font, text: 'HELLO' });
 
 Multi-line text uses `\n` with `align: 'left'|'center'|'right'`;
 `letterSpacing` (px) and `lineSpacing` (multiplier) tune the layout.
+`maxWidth` (px) word-wraps automatically — dialog boxes need no
+hand-broken `\n` lines, and updating `text` re-wraps (a word wider
+than `maxWidth` overflows rather than breaking mid-word).
 `tools/genfont.py` rasterizes any TTF into either format. The built-in
 font covers ASCII 32..126 — stick to plain characters or ship a font
 with more glyphs.
@@ -815,6 +818,7 @@ touch, `screenFixed`, ...) plus:
 | `align` | Multi-line alignment: `'left'` (default), `'center'`, `'right'` |
 | `letterSpacing` | Extra px between glyphs (negative tightens) |
 | `lineSpacing` | Multiplier on the font's line height (default 1) |
+| `maxWidth` | Wrap width in px — lines break on word boundaries (0 = no wrap, default) |
 
 `width`/`height` read the laid-out text block size; there is no font
 "size" — scale the sprite (`scale`) like any pixel art.

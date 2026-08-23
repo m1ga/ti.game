@@ -40,6 +40,7 @@
 	TGTextAlign _align;
 	float _letterSpacing;
 	float _lineSpacing;
+	float _maxWidth;             // wrap width in px, 0 = no wrap
 	TGTextLayout *_layout;       // nil = dirty
 }
 
@@ -112,6 +113,21 @@
 	}
 }
 
+- (float)maxWidth
+{
+	@synchronized (self) {
+		return _maxWidth;
+	}
+}
+
+- (void)setMaxWidth:(float)maxWidth
+{
+	@synchronized (self) {
+		_maxWidth = MAX(0.0f, maxWidth);
+		_layout = nil;
+	}
+}
+
 - (void)setTextFont:(TGBitmapFont *)font
 {
 	@synchronized (self) {
@@ -157,7 +173,7 @@
 	}
 	float spacing = _letterSpacing;
 	float lineStep = font.lineHeight * _lineSpacing;
-	NSArray<NSString *> *lines = [text componentsSeparatedByString:@"\n"];
+	NSArray<NSString *> *lines = [self wrapLines:text font:font spacing:spacing];
 
 	// First pass: place every line at x = 0 and remember its width
 	NSMutableData *quadData = [NSMutableData data];
@@ -223,6 +239,74 @@
 									 frameData:frameData
 										 width:blockWidth
 										height:blockHeight];
+}
+
+/**
+ * Splits the text into layout lines: hard breaks on '\n', plus soft
+ * breaks on word boundaries when maxWidth is set. Widths use the same
+ * pen simulation as layout (kerning, letterSpacing, missing-glyph
+ * advance), so a wrapped line never renders wider than it measured;
+ * the spaces around a soft break are dropped. A single word wider
+ * than maxWidth overflows rather than breaking mid-word.
+ * Called under @synchronized(self).
+ */
+- (NSArray<NSString *> *)wrapLines:(NSString *)text font:(TGBitmapFont *)font spacing:(float)spacing
+{
+	NSMutableArray<NSString *> *lines = [NSMutableArray array];
+	float limit = _maxWidth;
+	for (NSString *hard in [text componentsSeparatedByString:@"\n"]) {
+		if (limit <= 0.0f) {
+			[lines addObject:hard];
+			continue;
+		}
+		NSUInteger length = hard.length;
+		NSUInteger start = 0;
+		NSInteger lastSpace = -1; // break candidate: last space after a word
+		BOOL wordSeen = NO;
+		float pen = 0.0f;
+		int prev = -1;
+		for (NSUInteger c = 0; c < length; c++) {
+			int ch = [hard characterAtIndex:c];
+			TGGlyph g;
+			if (![font glyphForCharacter:ch into:&g]) {
+				pen += [font missingAdvance] + spacing;
+				prev = -1;
+			} else {
+				if (prev >= 0) {
+					pen += [font kernFirst:prev second:ch];
+				}
+				pen += g.xAdvance + spacing;
+				prev = ch;
+			}
+			if (ch == ' ') {
+				if (wordSeen) {
+					lastSpace = (NSInteger)c;
+				}
+			} else {
+				wordSeen = YES;
+			}
+			if (pen - spacing > limit && lastSpace >= 0) {
+				NSUInteger end = (NSUInteger)lastSpace;
+				while (end > start && [hard characterAtIndex:end - 1] == ' ') {
+					end--;
+				}
+				[lines addObject:[hard substringWithRange:NSMakeRange(start, end - start)]];
+				start = (NSUInteger)lastSpace + 1;
+				while (start < length && [hard characterAtIndex:start] == ' ') {
+					start++;
+				}
+				c = start - 1; // loop increment re-enters at the new start
+				lastSpace = -1;
+				wordSeen = NO;
+				pen = 0.0f;
+				prev = -1;
+			}
+		}
+		if (start == 0 || start < length) {
+			[lines addObject:[hard substringFromIndex:start]];
+		}
+	}
+	return lines;
 }
 
 @end
