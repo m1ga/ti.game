@@ -43,6 +43,7 @@ public class SpriteSheet
 	private volatile Frame[] frames = new Frame[0];
 	private volatile int textureId = -1;
 	private volatile boolean loadFailed = false;
+	private volatile boolean disposed = false;
 	private final Loader loader;
 
 	// Grid parameters; 0 means "atlas sheet", frames come from JSON
@@ -106,7 +107,7 @@ public class SpriteSheet
 	 */
 	public void ensureLoaded(TextureManager textures)
 	{
-		if (textureId >= 0 || loadFailed) {
+		if (textureId >= 0 || loadFailed || disposed) {
 			return;
 		}
 		Bitmap bitmap = (loader != null) ? loader.load(this) : null;
@@ -127,6 +128,21 @@ public class SpriteSheet
 	{
 		textureId = -1;
 		loadFailed = false;
+	}
+
+	/**
+	 * Marks the sheet for texture deletion on the next rendered frame
+	 * (TextureManager.deleteDisposed) and blocks any re-upload. Sprites
+	 * still referencing the sheet simply stop drawing.
+	 */
+	public void dispose()
+	{
+		disposed = true;
+	}
+
+	public boolean isDisposed()
+	{
+		return disposed;
 	}
 
 	/**

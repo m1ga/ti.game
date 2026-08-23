@@ -632,6 +632,7 @@ Options: `image`, `frameWidth`/`frameHeight` **or** `atlas`,
 | `frameCount` | Number of frames (0 until loaded for grid sheets) |
 | `frameNames` | Atlas frame names, sorted (atlas sheets only) |
 | `frameIndex(name)` | Index for an atlas frame name, `-1` if unknown |
+| `unload()` | Frees the GPU texture on the next frame. Permanent — sprites still using the sheet stop drawing. Use when streaming levels: unload the old level's atlases instead of accumulating GPU memory |
 
 ### Sprite
 
@@ -810,7 +811,8 @@ Options — pick one source:
 
 `smoothing` (default true; the built-in font is always crisp) filters the
 glyph texture like a sprite sheet. `lineHeight` (read-only) is the font's
-natural line height in px. Generate either format from a TTF with
+natural line height in px. `unload()` frees the glyph texture like
+`SpriteSheet.unload()` (permanent). Generate either format from a TTF with
 `tools/genfont.py`.
 
 ### Text

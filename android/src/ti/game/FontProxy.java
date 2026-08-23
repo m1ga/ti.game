@@ -292,6 +292,23 @@ public class FontProxy extends KrollProxy implements SpriteSheet.Loader
 		return (font != null) ? font.lineHeight : 0f;
 	}
 
+	/** Frees the glyph texture on the next rendered frame. Permanent —
+	 *  text sprites still using this font stop drawing. */
+	@Kroll.method
+	public void unload()
+	{
+		if (font != null && font.sheet != null) {
+			font.sheet.dispose();
+		}
+	}
+
+	@Override
+	public void release()
+	{
+		unload();
+		super.release();
+	}
+
 	@Override
 	public String getApiName()
 	{

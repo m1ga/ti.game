@@ -19,6 +19,7 @@ import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.titanium.TiApplication;
 
 import ti.game.engine.Easing;
+import ti.game.engine.SoundEngine;
 
 @Kroll.module(name = "TiGame", id = "ti.game")
 public class TiGameModule extends KrollModule
@@ -35,6 +36,7 @@ public class TiGameModule extends KrollModule
 	{
 		super();
 		TiGameView.beginRuntimeGeneration();
+		SoundEngine.beginRuntimeGeneration();
 	}
 
 	@Kroll.onAppCreate

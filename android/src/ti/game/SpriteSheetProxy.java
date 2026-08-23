@@ -163,6 +163,27 @@ public class SpriteSheetProxy extends KrollProxy implements SpriteSheet.Loader
 		return frameNames.toArray(new String[0]);
 	}
 
+	/**
+	 * Frees the sheet's GL texture on the next rendered frame (level
+	 * streaming: unload the old level's atlases instead of accumulating
+	 * GPU memory until the context is lost). Permanent — sprites still
+	 * using the sheet stop drawing.
+	 */
+	@Kroll.method
+	public void unload()
+	{
+		if (sheet != null) {
+			sheet.dispose();
+		}
+	}
+
+	@Override
+	public void release()
+	{
+		unload();
+		super.release();
+	}
+
 	@Override
 	public String getApiName()
 	{

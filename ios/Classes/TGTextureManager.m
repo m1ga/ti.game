@@ -71,6 +71,22 @@
 	}
 }
 
+- (void)deleteDisposed
+{
+	for (NSInteger i = (NSInteger)_uploadedSheets.count - 1; i >= 0; i--) {
+		TGSpriteSheet *sheet = _uploadedSheets[i];
+		if ([sheet isDisposed]) {
+			GLint textureId = [sheet textureId];
+			if (textureId >= 0) {
+				GLuint name = (GLuint)textureId;
+				glDeleteTextures(1, &name);
+			}
+			[sheet invalidateTexture];
+			[_uploadedSheets removeObjectAtIndex:(NSUInteger)i];
+		}
+	}
+}
+
 - (void)invalidateAll
 {
 	for (TGSpriteSheet *sheet in _uploadedSheets) {

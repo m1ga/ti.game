@@ -26,6 +26,8 @@ public class SoundEngine
 	public interface LifecycleListener {
 		void onEnginePause();
 		void onEngineResume();
+		/** The engine is being retired (LiveView restart) — release native players. */
+		void onEngineShutdown();
 	}
 
 	private static SoundEngine instance;
@@ -47,6 +49,37 @@ public class SoundEngine
 	private static synchronized SoundEngine instanceOrNull()
 	{
 		return instance;
+	}
+
+	private static synchronized SoundEngine takeInstance()
+	{
+		SoundEngine engine = instance;
+		instance = null;
+		return engine;
+	}
+
+	/**
+	 * Titanium LiveView replaces the JS runtime without releasing the
+	 * previous native proxies. This singleton survives that soft restart,
+	 * so a new module generation retires the old engine: music players are
+	 * released via their lifecycle listeners and the SoundPool goes down
+	 * with every loaded sample. The next getInstance() starts fresh.
+	 */
+	public static void beginRuntimeGeneration()
+	{
+		SoundEngine engine = takeInstance();
+		if (engine == null) {
+			return;
+		}
+		for (LifecycleListener listener : engine.lifecycleListeners) {
+			listener.onEngineShutdown();
+		}
+		engine.lifecycleListeners.clear();
+		synchronized (engine.loadLock) {
+			engine.loadListeners.clear();
+			engine.earlyLoadResults.clear();
+		}
+		engine.soundPool.release();
 	}
 
 	private SoundEngine()

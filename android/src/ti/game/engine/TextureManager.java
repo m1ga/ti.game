@@ -61,6 +61,22 @@ public class TextureManager
 		}
 	}
 
+	/** Frees the GL textures of sheets disposed since the last frame. */
+	public void deleteDisposed()
+	{
+		for (int i = uploadedSheets.size() - 1; i >= 0; i--) {
+			SpriteSheet sheet = uploadedSheets.get(i);
+			if (sheet.isDisposed()) {
+				int id = sheet.textureId();
+				if (id >= 0) {
+					GLES20.glDeleteTextures(1, new int[] { id }, 0);
+				}
+				sheet.invalidateTexture();
+				uploadedSheets.remove(i);
+			}
+		}
+	}
+
 	/** After context loss: forget every texture so sheets re-upload lazily. */
 	public void invalidateAll()
 	{

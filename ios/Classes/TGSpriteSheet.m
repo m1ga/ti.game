@@ -13,6 +13,7 @@
 	atomic_size_t _publishedFrameCount;
 	atomic_int _textureId;
 	atomic_bool _loadFailed;
+	atomic_bool _disposed;
 }
 
 - (instancetype)initWithLoader:(id<TGSpriteSheetLoader>)loader
@@ -29,6 +30,7 @@
 		atomic_init(&_publishedFrameCount, 0);
 		atomic_init(&_textureId, -1);
 		atomic_init(&_loadFailed, false);
+		atomic_init(&_disposed, false);
 	}
 	return self;
 }
@@ -93,7 +95,8 @@
 - (void)ensureLoaded:(TGTextureManager *)textures
 {
 	if (atomic_load_explicit(&_textureId, memory_order_acquire) >= 0
-		|| atomic_load_explicit(&_loadFailed, memory_order_acquire)) {
+		|| atomic_load_explicit(&_loadFailed, memory_order_acquire)
+		|| atomic_load_explicit(&_disposed, memory_order_acquire)) {
 		return;
 	}
 	id<TGSpriteSheetLoader> loader = _loader;
@@ -120,6 +123,16 @@
 {
 	atomic_store_explicit(&_textureId, -1, memory_order_release);
 	atomic_store_explicit(&_loadFailed, false, memory_order_release);
+}
+
+- (void)dispose
+{
+	atomic_store_explicit(&_disposed, true, memory_order_release);
+}
+
+- (BOOL)isDisposed
+{
+	return atomic_load_explicit(&_disposed, memory_order_acquire);
 }
 
 /**

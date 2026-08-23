@@ -61,6 +61,14 @@ typedef struct {
 /** Drops the GL texture reference after context loss so it reloads. */
 - (void)invalidateTexture;
 
+/**
+ * Marks the sheet for texture deletion on the next rendered frame
+ * (TGTextureManager deleteDisposed) and blocks any re-upload. Sprites
+ * still referencing the sheet simply stop drawing.
+ */
+- (void)dispose;
+- (BOOL)isDisposed;
+
 /** Grid frame UVs; `inset` pulls interior edges in by half a texel
  *  (linear-filtered sheets) so magnified edges don't bleed neighbors. */
 + (NSData *)buildGridFramesWithImageWidth:(int)imageWidth

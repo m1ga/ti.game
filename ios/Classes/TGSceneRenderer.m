@@ -121,6 +121,9 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	glClearColor(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
 	glClear(GL_COLOR_BUFFER_BIT);
 
+	// Sheets unloaded from JS free their texture here, on the render thread
+	[_textures deleteDisposed];
+
 	// Lazy texture upload happens here, on the render thread. A shared sheet
 	// is prepared once per frame even when many sprites reference it.
 	[_preparedSheets removeAllObjects];

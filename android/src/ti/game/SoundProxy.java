@@ -35,6 +35,12 @@ public class SoundProxy extends KrollProxy
 	private volatile float volume = 1f;
 	private volatile boolean loop = false;
 
+	// The engine generation this proxy loaded into. Never re-resolved:
+	// after a LiveView restart the new engine's SoundPool reuses sample
+	// ids, so a stale proxy going through getInstance() would play (or
+	// unload!) another generation's sample.
+	private volatile SoundEngine engine;
+
 	// Effect mode (shared SoundPool)
 	private int sampleId = -1;
 	private volatile boolean loaded = false;
@@ -88,6 +94,7 @@ public class SoundProxy extends KrollProxy
 			}
 		}
 
+		engine = SoundEngine.getInstance();
 		if (music) {
 			mediaPlayer = new MediaPlayer();
 			mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
@@ -95,20 +102,25 @@ public class SoundProxy extends KrollProxy
 				.setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
 				.build());
 			if (afd != null) {
-				mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-				afd.close();
+				try {
+					mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+				} finally {
+					afd.close();
+				}
 			} else {
 				mediaPlayer.setDataSource(path);
 			}
 			mediaPlayer.prepare();
 			mediaPlayer.setLooping(loop);
 			mediaPlayer.setVolume(volume, volume);
-			SoundEngine.getInstance().addLifecycleListener(this);
+			engine.addLifecycleListener(this);
 		} else {
-			SoundEngine engine = SoundEngine.getInstance();
 			if (afd != null) {
-				sampleId = engine.load(afd, this);
-				afd.close();
+				try {
+					sampleId = engine.load(afd, this);
+				} finally {
+					afd.close();
+				}
 			} else {
 				sampleId = engine.load(path, this);
 			}
@@ -129,8 +141,8 @@ public class SoundProxy extends KrollProxy
 			if (mediaPlayer != null) {
 				mediaPlayer.start();
 			}
-		} else if (loaded) {
-			lastStreamId = SoundEngine.getInstance().play(sampleId, volume, loop);
+		} else if (loaded && engine != null) {
+			lastStreamId = engine.play(sampleId, volume, loop);
 		} else if (sampleId >= 0) {
 			pendingPlay = true; // sample still loading — play as soon as it's ready
 		}
@@ -145,8 +157,8 @@ public class SoundProxy extends KrollProxy
 			if (mediaPlayer != null && mediaPlayer.isPlaying()) {
 				mediaPlayer.pause();
 			}
-		} else {
-			SoundEngine.getInstance().pauseStream(lastStreamId);
+		} else if (engine != null) {
+			engine.pauseStream(lastStreamId);
 		}
 	}
 
@@ -168,8 +180,8 @@ public class SoundProxy extends KrollProxy
 				}
 				mediaPlayer.seekTo(0);
 			}
-		} else {
-			SoundEngine.getInstance().stopStream(lastStreamId);
+		} else if (engine != null) {
+			engine.stopStream(lastStreamId);
 			lastStreamId = 0;
 		}
 	}
@@ -190,8 +202,8 @@ public class SoundProxy extends KrollProxy
 			if (mediaPlayer != null) {
 				mediaPlayer.setVolume(value, value);
 			}
-		} else {
-			SoundEngine.getInstance().setStreamVolume(lastStreamId, value);
+		} else if (engine != null) {
+			engine.setStreamVolume(lastStreamId, value);
 		}
 	}
 
@@ -256,17 +268,35 @@ public class SoundProxy extends KrollProxy
 		}
 	}
 
+	/** The engine generation died (LiveView restart) — drop everything native. */
+	@Override
+	public void onEngineShutdown()
+	{
+		pendingPlay = false;
+		resumeOnActivityResume = false;
+		loaded = false;
+		sampleId = -1;
+		lastStreamId = 0;
+		engine = null;
+		if (mediaPlayer != null) {
+			mediaPlayer.release();
+			mediaPlayer = null;
+		}
+	}
+
 	// --- Cleanup (framework proxy teardown) ------------------------------
 
 	@Override
 	public void release()
 	{
-		if (sampleId >= 0) {
-			SoundEngine.getInstance().unload(sampleId);
+		if (sampleId >= 0 && engine != null) {
+			engine.unload(sampleId);
 			sampleId = -1;
 		}
 		if (mediaPlayer != null) {
-			SoundEngine.getInstance().removeLifecycleListener(this);
+			if (engine != null) {
+				engine.removeLifecycleListener(this);
+			}
 			mediaPlayer.release();
 			mediaPlayer = null;
 		}

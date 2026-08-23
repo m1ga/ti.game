@@ -137,6 +137,9 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		List<ParticleEmitter> emitters = scene.emittersSnapshot();
 		List<Rope> ropes = scene.ropesSnapshot();
 
+		// Sheets unloaded from JS free their texture here, on the GL thread
+		textures.deleteDisposed();
+
 		// Lazy texture upload happens here, on the GL thread
 		for (Sprite s : sprites) {
 			ensureSheetLoaded(s.sheet);

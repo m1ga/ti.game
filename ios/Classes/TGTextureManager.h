@@ -25,6 +25,9 @@
 
 - (void)track:(TGSpriteSheet *)sheet;
 
+/** Frees the GL textures of sheets disposed since the last frame. */
+- (void)deleteDisposed;
+
 /** After context recreation: forget every texture so sheets re-upload lazily. */
 - (void)invalidateAll;
 

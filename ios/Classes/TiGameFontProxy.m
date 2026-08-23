@@ -257,4 +257,16 @@ static void appendFontFrame(NSMutableData *frameData, int x, int y, int w, int h
 	return @(_font.lineHeight);
 }
 
+/** Frees the glyph texture on the next rendered frame. Permanent —
+ *  text sprites still using this font stop drawing. */
+- (void)unload:(id)unused
+{
+	[_font.sheet dispose];
+}
+
+- (void)dealloc
+{
+	[_font.sheet dispose];
+}
+
 @end

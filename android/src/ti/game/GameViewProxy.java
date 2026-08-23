@@ -53,6 +53,16 @@ public class GameViewProxy extends TiViewProxy
 		return gameView;
 	}
 
+	// TiViewProxy only nulls its own view reference; dropping ours too is
+	// what lets the GLSurfaceView (and the Activity it holds) get collected
+	// while JS keeps the proxy alive across a window close.
+	@Override
+	public void releaseViews()
+	{
+		super.releaseViews();
+		gameView = null;
+	}
+
 	public Scene getScene()
 	{
 		return scene;

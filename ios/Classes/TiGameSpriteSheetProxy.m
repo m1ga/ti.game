@@ -123,4 +123,19 @@
 	return [_frameNames copy];
 }
 
+/**
+ * Frees the sheet's GL texture on the next rendered frame (level
+ * streaming: unload the old level's atlases instead of accumulating
+ * GPU memory). Permanent — sprites still using the sheet stop drawing.
+ */
+- (void)unload:(id)unused
+{
+	[_sheet dispose];
+}
+
+- (void)dealloc
+{
+	[_sheet dispose];
+}
+
 @end
