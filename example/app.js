@@ -15,6 +15,7 @@
 //   Camera: dead-zone follow, bounds, zoom buttons and screen shake
 //   Rope: native Verlet ropes — drag the balls they hang from
 //   Flip: flipX/flipY from movement — patrols turn around, tap flips gravity
+//   Hitbox: debug overlays — full-frame vs hitboxScaleX/Y-tuned adventurer
 //   Text: bitmap-font labels in the GL scene — HUD, world signs, text buttons
 //   Swept: fast bullets vs a thin wall — swept: true stops the tunneling
 //   Path & chain: native followPath circuits + play(name, { then }) chains
@@ -32,6 +33,7 @@ var demos = [
 	{ title: 'Demoscene', start: require('/demoscene') },
 	{ title: 'Flappy pig', start: require('/flappy') },
 	{ title: 'Flip', start: require('/flip') },
+	{ title: 'Hitbox', start: require('/hitbox') },
 	{ title: 'Maze (A*)', start: require('/maze') },
 	{ title: 'Particles', start: require('/particles') },
 	{ title: 'Path & chain', start: require('/path') },

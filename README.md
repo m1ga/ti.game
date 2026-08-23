@@ -35,7 +35,7 @@ identical on both platforms.
   the GL scene with a built-in pixel font, BMFont/AngelCode or monospace
   grid fonts (`createFont`); `screenFixed` pins any sprite to the surface
   for camera-proof HUDs
-- 21 example games in `example/` covering every feature
+- 26 example demos in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -562,6 +562,7 @@ a feature set — find the one closest to your game and start there:
 | `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground, `scrollFactor` parallax (1.35x cloud shadows, a scrollFactor-0 sun pinned to the view) |
 | `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
 | `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
+| `hitbox.js` | `debug: true` overlays explained: two identical adventurers walk against a wall — the full-frame one stops a body's width early and hovers on its frame padding, the `hitboxScaleX`/`hitboxScaleY`-tuned one gets flush and lands its feet; tap to toggle the tuning live |
 | `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` vs `'multiply'` vs `'screen'` (the multiply/screen rows sit on a bright meadow strip, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
 | `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
 | `swept.js` | Swept AABB comparison: two lanes fire identical bullets at a thin wall with rising speed — the `swept: false` lane starts tunneling straight through, the `swept: true` lane never misses |
