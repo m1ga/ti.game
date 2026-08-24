@@ -43,10 +43,10 @@
 		A1B2C3D40504000000000000 /* TGSkidTrail.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40502000000000000 /* TGSkidTrail.m */; };
 		A1B2C3D40603000000000000 /* TGSprite.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40601000000000000 /* TGSprite.h */; };
 		A1B2C3D40604000000000000 /* TGSprite.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40602000000000000 /* TGSprite.m */; };
-		A1B2C3D41803000000000000 /* TGScreenOverlay.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41801000000000000 /* TGScreenOverlay.h */; };
-		A1B2C3D41804000000000000 /* TGScreenOverlay.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41802000000000000 /* TGScreenOverlay.m */; };
-		A1B2C3D41903000000000000 /* TGFrameStats.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41901000000000000 /* TGFrameStats.h */; };
-		A1B2C3D41904000000000000 /* TGFrameStats.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41902000000000000 /* TGFrameStats.m */; };
+		A1B2C3D42403000000000000 /* TGScreenOverlay.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42401000000000000 /* TGScreenOverlay.h */; };
+		A1B2C3D42404000000000000 /* TGScreenOverlay.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42402000000000000 /* TGScreenOverlay.m */; };
+		A1B2C3D42503000000000000 /* TGFrameStats.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42501000000000000 /* TGFrameStats.h */; };
+		A1B2C3D42504000000000000 /* TGFrameStats.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42502000000000000 /* TGFrameStats.m */; };
 		A1B2C3D41A03000000000000 /* TGDebugHud.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41A01000000000000 /* TGDebugHud.h */; };
 		A1B2C3D41A04000000000000 /* TGDebugHud.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41A02000000000000 /* TGDebugHud.m */; };
 		A1B2C3D40703000000000000 /* TGSpriteBatch.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40701000000000000 /* TGSpriteBatch.h */; };
@@ -133,10 +133,10 @@
 		A1B2C3D40502000000000000 /* TGSkidTrail.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGSkidTrail.m"; path = "Classes/TGSkidTrail.m"; sourceTree = "<group>"; };
 		A1B2C3D40601000000000000 /* TGSprite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGSprite.h"; path = "Classes/TGSprite.h"; sourceTree = "<group>"; };
 		A1B2C3D40602000000000000 /* TGSprite.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGSprite.m"; path = "Classes/TGSprite.m"; sourceTree = "<group>"; };
-		A1B2C3D41801000000000000 /* TGScreenOverlay.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGScreenOverlay.h"; path = "Classes/TGScreenOverlay.h"; sourceTree = "<group>"; };
-		A1B2C3D41802000000000000 /* TGScreenOverlay.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGScreenOverlay.m"; path = "Classes/TGScreenOverlay.m"; sourceTree = "<group>"; };
-		A1B2C3D41901000000000000 /* TGFrameStats.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGFrameStats.h"; path = "Classes/TGFrameStats.h"; sourceTree = "<group>"; };
-		A1B2C3D41902000000000000 /* TGFrameStats.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGFrameStats.m"; path = "Classes/TGFrameStats.m"; sourceTree = "<group>"; };
+		A1B2C3D42401000000000000 /* TGScreenOverlay.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGScreenOverlay.h"; path = "Classes/TGScreenOverlay.h"; sourceTree = "<group>"; };
+		A1B2C3D42402000000000000 /* TGScreenOverlay.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGScreenOverlay.m"; path = "Classes/TGScreenOverlay.m"; sourceTree = "<group>"; };
+		A1B2C3D42501000000000000 /* TGFrameStats.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGFrameStats.h"; path = "Classes/TGFrameStats.h"; sourceTree = "<group>"; };
+		A1B2C3D42502000000000000 /* TGFrameStats.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGFrameStats.m"; path = "Classes/TGFrameStats.m"; sourceTree = "<group>"; };
 		A1B2C3D41A01000000000000 /* TGDebugHud.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGDebugHud.h"; path = "Classes/TGDebugHud.h"; sourceTree = "<group>"; };
 		A1B2C3D41A02000000000000 /* TGDebugHud.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGDebugHud.m"; path = "Classes/TGDebugHud.m"; sourceTree = "<group>"; };
 		A1B2C3D40701000000000000 /* TGSpriteBatch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGSpriteBatch.h"; path = "Classes/TGSpriteBatch.h"; sourceTree = "<group>"; };
@@ -247,10 +247,10 @@
 				A1B2C3D40502000000000000 /* TGSkidTrail.m */,
 				A1B2C3D40601000000000000 /* TGSprite.h */,
 				A1B2C3D40602000000000000 /* TGSprite.m */,
-				A1B2C3D41801000000000000 /* TGScreenOverlay.h */,
-				A1B2C3D41802000000000000 /* TGScreenOverlay.m */,
-				A1B2C3D41901000000000000 /* TGFrameStats.h */,
-				A1B2C3D41902000000000000 /* TGFrameStats.m */,
+				A1B2C3D42401000000000000 /* TGScreenOverlay.h */,
+				A1B2C3D42402000000000000 /* TGScreenOverlay.m */,
+				A1B2C3D42501000000000000 /* TGFrameStats.h */,
+				A1B2C3D42502000000000000 /* TGFrameStats.m */,
 				A1B2C3D41A01000000000000 /* TGDebugHud.h */,
 				A1B2C3D41A02000000000000 /* TGDebugHud.m */,
 				A1B2C3D40701000000000000 /* TGSpriteBatch.h */,
@@ -349,8 +349,8 @@
 				A1B2C3D40403000000000000 /* TGSceneRenderer.h in Headers */,
 				A1B2C3D40503000000000000 /* TGSkidTrail.h in Headers */,
 				A1B2C3D40603000000000000 /* TGSprite.h in Headers */,
-				A1B2C3D41803000000000000 /* TGScreenOverlay.h in Headers */,
-				A1B2C3D41903000000000000 /* TGFrameStats.h in Headers */,
+				A1B2C3D42403000000000000 /* TGScreenOverlay.h in Headers */,
+				A1B2C3D42503000000000000 /* TGFrameStats.h in Headers */,
 				A1B2C3D41A03000000000000 /* TGDebugHud.h in Headers */,
 				A1B2C3D40703000000000000 /* TGSpriteBatch.h in Headers */,
 				A1B2C3D40803000000000000 /* TGSpriteSheet.h in Headers */,
@@ -456,8 +456,8 @@
 				A1B2C3D40404000000000000 /* TGSceneRenderer.m in Sources */,
 				A1B2C3D40504000000000000 /* TGSkidTrail.m in Sources */,
 				A1B2C3D40604000000000000 /* TGSprite.m in Sources */,
-				A1B2C3D41804000000000000 /* TGScreenOverlay.m in Sources */,
-				A1B2C3D41904000000000000 /* TGFrameStats.m in Sources */,
+				A1B2C3D42404000000000000 /* TGScreenOverlay.m in Sources */,
+				A1B2C3D42504000000000000 /* TGFrameStats.m in Sources */,
 				A1B2C3D41A04000000000000 /* TGDebugHud.m in Sources */,
 				A1B2C3D40704000000000000 /* TGSpriteBatch.m in Sources */,
 				A1B2C3D40804000000000000 /* TGSpriteSheet.m in Sources */,
