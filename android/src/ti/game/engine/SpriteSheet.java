@@ -169,19 +169,20 @@ public class SpriteSheet
 				float v0 = (row * frameHeight) / (float) imageHeight;
 				float u1 = ((col + 1) * frameWidth) / (float) imageWidth;
 				float v1 = ((row + 1) * frameHeight) / (float) imageHeight;
-				if (inset) {
-					if (col > 0) {
-						u0 += halfX;
-					}
-					if (col < cols - 1) {
-						u1 -= halfX;
-					}
-					if (row > 0) {
-						v0 += halfY;
-					}
-					if (row < rows - 1) {
-						v1 -= halfY;
-					}
+				// Both edges of an axis, or neither. Insetting only the side
+				// that faces a neighbour made the first and last frame of a
+				// strip half a texel wider than the rest and shifted their
+				// centres a quarter of a texel to opposite sides, so an
+				// animation cycling through them visibly rocked side to side.
+				// A single-frame sheet keeps the exact 0..1 range, which is
+				// what `tileRepeat` needs to wrap seamlessly.
+				if (inset && cols > 1) {
+					u0 += halfX;
+					u1 -= halfX;
+				}
+				if (inset && rows > 1) {
+					v0 += halfY;
+					v1 -= halfY;
 				}
 				result[i++] = new Frame(u0, v0, u1, v1, frameWidth, frameHeight);
 			}

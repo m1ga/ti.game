@@ -164,19 +164,19 @@
 			f.v0 = (row * frameHeight) / (float)imageHeight;
 			f.u1 = ((col + 1) * frameWidth) / (float)imageWidth;
 			f.v1 = ((row + 1) * frameHeight) / (float)imageHeight;
-			if (inset) {
-				if (col > 0) {
-					f.u0 += halfX;
-				}
-				if (col < cols - 1) {
-					f.u1 -= halfX;
-				}
-				if (row > 0) {
-					f.v0 += halfY;
-				}
-				if (row < rows - 1) {
-					f.v1 -= halfY;
-				}
+			// Both edges of an axis, or neither. Insetting only the side that
+			// faces a neighbour made the first and last frame of a strip half
+			// a texel wider than the rest and shifted their centres a quarter
+			// of a texel to opposite sides, so an animation cycling through
+			// them visibly rocked side to side. A single-frame sheet keeps the
+			// exact 0..1 range, which is what `tileRepeat` needs to wrap.
+			if (inset && cols > 1) {
+				f.u0 += halfX;
+				f.u1 -= halfX;
+			}
+			if (inset && rows > 1) {
+				f.v0 += halfY;
+				f.v1 -= halfY;
 			}
 			f.width = frameWidth;
 			f.height = frameHeight;
