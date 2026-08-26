@@ -1014,6 +1014,43 @@ static NSSet<NSString *> *toGroupSet(id value)
 	free(ys);
 }
 
+#pragma mark Attachment
+
+/**
+ * sprite.attachTo(target, { offsetX: 0, offsetY: -40, rotate: false }):
+ * pins this sprite to another sprite natively — see the Android twin
+ * for the full contract (offset in the sprite's own space, rotate
+ * swings the offset and copies the target's rotation, drags win while
+ * the finger is down, cross-space attach converts automatically).
+ * attachTo(null) detaches.
+ */
+- (void)attachTo:(id)args
+{
+	id first = [args isKindOfClass:[NSArray class]] ? [args firstObject] : args;
+	if (![first isKindOfClass:[TiGameSpriteProxy class]] || first == self) {
+		self.sprite.attachTarget = nil;
+		return;
+	}
+	NSDictionary *options = ([args isKindOfClass:[NSArray class]] && [args count] > 1
+		&& [args[1] isKindOfClass:[NSDictionary class]]) ? args[1] : nil;
+	self.sprite.attachOffsetX = [TiUtils floatValue:options[@"offsetX"] def:0];
+	self.sprite.attachOffsetY = [TiUtils floatValue:options[@"offsetY"] def:0];
+	self.sprite.attachRotate = [TiUtils boolValue:options[@"rotate"] def:NO];
+	self.sprite.attachTarget = [(TiGameSpriteProxy *)first sprite];
+}
+
+/** Releases the sprite where it is; x/y are writable again. */
+- (void)detach:(id)unused
+{
+	self.sprite.attachTarget = nil;
+}
+
+- (id)attachedTo
+{
+	TiProxy *proxy = self.sprite.attachTarget.proxy;
+	return [proxy isKindOfClass:[TiGameSpriteProxy class]] ? proxy : nil;
+}
+
 #pragma mark Native engine callbacks (render thread; fireEvent is thread-safe)
 
 - (void)spriteAnimationComplete:(TGSprite *)s animationName:(NSString *)animationName

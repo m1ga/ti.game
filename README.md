@@ -35,6 +35,8 @@ identical on both platforms.
   the GL scene with a built-in pixel font, BMFont/AngelCode or monospace
   grid fonts (`createFont`); `screenFixed` pins any sprite to the surface
   for camera-proof HUDs
+- Sprite attachment (`attachTo`) — pin any sprite to another with an
+  offset, tracked natively every frame (name tags, health bars, turrets)
 - 26 example demos in `example/` covering every feature
 
 New to the module? `tutorial.md` walks through your first scene
@@ -530,6 +532,18 @@ are ignored — HUDs, on-screen buttons, overlays. Touch events map back
 automatically (see `text.js`: the score HUD stays put while the camera
 follows the ball).
 
+To put a label ON a sprite — a name tag, a health readout — attach it:
+
+```javascript
+var tag = Game.createText({ text: 'PLAYER 1', zIndex: 6 });
+tag.attachTo(hero, { offsetY: -40 }); // 40 px above the hero's anchor
+gameView.add(tag);
+```
+
+The tag follows the hero natively every frame (physics, tweens, drags,
+moving platforms included) with no per-frame JS. `attachTo` works on any
+sprite, not just text — see the Sprite methods reference.
+
 ### Depth in top-down scenes
 
 `ySort: true` sorts sprites within the same `zIndex` by their **bottom
@@ -763,6 +777,8 @@ mid-drag or mid-tween. All can be passed at creation.
 | `play(name, options)` | Start the named sheet animation; returns false for unknown names. `options.then` (a name or array of names) chains natively: each queued animation plays as the previous non-looping one finishes — a looping animation ends the chain |
 | `stop()` | Stop the running sheet animation (the current frame stays); also drops any queued chain |
 | `followPath(points, options)` | Walk the sprite along `points` (`{x, y}` objects or `[x, y]` pairs) natively at `options.speed` px/s (default 100); `loop` = closed circuit, `rotate` = face along the path, `smoothing` = corner radius in px. Fires `pathcomplete` when a non-looping run ends; `followPath(null)` stops in place |
+| `attachTo(target, options)` | Pin this sprite to another sprite natively: every frame (after physics and solid resolution) its position becomes the target's final position plus `options.offsetX`/`offsetY` — name tags, health bars and shadows track their owner with no per-frame JS. `rotate: true` also copies the target's rotation and swings the offset around it (turrets, hats). While attached, direct `x`/`y` writes, velocity and position tweens are overwritten (an active drag wins until the finger lifts); attaching a `screenFixed` sprite to a world sprite (or the reverse) converts coordinates automatically. `attachTo(null)` detaches |
+| `detach()` | Release the sprite where it is — `x`/`y` are writable again. The read-only `attachedTo` property returns the current target sprite, or null |
 | `animate(options)` | Native tween of `x`, `y`, `scale`/`scaleX`/`scaleY`, `rotation`, `opacity`, `glowOpacity` with `duration`/`delay` (ms) and `easing` (`EASE_*` constants); an optional `frame` is set once it finishes; fires `complete` |
 | `clearTweens()` | Cancel all running tweens (values stay where they are) |
 | `flash(color, duration)` | Fill the sprite's silhouette with `color` (default white) and fade it out over `duration` ms (default 150), all natively — the damage/invincibility flash a multiplicative `tintColor` can't do (white tint = no change) |
