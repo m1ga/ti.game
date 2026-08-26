@@ -314,7 +314,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float sinr = sinf(rad);
 	float sx = s.scaleX;
 	float sy = s.scaleY;
-	float alpha = MAX(0.0f, MIN(1.0f, s.opacity));
+	float alpha = MAX(0.0f, MIN(1.0f, [s effectiveOpacity]));
 	float x = [self parallaxX:s];
 	float y = [self parallaxY:s];
 	if (s.pixelSnap) {
@@ -437,7 +437,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float sinr = sinf(rad);
 	float sx = s.scaleX;
 	float sy = s.scaleY;
-	float alpha = MAX(0.0f, MIN(1.0f, s.opacity));
+	float alpha = MAX(0.0f, MIN(1.0f, [s effectiveOpacity]));
 	float x = [self parallaxX:s];
 	float y = [self parallaxY:s];
 	if (s.pixelSnap) {

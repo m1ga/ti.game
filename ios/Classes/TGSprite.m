@@ -49,6 +49,7 @@ static _Atomic int TGIdleSequence = 0;
 		_anchorX = 0.5f;
 		_anchorY = 0.5f;
 		_opacity = 1.0f;
+		_attachOpacity = 1.0f;
 		_tintR = 1.0f;
 		_tintG = 1.0f;
 		_tintB = 1.0f;
@@ -496,9 +497,14 @@ static _Atomic int TGIdleSequence = 0;
 	}
 }
 
+- (float)effectiveOpacity
+{
+	return self.opacity * self.attachOpacity;
+}
+
 - (BOOL)hitTestX:(float)px y:(float)py
 {
-	if (!self.visible || self.opacity <= 0.0f || !self.touchEnabled) {
+	if (!self.visible || [self effectiveOpacity] <= 0.0f || !self.touchEnabled) {
 		return NO;
 	}
 	// Screen-fixed sprites live in surface coordinates; the touch

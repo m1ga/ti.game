@@ -347,6 +347,7 @@ public class Scene
 		}
 		sprite.scene = null;
 		sprite.attachTarget = null;
+		sprite.attachOpacity = 1f;
 		List<Sprite> attached = null;
 		for (Sprite s : sprites) {
 			if (s.attachTarget == sprite) {
@@ -369,6 +370,7 @@ public class Scene
 			for (Sprite s : sprites) {
 				s.scene = null;
 				s.attachTarget = null;
+				s.attachOpacity = 1f;
 			}
 			sprites.clear();
 		}
@@ -1051,11 +1053,17 @@ public class Scene
 	private void applyAttachment(Sprite s, int depth)
 	{
 		Sprite target = s.attachTarget;
-		if (target == null || target == s || target.scene != this || s.dragged) {
-			return; // orphaned or held by a finger — the finger outranks
+		if (target == null || target == s || target.scene != this) {
+			return; // orphaned — keep the last applied state
 		}
 		if (target.attachTarget != null && depth < 8) {
 			applyAttachment(target, depth + 1);
+		}
+		// Opacity inherits even while dragged; parent-first recursion
+		// means a chain multiplies down correctly.
+		s.attachOpacity = target.effectiveOpacity();
+		if (s.dragged) {
+			return; // held by a finger — the finger outranks the position
 		}
 		float ox = s.attachOffsetX;
 		float oy = s.attachOffsetY;

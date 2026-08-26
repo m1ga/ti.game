@@ -314,7 +314,7 @@ public class SpriteBatch
 		float sin = (float) Math.sin(rad);
 		float sx = s.scaleX;
 		float sy = s.scaleY;
-		float alpha = Math.max(0f, Math.min(1f, s.opacity));
+		float alpha = Math.max(0f, Math.min(1f, s.effectiveOpacity()));
 		float x = parallaxX(s);
 		float y = parallaxY(s);
 		if (s.pixelSnap) {
@@ -460,7 +460,7 @@ public class SpriteBatch
 		float sin = (float) Math.sin(rad);
 		float sx = s.scaleX;
 		float sy = s.scaleY;
-		float alpha = Math.max(0f, Math.min(1f, s.opacity));
+		float alpha = Math.max(0f, Math.min(1f, s.effectiveOpacity()));
 		float x = parallaxX(s);
 		float y = parallaxY(s);
 		if (s.pixelSnap) {

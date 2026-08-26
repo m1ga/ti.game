@@ -541,8 +541,10 @@ gameView.add(tag);
 ```
 
 The tag follows the hero natively every frame (physics, tweens, drags,
-moving platforms included) with no per-frame JS, and is removed along
-with the hero — attached sprites never outlive their target. `attachTo`
+moving platforms included) with no per-frame JS, fades along with the
+hero (the target's opacity multiplies into attached sprites) and is
+removed along with the hero — attached sprites never outlive their
+target. `attachTo`
 works on any sprite, not just text — see the Sprite methods reference.
 
 ### Depth in top-down scenes
@@ -778,7 +780,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `play(name, options)` | Start the named sheet animation; returns false for unknown names. `options.then` (a name or array of names) chains natively: each queued animation plays as the previous non-looping one finishes — a looping animation ends the chain |
 | `stop()` | Stop the running sheet animation (the current frame stays); also drops any queued chain |
 | `followPath(points, options)` | Walk the sprite along `points` (`{x, y}` objects or `[x, y]` pairs) natively at `options.speed` px/s (default 100); `loop` = closed circuit, `rotate` = face along the path, `smoothing` = corner radius in px. Fires `pathcomplete` when a non-looping run ends; `followPath(null)` stops in place |
-| `attachTo(target, options)` | Pin this sprite to another sprite natively: every frame (after physics and solid resolution) its position becomes the target's final position plus `options.offsetX`/`offsetY` — name tags, health bars and shadows track their owner with no per-frame JS. `rotate: true` also copies the target's rotation and swings the offset around it (turrets, hats). While attached, direct `x`/`y` writes, velocity and position tweens are overwritten (an active drag wins until the finger lifts); attaching a `screenFixed` sprite to a world sprite (or the reverse) converts coordinates automatically. `attachTo(null)` detaches. Removing the target sprite also removes every sprite attached to it (recursively — a chain goes with it); `detach()` first to keep one alive |
+| `attachTo(target, options)` | Pin this sprite to another sprite natively: every frame (after physics and solid resolution) its position becomes the target's final position plus `options.offsetX`/`offsetY` — name tags, health bars and shadows track their owner with no per-frame JS. `rotate: true` also copies the target's rotation and swings the offset around it (turrets, hats). While attached, direct `x`/`y` writes, velocity and position tweens are overwritten (an active drag wins until the finger lifts); attaching a `screenFixed` sprite to a world sprite (or the reverse) converts coordinates automatically; the target's `opacity` multiplies into attached sprites, so fading the owner (opacity tweens included) fades its tags too, without touching their own `opacity`. `attachTo(null)` detaches. Removing the target sprite also removes every sprite attached to it (recursively — a chain goes with it); `detach()` first to keep one alive |
 | `detach()` | Release the sprite where it is — `x`/`y` are writable again. The read-only `attachedTo` property returns the current target sprite, or null |
 | `animate(options)` | Native tween of `x`, `y`, `scale`/`scaleX`/`scaleY`, `rotation`, `opacity`, `glowOpacity` with `duration`/`delay` (ms) and `easing` (`EASE_*` constants); an optional `frame` is set once it finishes; fires `complete` |
 | `clearTweens()` | Cancel all running tweens (values stay where they are) |

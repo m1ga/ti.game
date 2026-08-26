@@ -1429,9 +1429,11 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	 * velocity and position tweens are overwritten each frame; an active
 	 * drag wins until the finger lifts. Attaching across coordinate
 	 * spaces (screenFixed to world or back) converts automatically.
-	 * attachTo(null) detaches. Removing the target from the scene also
-	 * removes every sprite attached to it (recursively); detach() first
-	 * to keep one alive.
+	 * attachTo(null) detaches. The target's opacity multiplies into
+	 * attached sprites, so fading the owner (opacity tweens included)
+	 * fades its tags too — their own opacity stays untouched. Removing
+	 * the target from the scene also removes every sprite attached to it
+	 * (recursively); detach() first to keep one alive.
 	 */
 	// The target parameter is a plain Object, not SpriteProxy: a typed proxy
 	// parameter makes the generated JNI binding pass whatever JS sent
@@ -1446,6 +1448,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 				Log.w(LCAT, "attachTo: target is not a sprite; detaching");
 			}
 			sprite.attachTarget = null;
+			sprite.attachOpacity = 1f;
 			return;
 		}
 		float offsetX = 0f;
@@ -1467,6 +1470,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void detach()
 	{
 		sprite.attachTarget = null;
+		sprite.attachOpacity = 1f;
 	}
 
 	@Kroll.getProperty

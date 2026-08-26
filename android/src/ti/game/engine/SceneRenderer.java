@@ -173,7 +173,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			while (nextRope < ropes.size() && ropes.get(nextRope).zIndex < s.zIndex) {
 				ropes.get(nextRope++).draw(batch);
 			}
-			if (s.visible && s.opacity > 0f) {
+			if (s.visible && s.effectiveOpacity() > 0f) {
 				batch.draw(s);
 			}
 		}

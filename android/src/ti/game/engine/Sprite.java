@@ -56,13 +56,27 @@ public class Sprite
 	// attachRotate the sprite also copies the target's rotation and the
 	// offset swings around it (turrets, hats). Direct x/y writes, velocity
 	// and position tweens are overwritten while attached; an active drag
-	// wins over the attachment, like it does over moving platforms.
-	// Removing the target from the scene removes its attached sprites too
-	// (Scene.removeWithAttachments). Applied by Scene.applyAttachments.
+	// wins over the attachment, like it does over moving platforms. The
+	// target's opacity multiplies into attached sprites (attachOpacity),
+	// so fades cascade down a chain. Removing the target from the scene
+	// removes its attached sprites too (Scene.removeWithAttachments).
+	// Applied by Scene.applyAttachments.
 	public volatile Sprite attachTarget;
 	public volatile float attachOffsetX = 0f;
 	public volatile float attachOffsetY = 0f;
 	public volatile boolean attachRotate = false;
+	// Inherited opacity: the target's effective opacity, copied by
+	// Scene.applyAttachments each frame and multiplied with the sprite's
+	// own opacity wherever it is drawn or hit-tested — a fade on the
+	// owner fades its tags too, without clobbering their own opacity.
+	// 1 while not attached (reset on every detach path).
+	public volatile float attachOpacity = 1f;
+
+	/** Own opacity times the attached target's (chained). */
+	public float effectiveOpacity()
+	{
+		return opacity * attachOpacity;
+	}
 
 	// Tint: multiplies the frame's colors (white = art unchanged) — damage
 	// flashes, team colors, day/night shading. Parsed 0..1 channels.
@@ -663,7 +677,7 @@ public class Sprite
 	 */
 	public boolean hitTest(float px, float py)
 	{
-		if (!visible || opacity <= 0f || !touchEnabled) {
+		if (!visible || effectiveOpacity() <= 0f || !touchEnabled) {
 			return false;
 		}
 		// Screen-fixed sprites live in surface coordinates; the touch

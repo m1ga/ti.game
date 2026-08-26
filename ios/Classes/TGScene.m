@@ -250,6 +250,7 @@ static float bottomEdge(TGSprite *s)
 	[_sprites removeObjectIdenticalTo:sprite];
 	sprite.scene = nil;
 	sprite.attachTarget = nil;
+	sprite.attachOpacity = 1.0f;
 	_snapshotCache = nil;
 	NSMutableArray<TGSprite *> *attached = nil;
 	for (TGSprite *s in _sprites) {
@@ -271,6 +272,7 @@ static float bottomEdge(TGSprite *s)
 		for (TGSprite *s in _sprites) {
 			s.scene = nil;
 			s.attachTarget = nil;
+			s.attachOpacity = 1.0f;
 		}
 		[_sprites removeAllObjects];
 		_snapshotCache = nil;
@@ -1148,11 +1150,17 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 - (void)applyAttachment:(TGSprite *)s depth:(int)depth
 {
 	TGSprite *target = s.attachTarget;
-	if (target == nil || target == s || target.scene != self || s.dragged) {
-		return; // orphaned or held by a finger — the finger outranks
+	if (target == nil || target == s || target.scene != self) {
+		return; // orphaned — keep the last applied state
 	}
 	if (target.attachTarget != nil && depth < 8) {
 		[self applyAttachment:target depth:depth + 1];
+	}
+	// Opacity inherits even while dragged; parent-first recursion
+	// means a chain multiplies down correctly.
+	s.attachOpacity = [target effectiveOpacity];
+	if (s.dragged) {
+		return; // held by a finger — the finger outranks the position
 	}
 	float ox = s.attachOffsetX;
 	float oy = s.attachOffsetY;

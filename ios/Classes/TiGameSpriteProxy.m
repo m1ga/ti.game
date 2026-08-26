@@ -1022,14 +1022,16 @@ static NSSet<NSString *> *toGroupSet(id value)
  * for the full contract (offset in the sprite's own space, rotate
  * swings the offset and copies the target's rotation, drags win while
  * the finger is down, cross-space attach converts automatically).
- * attachTo(null) detaches. Removing the target from the scene also
- * removes every sprite attached to it (recursively).
+ * attachTo(null) detaches. The target's opacity multiplies into
+ * attached sprites (fades cascade). Removing the target from the scene
+ * also removes every sprite attached to it (recursively).
  */
 - (void)attachTo:(id)args
 {
 	id first = [args isKindOfClass:[NSArray class]] ? [args firstObject] : args;
 	if (![first isKindOfClass:[TiGameSpriteProxy class]] || first == self) {
 		self.sprite.attachTarget = nil;
+		self.sprite.attachOpacity = 1.0f;
 		return;
 	}
 	NSDictionary *options = ([args isKindOfClass:[NSArray class]] && [args count] > 1
@@ -1044,6 +1046,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 - (void)detach:(id)unused
 {
 	self.sprite.attachTarget = nil;
+	self.sprite.attachOpacity = 1.0f;
 }
 
 - (id)attachedTo

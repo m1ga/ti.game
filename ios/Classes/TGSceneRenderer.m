@@ -161,7 +161,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		while (nextRope < ropes.count && ropes[nextRope].zIndex < s.zIndex) {
 			[ropes[nextRope++] draw:_batch];
 		}
-		if (s.visible && s.opacity > 0.0f) {
+		if (s.visible && [s effectiveOpacity] > 0.0f) {
 			[_batch draw:s];
 		}
 	}
