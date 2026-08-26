@@ -370,7 +370,11 @@ solids to *block*, collision events to *react*.
   works as an invisible trigger: score zones, goals, checkpoints,
   ceilings (flappy, racing and volley demos all use these).
 - `hitboxScale` shrinks the collision box around the anchor — art rarely
-  fills its frame, and slightly small hitboxes feel fairer.
+  fills its frame, and slightly small hitboxes feel fairer. It does not
+  reach the **touch** area: taps are tested against the whole drawn
+  frame (the blue box below), so a sprite with `hitboxScale: 0.6` still
+  takes taps out to the edge of its art. Shrink `width`/`height` when a
+  tap target has to match the collision box.
 - `hitboxScaleX` / `hitboxScaleY` correct that per axis, multiplied on
   top of `hitboxScale` (both default to 1). When a drawing fills its
   frame by a different fraction on each axis there is no single number
@@ -666,10 +670,10 @@ app down mid-frame.
 | `cameraX` / `cameraY` | World-space offset of the view (scrolling) |
 | `cameraScale` | Zoom, anchored on the view center (default 1) |
 | `cameraBounds` | `{ minX, minY, maxX, maxY }` world rect the visible area is clamped into; `null` = unbounded |
-| `follow(sprite, options)` | Native dead-zone camera follow. Vertical: `topMargin`/`bottomMargin` (fractions of the visible height, defaults 0.33/0.7), clamped to `maxY` (default 0). Horizontal: enabled by `leftMargin`/`rightMargin` (defaults 0.35/0.65). `smoothing` (0..1, default 0 = snap) eases by that fraction of the remaining distance per 1/60 s |
+| `follow(sprite, options)` | Native dead-zone camera follow. Vertical: `topMargin`/`bottomMargin` (fractions of the visible height, defaults 0.33/0.7), clamped to `maxY` (default 0). Horizontal: enabled by `leftMargin`/`rightMargin` (defaults 0.35/0.65). `smoothing` (0..1, default 0 = snap) eases by that fraction of the remaining distance per 1/60 s. Every call resets all of them to their defaults first, so `follow(sprite)` with no options wipes a configuration set earlier |
 | `stopFollow()` | Stop following; the camera stays where it is |
 | `shake({ strength, duration })` | Camera shake: `strength` px (default 12), `duration` ms (default 400) — offsets only the projection, so follow/bounds/touches are unaffected |
-| `raycast(x0, y0, x1, y1, groups)` | One-shot nearest-hit query along the segment against visible sprites whose `collisionGroup` is in `groups` (omit for any tagged sprite). Returns `null` for a clear ray, else `{ x, y, distance, group, sprite, normal: { x, y } }`. Rect hitboxes use their AABB, circle hitboxes intersect exactly; a ray starting inside a hitbox reports it at distance 0. For discrete checks — line of sight on an AI timer, ledge/ground probes, tap hitscan — not per-frame JS polling |
+| `raycast(x0, y0, x1, y1, groups)` | One-shot nearest-hit query along the segment against visible sprites whose `collisionGroup` is in `groups` (omit for any tagged sprite). Returns `null` for a clear ray, else `{ x, y, distance, group, sprite, normal: { x, y } }`. Rect hitboxes use their AABB, circle hitboxes intersect exactly; a ray starting inside a hitbox reports it at distance 0. Pass `groups` as an **array**: Android also accepts loose arguments, iOS reads only the array and silently falls back to testing every tagged sprite. For discrete checks — line of sight on an AI timer, ledge/ground probes, tap hitscan — not per-frame JS polling |
 | `findPath(from, to, options)` | Grid A* from `from` to `to` (`{ x, y }` world points) around the visible sprites whose `collisionGroup` is in `options.groups` (omit for any tagged sprite). Returns an array of `{ x, y }` waypoints ready for `sprite.followPath()`, or `null` when no route exists. Options: `cellSize` (grid resolution in px, default 32), `clearance` (extra obstacle inflation in px — about half the walker's width keeps it from scraping corners), `bounds` (`{ minX, minY, maxX, maxY }` search rect, default the surface), `diagonals` (default `true`, never cuts corners), `simplify` (line-of-sight waypoint reduction, default `true`). A blocked start/goal snaps to the nearest free cell a few cells out, so tapping an obstacle walks to its edge. Like `raycast`, a discrete query — run it on taps and AI timers, not per frame |
 | `after(ms, callback)` | Runs the callback once after `ms` of **game time**: the delay stretches with slow motion and freezes at `timeScale: 0`, unlike `setTimeout`. Returns an id for `cancelTimer()`. Without a callback, the view fires a `timer` event with the id instead |
 | `every(ms, callback)` | Like `after()`, repeating every `ms` of game time until cancelled (at most once per frame). Returns an id for `cancelTimer()` |
@@ -764,7 +768,7 @@ mid-drag or mid-tween. All can be passed at creation.
 |---|---|
 | `collisionGroup` | This sprite's group tag (what others test against) |
 | `collidesWith` | Groups that fire `collision`/`collisionend` events on overlap |
-| `hitboxScale` | Shrinks the hitbox **around the anchor** (default 1, or `'80%'`); slightly small hitboxes feel fairer. Pair it with `anchor` to move which edge stays put |
+| `hitboxScale` | Shrinks the hitbox **around the anchor** (default 1, or `'80%'`); slightly small hitboxes feel fairer. Pair it with `anchor` to move which edge stays put. Collision only — the touch area stays the full drawn frame |
 | `hitboxScaleX` / `hitboxScaleY` | Per-axis corrections multiplied on top of `hitboxScale` (default 1), for art that fills its frame by a different fraction on each axis; ignored by circle hitboxes |
 | `hitboxShape` | `'rect'` (default) or `'circle'` — circles also bounce off solid corners along the contact normal |
 | `swept` | Movement is collision-tested as a path (swept AABB) — fast bullets stop tunneling through thin targets and solids |
@@ -813,7 +817,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | Property | Description |
 |---|---|
 | `tintColor` | Multiplies the frame's colors, e.g. `'#ff5252'` (team colors, day/night shading); `null` or `'#fff'` = art unchanged |
-| `glowColor` | Glow tint, e.g. `'#ffc94d'` — a tinted, blurred silhouette drawn behind the sprite (selection highlights, power-ups); follows shape, rotation and opacity |
+| `glowColor` | Glow tint, e.g. `'#ffc94d'` — a tinted, blurred silhouette drawn behind the sprite (selection highlights, power-ups); follows shape, rotation and opacity. Draws nothing on its own: `glowBlur` defaults to `0`, so set the radius with the color |
 | `glowBlur` | Glow blur radius in px; `0` = off. An active glow costs 2 extra draw calls per sprite per frame (shader switches) — fine for a few highlights, not for every coin on screen |
 | `glowOpacity` | Halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur |
 | `blend` | `'normal'`/`'add'`/`'multiply'`/`'screen'` — `add` brightens the backdrop instead of covering it (glows, fire, lasers), `multiply` darkens it (shadows, stains), `screen` lightens softly without blowing out to white (fog, soft light); costs one batch flush per mode change, so group same-blend sprites by `zIndex` |
@@ -824,8 +828,8 @@ mid-drag or mid-tween. All can be passed at creation.
 |---|---|
 | `play(name, options)` | Start the named sheet animation; returns false for unknown names. `options.then` (a name or array of names) chains natively: each queued animation plays as the previous non-looping one finishes — a looping animation ends the chain |
 | `stop()` | Stop the running sheet animation (the current frame stays); also drops any queued chain |
-| `followPath(points, options)` | Walk the sprite along `points` (`{x, y}` objects or `[x, y]` pairs) natively at `options.speed` px/s (default 100); `loop` = closed circuit, `rotate` = face along the path, `smoothing` = corner radius in px. Fires `pathcomplete` when a non-looping run ends; `followPath(null)` stops in place |
-| `attachTo(target, options)` | Pin this sprite to another sprite natively: every frame (after physics and solid resolution) its position becomes the target's final position plus `options.offsetX`/`offsetY` — name tags, health bars and shadows track their owner with no per-frame JS. `rotate: true` also copies the target's rotation and swings the offset around it (turrets, hats). While attached, direct `x`/`y` writes, velocity and position tweens are overwritten (an active drag wins until the finger lifts); attaching a `screenFixed` sprite to a world sprite (or the reverse) converts coordinates automatically; the target's `opacity` multiplies into attached sprites, so fading the owner (opacity tweens included) fades its tags too, without touching their own `opacity`. `attachTo(null)` detaches. Removing the target sprite also removes every sprite attached to it (recursively — a chain goes with it); `detach()` first to keep one alive |
+| `followPath(points, options)` | Walk the sprite along `points` (`{x, y}` objects or `[x, y]` pairs) natively at `options.speed` px/s (default 100); `loop` = closed circuit, `rotate` = face along the path, `smoothing` = corner radius in px. Fires `pathcomplete` when a non-looping run ends; `followPath(null)` stops in place. Needs at least two points — fewer logs a warning and clears the path instead of parking the sprite there |
+| `attachTo(target, options)` | Pin this sprite to another sprite natively: every frame (after physics and solid resolution) its position becomes the target's final position plus `options.offsetX`/`offsetY` — name tags, health bars and shadows track their owner with no per-frame JS. `rotate: true` also copies the target's rotation and swings the offset around it (turrets, hats). While attached, direct `x`/`y` writes, velocity and position tweens are overwritten (an active drag wins until the finger lifts); attaching a `screenFixed` sprite to a world sprite (or the reverse) converts coordinates automatically; the target's `opacity` multiplies into attached sprites, so fading the owner (opacity tweens included) fades its tags too, without touching their own `opacity` — and that inherited value goes through the hit test as well, so an owner at `opacity: 0` leaves an attached text button untappable. `attachTo(null)` detaches. Removing the target sprite also removes every sprite attached to it (recursively — a chain goes with it); `detach()` first to keep one alive |
 | `detach()` | Release the sprite where it is — `x`/`y` are writable again. The read-only `attachedTo` property returns the current target sprite, or null |
 | `animate(options)` | Native tween of `x`, `y`, `scale`/`scaleX`/`scaleY`, `rotation`, `opacity`, `glowOpacity` with `duration`/`delay` (ms) and `easing` (`EASE_*` constants); an optional `frame` is set once it finishes; fires `complete` |
 | `clearTweens()` | Cancel all running tweens (values stay where they are) |
