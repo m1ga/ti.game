@@ -1,4 +1,5 @@
 #import "TiGameSoundProxy.h"
+#import "TGValues.h"
 
 @implementation TiGameSoundProxy {
 	TGSound *_sound;
@@ -53,7 +54,7 @@
 
 - (void)setVolume:(id)value
 {
-	_sound.volume = [TiUtils floatValue:value def:1];
+	_sound.volume = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)volume

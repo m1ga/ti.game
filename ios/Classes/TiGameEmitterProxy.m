@@ -2,6 +2,7 @@
 #import "TGSprite.h"
 #import "TiGameSpriteProxy.h"
 #import "TiGameSpriteSheetProxy.h"
+#import "TGValues.h"
 
 @implementation TiGameEmitterProxy {
 	TiGameSpriteSheetProxy *_sheetProxy;
@@ -211,7 +212,7 @@
 
 - (void)setStartScale:(id)value
 {
-	self.emitter.startScale = [TiUtils floatValue:value def:1];
+	self.emitter.startScale = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)startScale
@@ -221,7 +222,7 @@
 
 - (void)setEndScale:(id)value
 {
-	self.emitter.endScale = [TiUtils floatValue:value def:1];
+	self.emitter.endScale = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)endScale
@@ -231,7 +232,7 @@
 
 - (void)setStartOpacity:(id)value
 {
-	self.emitter.startOpacity = [TiUtils floatValue:value def:1];
+	self.emitter.startOpacity = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)startOpacity
@@ -241,7 +242,7 @@
 
 - (void)setEndOpacity:(id)value
 {
-	self.emitter.endOpacity = [TiUtils floatValue:value def:0];
+	self.emitter.endOpacity = [TGValues ratio:value fallback:0];
 }
 
 - (NSNumber *)endOpacity

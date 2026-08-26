@@ -8,6 +8,7 @@
 #import "TiGameRopeProxy.h"
 #import "TiGameSpriteProxy.h"
 #import <float.h>
+#import "TGValues.h"
 
 @interface TiGameGameViewProxy () <TGSceneTimerListener>
 @end
@@ -110,7 +111,7 @@
 /** Effect strength 0..1 (tint mix / glitch amount). */
 - (void)setCameraEffectIntensity:(id)value
 {
-	self.scene.effectIntensity = [TiUtils floatValue:value def:1];
+	self.scene.effectIntensity = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)cameraEffectIntensity
@@ -152,7 +153,7 @@
 /** Zoom, anchored on the view center (1 = no zoom, 2 = 2x). */
 - (void)setCameraScale:(id)value
 {
-	self.scene.cameraScale = MAX(0.05f, [TiUtils floatValue:value def:1]);
+	self.scene.cameraScale = MAX(0.05f, [TGValues ratio:value fallback:1]);
 }
 
 - (NSNumber *)cameraScale
@@ -165,7 +166,7 @@
  *  menus, hit-stop). Negative values clamp to 0. */
 - (void)setTimeScale:(id)value
 {
-	self.scene.timeScale = MAX(0.0f, [TiUtils floatValue:value def:1]);
+	self.scene.timeScale = MAX(0.0f, [TGValues ratio:value fallback:1]);
 }
 
 - (NSNumber *)timeScale

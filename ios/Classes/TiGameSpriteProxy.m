@@ -4,6 +4,7 @@
 #import "TGScene.h"
 #import "TGTween.h"
 #import "TiGameSpriteSheetProxy.h"
+#import "TGValues.h"
 
 @implementation TiGameSpriteProxy {
 	TiGameSpriteSheetProxy *_sheetProxy;
@@ -123,7 +124,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setScaleX:(id)value
 {
-	self.sprite.scaleX = [TiUtils floatValue:value def:1];
+	self.sprite.scaleX = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)scaleX
@@ -133,7 +134,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setScaleY:(id)value
 {
-	self.sprite.scaleY = [TiUtils floatValue:value def:1];
+	self.sprite.scaleY = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)scaleY
@@ -153,7 +154,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setAnchorX:(id)value
 {
-	self.sprite.anchorX = [TiUtils floatValue:value def:0.5f];
+	self.sprite.anchorX = [TGValues anchorX:value fallback:0.5f];
 }
 
 - (NSNumber *)anchorX
@@ -163,7 +164,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setAnchorY:(id)value
 {
-	self.sprite.anchorY = [TiUtils floatValue:value def:0.5f];
+	self.sprite.anchorY = [TGValues anchorY:value fallback:0.5f];
 }
 
 - (NSNumber *)anchorY
@@ -171,9 +172,29 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.anchorY);
 }
 
+/**
+ Both anchors at once, by name: `anchor: "bottom-left"`. Accepts the nine
+ corners and edges. Reading it back gives the preset the sprite is on, or
+ `custom` when its anchors are somewhere else.
+ */
+- (void)setAnchor:(id)value
+{
+	float x = 0.5f;
+	float y = 0.5f;
+	if ([TGValues anchor:value x:&x y:&y]) {
+		self.sprite.anchorX = x;
+		self.sprite.anchorY = y;
+	}
+}
+
+- (NSString *)anchor
+{
+	return [TGValues anchorNameForX:self.sprite.anchorX y:self.sprite.anchorY];
+}
+
 - (void)setOpacity:(id)value
 {
-	self.sprite.opacity = [TiUtils floatValue:value def:1];
+	self.sprite.opacity = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)opacity
@@ -255,7 +276,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 /** Halo strength 0..1 (fade the glow without touching the blur). */
 - (void)setGlowOpacity:(id)value
 {
-	self.sprite.glowOpacity = [TiUtils floatValue:value def:1];
+	self.sprite.glowOpacity = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)glowOpacity
@@ -301,7 +322,7 @@ static NSSet<NSString *> *toGroupSet(id value)
  *  x/y, physics and collisions stay in world coordinates. */
 - (void)setScrollFactor:(id)value
 {
-	self.sprite.scrollFactor = [TiUtils floatValue:value def:1.0f];
+	self.sprite.scrollFactor = [TGValues ratio:value fallback:1.0f];
 }
 
 - (NSNumber *)scrollFactor
@@ -533,7 +554,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setThrottle:(id)value
 {
-	self.sprite.throttle = [TiUtils floatValue:value def:0];
+	self.sprite.throttle = [TGValues ratio:value fallback:0];
 }
 
 - (NSNumber *)throttle
@@ -543,7 +564,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setSteering:(id)value
 {
-	self.sprite.steering = [TiUtils floatValue:value def:0];
+	self.sprite.steering = [TGValues ratio:value fallback:0];
 }
 
 - (NSNumber *)steering
@@ -631,7 +652,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setHitboxScale:(id)value
 {
-	self.sprite.hitboxScale = [TiUtils floatValue:value def:1];
+	self.sprite.hitboxScale = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)hitboxScale
@@ -646,7 +667,7 @@ static NSSet<NSString *> *toGroupSet(id value)
  */
 - (void)setHitboxScaleX:(id)value
 {
-	self.sprite.hitboxScaleX = [TiUtils floatValue:value def:1];
+	self.sprite.hitboxScaleX = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)hitboxScaleX
@@ -656,7 +677,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setHitboxScaleY:(id)value
 {
-	self.sprite.hitboxScaleY = [TiUtils floatValue:value def:1];
+	self.sprite.hitboxScaleY = [TGValues ratio:value fallback:1];
 }
 
 - (NSNumber *)hitboxScaleY
@@ -764,7 +785,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 
 - (void)setRestitution:(id)value
 {
-	self.sprite.restitution = [TiUtils floatValue:value def:0];
+	self.sprite.restitution = [TGValues ratio:value fallback:0];
 }
 
 - (NSNumber *)restitution
