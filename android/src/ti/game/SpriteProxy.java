@@ -94,22 +94,32 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.scaleY = s;
 		}
 		if (options.containsKey("scaleX")) {
-			sprite.scaleX = TiConvert.toFloat(options.get("scaleX"));
+			sprite.scaleX = Values.ratio(options.get("scaleX"), sprite.scaleX);
 		}
 		if (options.containsKey("scaleY")) {
-			sprite.scaleY = TiConvert.toFloat(options.get("scaleY"));
+			sprite.scaleY = Values.ratio(options.get("scaleY"), sprite.scaleY);
 		}
 		if (options.containsKey("rotation")) {
 			sprite.rotation = TiConvert.toFloat(options.get("rotation"));
 		}
 		if (options.containsKey("anchorX")) {
-			sprite.anchorX = TiConvert.toFloat(options.get("anchorX"));
+			sprite.anchorX = Values.anchorX(options.get("anchorX"), sprite.anchorX);
 		}
 		if (options.containsKey("anchorY")) {
-			sprite.anchorY = TiConvert.toFloat(options.get("anchorY"));
+			sprite.anchorY = Values.anchorY(options.get("anchorY"), sprite.anchorY);
+		}
+		// Va despues de los dos sueltos, para que el preset gane si llegan los
+		// tres. `anchor: "bottom-left"` es lo que hace legible lo que hoy se
+		// escribe `anchorX: 0, anchorY: 1`.
+		if (options.containsKey("anchor")) {
+			float[] anchor = Values.anchor(options.get("anchor"));
+			if (anchor != null) {
+				sprite.anchorX = anchor[0];
+				sprite.anchorY = anchor[1];
+			}
 		}
 		if (options.containsKey("opacity")) {
-			sprite.opacity = TiConvert.toFloat(options.get("opacity"));
+			sprite.opacity = Values.ratio(options.get("opacity"), sprite.opacity);
 		}
 		if (options.containsKey("tintColor")) {
 			setTintColor(TiConvert.toString(options.get("tintColor")));
@@ -124,7 +134,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.glowBlur = TiConvert.toFloat(options.get("glowBlur"));
 		}
 		if (options.containsKey("glowOpacity")) {
-			sprite.glowOpacity = TiConvert.toFloat(options.get("glowOpacity"));
+			sprite.glowOpacity = Values.ratio(options.get("glowOpacity"), sprite.glowOpacity);
 		}
 		if (options.containsKey("visible")) {
 			sprite.visible = TiConvert.toBoolean(options.get("visible"), true);
@@ -136,7 +146,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.screenFixed = TiConvert.toBoolean(options.get("screenFixed"), false);
 		}
 		if (options.containsKey("scrollFactor")) {
-			sprite.scrollFactor = TiConvert.toFloat(options.get("scrollFactor"), 1f);
+			sprite.scrollFactor = Values.ratio(options.get("scrollFactor"), sprite.scrollFactor);
 		}
 		if (options.containsKey("zIndex")) {
 			sprite.zIndex = TiConvert.toInt(options.get("zIndex"));
@@ -184,13 +194,13 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.wrapShift = TiConvert.toFloat(options.get("wrapShift"));
 		}
 		if (options.containsKey("hitboxScale")) {
-			sprite.hitboxScale = TiConvert.toFloat(options.get("hitboxScale"));
+			sprite.hitboxScale = Values.ratio(options.get("hitboxScale"), sprite.hitboxScale);
 		}
 		if (options.containsKey("hitboxScaleX")) {
-			sprite.hitboxScaleX = TiConvert.toFloat(options.get("hitboxScaleX"));
+			sprite.hitboxScaleX = Values.ratio(options.get("hitboxScaleX"), sprite.hitboxScaleX);
 		}
 		if (options.containsKey("hitboxScaleY")) {
-			sprite.hitboxScaleY = TiConvert.toFloat(options.get("hitboxScaleY"));
+			sprite.hitboxScaleY = Values.ratio(options.get("hitboxScaleY"), sprite.hitboxScaleY);
 		}
 		if (options.containsKey("hitboxShape")) {
 			setHitboxShape(TiConvert.toString(options.get("hitboxShape")));
@@ -369,9 +379,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setScaleX(float value)
+	public void setScaleX(Object value)
 	{
-		sprite.scaleX = value;
+		sprite.scaleX = Values.ratio(value, sprite.scaleX);
 	}
 
 	@Kroll.getProperty
@@ -381,9 +391,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setScaleY(float value)
+	public void setScaleY(Object value)
 	{
-		sprite.scaleY = value;
+		sprite.scaleY = Values.ratio(value, sprite.scaleY);
 	}
 
 	@Kroll.setProperty
@@ -418,9 +428,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setAnchorX(float value)
+	public void setAnchorX(Object value)
 	{
-		sprite.anchorX = value;
+		sprite.anchorX = Values.anchorX(value, sprite.anchorX);
 	}
 
 	@Kroll.getProperty
@@ -430,9 +440,30 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setAnchorY(float value)
+	public void setAnchorY(Object value)
 	{
-		sprite.anchorY = value;
+		sprite.anchorY = Values.anchorY(value, sprite.anchorY);
+	}
+
+	/**
+	 * Both anchors at once, by name: `anchor: "bottom-left"`. Accepts the nine
+	 * corners and edges. Reading it back gives the preset the sprite is on, or
+	 * `"custom"` when its anchors are somewhere else.
+	 */
+	@Kroll.getProperty
+	public String getAnchor()
+	{
+		return Values.anchorName(sprite.anchorX, sprite.anchorY);
+	}
+
+	@Kroll.setProperty
+	public void setAnchor(Object value)
+	{
+		float[] anchor = Values.anchor(value);
+		if (anchor != null) {
+			sprite.anchorX = anchor[0];
+			sprite.anchorY = anchor[1];
+		}
 	}
 
 	@Kroll.getProperty
@@ -442,9 +473,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setOpacity(float value)
+	public void setOpacity(Object value)
 	{
-		sprite.opacity = value;
+		sprite.opacity = Values.ratio(value, sprite.opacity);
 	}
 
 	/** Multiplies the frame's colors, e.g. '#ff5252'; null/white = unchanged. */
@@ -580,9 +611,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setGlowOpacity(float value)
+	public void setGlowOpacity(Object value)
 	{
-		sprite.glowOpacity = value;
+		sprite.glowOpacity = Values.ratio(value, sprite.glowOpacity);
 	}
 
 	@Kroll.getProperty
@@ -634,9 +665,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setScrollFactor(float value)
+	public void setScrollFactor(Object value)
 	{
-		sprite.scrollFactor = value;
+		sprite.scrollFactor = Values.ratio(value, sprite.scrollFactor);
 	}
 
 	@Kroll.getProperty
@@ -1032,9 +1063,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setHitboxScale(float value)
+	public void setHitboxScale(Object value)
 	{
-		sprite.hitboxScale = value;
+		sprite.hitboxScale = Values.ratio(value, sprite.hitboxScale);
 	}
 
 	/**
@@ -1049,9 +1080,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setHitboxScaleX(float value)
+	public void setHitboxScaleX(Object value)
 	{
-		sprite.hitboxScaleX = value;
+		sprite.hitboxScaleX = Values.ratio(value, sprite.hitboxScaleX);
 	}
 
 	@Kroll.getProperty
@@ -1061,9 +1092,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setHitboxScaleY(float value)
+	public void setHitboxScaleY(Object value)
 	{
-		sprite.hitboxScaleY = value;
+		sprite.hitboxScaleY = Values.ratio(value, sprite.hitboxScaleY);
 	}
 
 	/** 'rect' (default) or 'circle' — balls and asteroids want circles. */

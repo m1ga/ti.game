@@ -85,7 +85,7 @@ public class GameViewProxy extends TiViewProxy
 			scene.effectIntensity = TiConvert.toFloat(options.get("cameraEffectIntensity"));
 		}
 		if (options.containsKey("timeScale")) {
-			setTimeScale(TiConvert.toFloat(options.get("timeScale"), 1f));
+			setTimeScale(options.get("timeScale"));
 		}
 		if (options.containsKey("maxFps")) {
 			setMaxFps(TiConvert.toInt(options.get("maxFps")));
@@ -287,25 +287,25 @@ public class GameViewProxy extends TiViewProxy
 		scene.cameraMaxY = 0f;
 		if (options != null) {
 			if (options.containsKey("topMargin")) {
-				scene.followTopFraction = TiConvert.toFloat(options.get("topMargin"));
+				scene.followTopFraction = Values.ratio(options.get("topMargin"), scene.followTopFraction);
 			}
 			if (options.containsKey("bottomMargin")) {
-				scene.followBottomFraction = TiConvert.toFloat(options.get("bottomMargin"));
+				scene.followBottomFraction = Values.ratio(options.get("bottomMargin"), scene.followBottomFraction);
 			}
 			boolean horizontal = false;
 			if (options.containsKey("leftMargin")) {
-				scene.followLeftFraction = TiConvert.toFloat(options.get("leftMargin"));
+				scene.followLeftFraction = Values.ratio(options.get("leftMargin"), scene.followLeftFraction);
 				horizontal = true;
 			}
 			if (options.containsKey("rightMargin")) {
-				scene.followRightFraction = TiConvert.toFloat(options.get("rightMargin"));
+				scene.followRightFraction = Values.ratio(options.get("rightMargin"), scene.followRightFraction);
 				horizontal = true;
 			}
 			if (horizontal && scene.followLeftFraction < 0f) {
 				scene.followLeftFraction = 0.35f;
 			}
 			if (options.containsKey("smoothing")) {
-				scene.followSmoothing = TiConvert.toFloat(options.get("smoothing"));
+				scene.followSmoothing = Values.ratio(options.get("smoothing"), scene.followSmoothing);
 			}
 			if (options.containsKey("maxY")) {
 				scene.cameraMaxY = TiConvert.toFloat(options.get("maxY"));
@@ -345,9 +345,9 @@ public class GameViewProxy extends TiViewProxy
 	}
 
 	@Kroll.setProperty
-	public void setTimeScale(float value)
+	public void setTimeScale(Object value)
 	{
-		scene.timeScale = Math.max(0f, value);
+		scene.timeScale = Math.max(0f, Values.ratio(value, scene.timeScale));
 	}
 
 	/** Zoom, anchored on the view center (1 = no zoom, 2 = 2x). */
@@ -358,9 +358,9 @@ public class GameViewProxy extends TiViewProxy
 	}
 
 	@Kroll.setProperty
-	public void setCameraScale(float value)
+	public void setCameraScale(Object value)
 	{
-		scene.cameraScale = Math.max(0.05f, value);
+		scene.cameraScale = Math.max(0.05f, Values.ratio(value, scene.cameraScale));
 	}
 
 	/**
