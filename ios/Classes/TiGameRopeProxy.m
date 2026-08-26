@@ -2,6 +2,7 @@
 #import "TGSprite.h"
 #import "TiGameSpriteProxy.h"
 #import "TiGameSpriteSheetProxy.h"
+#import "TGValues.h"
 
 @implementation TiGameRopeProxy {
 	TiGameSpriteSheetProxy *_sheetProxy;
@@ -147,7 +148,7 @@
 
 - (void)setDamping:(id)value
 {
-	self.rope.damping = [TiUtils floatValue:value def:0.98f];
+	self.rope.damping = [TGValues ratio:value fallback:0.98f];
 }
 
 - (NSNumber *)damping

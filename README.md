@@ -593,6 +593,50 @@ a feature set — find the one closest to your game and start there:
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
 
+## Names and percentages
+
+Anything that is a **ratio** takes `"50%"` as happily as `0.5`, and the **anchors**
+take names. Numbers keep working exactly as before; this is additive.
+
+```javascript
+// These two sprites are identical.
+Game.createSprite({ anchorX: 0, anchorY: 1, hitboxScaleY: 0.55, opacity: 0.8 });
+Game.createSprite({ anchor: 'bottom-left', hitboxScaleY: '55%', opacity: '80%' });
+```
+
+`anchorX` takes `left`, `center`, `right`; `anchorY` takes `top`, `middle`,
+`bottom`; and `anchor` sets both from one of the nine corners and edges —
+`'top-left'`, `'bottom'`, `'center'`, `'right'` — in either order. Read `anchor`
+back and you get the preset the sprite is on, or `'custom'`.
+
+Percentages work on every ratio the engine exposes: `scale`, `scaleX`, `scaleY`,
+`opacity`, `glowOpacity`, `scrollFactor`, `hitboxScale`, `hitboxScaleX`,
+`hitboxScaleY`, `restitution`, `throttle`, `steering`, the emitter's
+`startScale`, `endScale`, `startOpacity` and `endOpacity`, a rope's `damping`, a
+sound's `volume`, and on the GameView `cameraScale`, `timeScale`,
+`cameraEffectIntensity` and the four `follow` margins plus its `smoothing`.
+
+They do **not** apply to coordinates, sizes, degrees, speeds or the car model's
+`grip` and `drag` — those are 1/s friction coefficients, not fractions, and a
+percentage there would not mean anything.
+
+Why it matters, with the case that prompted it. To give a prop a hitbox that
+covers its lower half but still reaches the ground you write:
+
+```javascript
+sprite.anchorY = 1;          // pinned by its feet
+sprite.hitboxScaleY = 0.55;  // colliding from mid-height down
+```
+
+Nothing in those two numbers says that, and the combination is easy to miss —
+`hitboxScale` shrinks around the anchor, so moving the anchor is what lets the
+box start lower without lifting off the ground. `anchor: 'bottom'` and
+`hitboxScaleY: '55%'` say it out loud.
+
+A value that cannot be understood logs a warning and leaves the property at what
+it already held, so a typo degrades to the current value instead of taking the
+app down mid-frame.
+
 ## API reference
 
 ### Module
@@ -666,8 +710,9 @@ mid-drag or mid-tween. All can be passed at creation.
 | `scale` | Sets `scaleX` and `scaleY` together (default 1) |
 | `scaleX`, `scaleY` | Per-axis scale; negative values flip |
 | `rotation` | Degrees, positive = clockwise |
-| `anchorX`, `anchorY` | Anchor as a fraction of the size (default 0.5/0.5 = center) — position, rotation and scaling pivot here |
-| `opacity` | 0..1 (default 1); 0 also disables touch |
+| `anchorX`, `anchorY` | Anchor as a fraction of the size (default 0.5/0.5 = center) — position, rotation and scaling pivot here. Also takes names: `left`/`center`/`right` and `top`/`middle`/`bottom` |
+| `anchor` | Both anchors from one preset: `'bottom-left'`, `'top'`, `'center'`… Reads back as the preset, or `'custom'` |
+| `opacity` | 0..1 or `'50%'` (default 1); 0 also disables touch |
 | `visible` | false hides the sprite and removes it from touch and collision |
 | `pixelSnap` | Snap only the rendered anchor to the framebuffer pixel grid (default false); physics and live `x`/`y` stay subpixel floats |
 | `screenFixed` | `x`/`y` become surface coordinates; camera position, zoom and shake are ignored (HUDs, on-screen buttons) — touch maps back automatically |
@@ -719,7 +764,7 @@ mid-drag or mid-tween. All can be passed at creation.
 |---|---|
 | `collisionGroup` | This sprite's group tag (what others test against) |
 | `collidesWith` | Groups that fire `collision`/`collisionend` events on overlap |
-| `hitboxScale` | Shrinks the hitbox around the anchor (default 1); slightly small hitboxes feel fairer |
+| `hitboxScale` | Shrinks the hitbox **around the anchor** (default 1, or `'80%'`); slightly small hitboxes feel fairer. Pair it with `anchor` to move which edge stays put |
 | `hitboxScaleX` / `hitboxScaleY` | Per-axis corrections multiplied on top of `hitboxScale` (default 1), for art that fills its frame by a different fraction on each axis; ignored by circle hitboxes |
 | `hitboxShape` | `'rect'` (default) or `'circle'` — circles also bounce off solid corners along the contact normal |
 | `swept` | Movement is collision-tested as a path (swept AABB) — fast bullets stop tunneling through thin targets and solids |

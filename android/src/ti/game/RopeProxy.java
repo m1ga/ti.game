@@ -71,7 +71,7 @@ public class RopeProxy extends KrollProxy
 			rope.gravity = TiConvert.toFloat(options.get("gravity"));
 		}
 		if (options.containsKey("damping")) {
-			rope.damping = TiConvert.toFloat(options.get("damping"));
+			rope.damping = Values.ratio(options.get("damping"), rope.damping);
 		}
 		if (options.containsKey("iterations")) {
 			rope.iterations = TiConvert.toInt(options.get("iterations"));
@@ -215,9 +215,9 @@ public class RopeProxy extends KrollProxy
 	}
 
 	@Kroll.setProperty
-	public void setDamping(float value)
+	public void setDamping(Object value)
 	{
-		rope.damping = value;
+		rope.damping = Values.ratio(value, rope.damping);
 	}
 
 	@Kroll.getProperty
