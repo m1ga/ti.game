@@ -91,16 +91,16 @@ public class EmitterProxy extends KrollProxy
 			emitter.size = TiConvert.toFloat(options.get("size"));
 		}
 		if (options.containsKey("startScale")) {
-			emitter.startScale = TiConvert.toFloat(options.get("startScale"));
+			emitter.startScale = Values.ratio(options.get("startScale"), emitter.startScale);
 		}
 		if (options.containsKey("endScale")) {
-			emitter.endScale = TiConvert.toFloat(options.get("endScale"));
+			emitter.endScale = Values.ratio(options.get("endScale"), emitter.endScale);
 		}
 		if (options.containsKey("startOpacity")) {
-			emitter.startOpacity = TiConvert.toFloat(options.get("startOpacity"));
+			emitter.startOpacity = Values.ratio(options.get("startOpacity"), emitter.startOpacity);
 		}
 		if (options.containsKey("endOpacity")) {
-			emitter.endOpacity = TiConvert.toFloat(options.get("endOpacity"));
+			emitter.endOpacity = Values.ratio(options.get("endOpacity"), emitter.endOpacity);
 		}
 		if (options.containsKey("tint")) {
 			setTint(TiConvert.toString(options.get("tint")));
@@ -326,9 +326,9 @@ public class EmitterProxy extends KrollProxy
 	}
 
 	@Kroll.setProperty
-	public void setStartScale(float value)
+	public void setStartScale(Object value)
 	{
-		emitter.startScale = value;
+		emitter.startScale = Values.ratio(value, emitter.startScale);
 	}
 
 	@Kroll.getProperty
@@ -338,9 +338,9 @@ public class EmitterProxy extends KrollProxy
 	}
 
 	@Kroll.setProperty
-	public void setEndScale(float value)
+	public void setEndScale(Object value)
 	{
-		emitter.endScale = value;
+		emitter.endScale = Values.ratio(value, emitter.endScale);
 	}
 
 	@Kroll.getProperty
@@ -350,9 +350,9 @@ public class EmitterProxy extends KrollProxy
 	}
 
 	@Kroll.setProperty
-	public void setStartOpacity(float value)
+	public void setStartOpacity(Object value)
 	{
-		emitter.startOpacity = value;
+		emitter.startOpacity = Values.ratio(value, emitter.startOpacity);
 	}
 
 	@Kroll.getProperty
@@ -362,9 +362,9 @@ public class EmitterProxy extends KrollProxy
 	}
 
 	@Kroll.setProperty
-	public void setEndOpacity(float value)
+	public void setEndOpacity(Object value)
 	{
-		emitter.endOpacity = value;
+		emitter.endOpacity = Values.ratio(value, emitter.endOpacity);
 	}
 
 	@Kroll.setProperty

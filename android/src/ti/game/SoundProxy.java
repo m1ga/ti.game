@@ -59,7 +59,7 @@ public class SoundProxy extends KrollProxy
 		music = options.optBoolean("music", false);
 		loop = options.optBoolean("loop", false);
 		if (options.containsKey("volume")) {
-			volume = TiConvert.toFloat(options.get("volume"));
+			volume = Values.ratio(options.get("volume"), volume);
 		}
 		if (url == null) {
 			Log.e(LCAT, "createSound requires a 'url' property");
@@ -195,15 +195,16 @@ public class SoundProxy extends KrollProxy
 	}
 
 	@Kroll.setProperty
-	public void setVolume(float value)
+	public void setVolume(Object value)
 	{
-		volume = value;
+		float level = Values.ratio(value, volume);
+		volume = level;
 		if (music) {
 			if (mediaPlayer != null) {
-				mediaPlayer.setVolume(value, value);
+				mediaPlayer.setVolume(level, level);
 			}
 		} else if (engine != null) {
-			engine.setStreamVolume(lastStreamId, value);
+			engine.setStreamVolume(lastStreamId, level);
 		}
 	}
 

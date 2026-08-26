@@ -89,7 +89,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.height = TiConvert.toFloat(options.get("height"));
 		}
 		if (options.containsKey("scale")) {
-			float s = TiConvert.toFloat(options.get("scale"));
+			float s = Values.ratio(options.get("scale"), sprite.scaleX);
 			sprite.scaleX = s;
 			sprite.scaleY = s;
 		}
@@ -227,7 +227,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.carryRiders = TiConvert.toBoolean(options.get("carryRiders"), true);
 		}
 		if (options.containsKey("restitution")) {
-			sprite.restitution = TiConvert.toFloat(options.get("restitution"));
+			sprite.restitution = Values.ratio(options.get("restitution"), sprite.restitution);
 		}
 		if (options.containsKey("carMode")) {
 			sprite.carMode = TiConvert.toBoolean(options.get("carMode"), false);
@@ -397,10 +397,11 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setScale(float value)
+	public void setScale(Object value)
 	{
-		sprite.scaleX = value;
-		sprite.scaleY = value;
+		float scale = Values.ratio(value, sprite.scaleX);
+		sprite.scaleX = scale;
+		sprite.scaleY = scale;
 	}
 
 	@Kroll.getProperty
@@ -946,9 +947,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setThrottle(float value)
+	public void setThrottle(Object value)
 	{
-		sprite.throttle = value;
+		sprite.throttle = Values.ratio(value, sprite.throttle);
 	}
 
 	@Kroll.getProperty
@@ -958,9 +959,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setSteering(float value)
+	public void setSteering(Object value)
 	{
-		sprite.steering = value;
+		sprite.steering = Values.ratio(value, sprite.steering);
 	}
 
 	@Kroll.getProperty
@@ -1235,9 +1236,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setRestitution(float value)
+	public void setRestitution(Object value)
 	{
-		sprite.restitution = value;
+		sprite.restitution = Values.ratio(value, sprite.restitution);
 	}
 
 	// --- Idle animation ---------------------------------------------------
@@ -1353,7 +1354,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			tween.toY = TiConvert.toFloat(options.get("y"));
 		}
 		if (options.containsKey("scale")) {
-			float s = TiConvert.toFloat(options.get("scale"));
+			float s = Values.ratio(options.get("scale"), sprite.scaleX);
 			tween.toScaleX = s;
 			tween.toScaleY = s;
 		}

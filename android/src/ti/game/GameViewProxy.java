@@ -82,7 +82,7 @@ public class GameViewProxy extends TiViewProxy
 			setCameraTint(TiConvert.toString(options.get("cameraTint")));
 		}
 		if (options.containsKey("cameraEffectIntensity")) {
-			scene.effectIntensity = TiConvert.toFloat(options.get("cameraEffectIntensity"));
+			scene.effectIntensity = Values.ratio(options.get("cameraEffectIntensity"), scene.effectIntensity);
 		}
 		if (options.containsKey("timeScale")) {
 			setTimeScale(options.get("timeScale"));
@@ -187,9 +187,9 @@ public class GameViewProxy extends TiViewProxy
 	}
 
 	@Kroll.setProperty
-	public void setCameraEffectIntensity(float value)
+	public void setCameraEffectIntensity(Object value)
 	{
-		scene.effectIntensity = value;
+		scene.effectIntensity = Values.ratio(value, scene.effectIntensity);
 	}
 
 	/** Renders debug overlays (collision box, bounds, anchor) for every sprite. */
