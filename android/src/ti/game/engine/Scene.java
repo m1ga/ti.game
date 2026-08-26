@@ -330,8 +330,35 @@ public class Scene
 	public void remove(Sprite sprite)
 	{
 		synchronized (lock) {
-			if (sprites.remove(sprite)) {
-				sprite.scene = null;
+			removeWithAttachments(sprite);
+		}
+	}
+
+	/**
+	 * Removes a sprite and, recursively, every sprite attached to it — a
+	 * name tag or health bar never outlives its owner, and a chain (a hat
+	 * on the tag) goes with it. Cycle-safe: a sprite no longer in the
+	 * list is skipped. Caller holds `lock`.
+	 */
+	private void removeWithAttachments(Sprite sprite)
+	{
+		if (!sprites.remove(sprite)) {
+			return;
+		}
+		sprite.scene = null;
+		sprite.attachTarget = null;
+		List<Sprite> attached = null;
+		for (Sprite s : sprites) {
+			if (s.attachTarget == sprite) {
+				if (attached == null) {
+					attached = new ArrayList<>();
+				}
+				attached.add(s);
+			}
+		}
+		if (attached != null) {
+			for (Sprite s : attached) {
+				removeWithAttachments(s);
 			}
 		}
 	}
@@ -341,6 +368,7 @@ public class Scene
 		synchronized (lock) {
 			for (Sprite s : sprites) {
 				s.scene = null;
+				s.attachTarget = null;
 			}
 			sprites.clear();
 		}

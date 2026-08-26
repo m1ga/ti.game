@@ -57,7 +57,8 @@ public class Sprite
 	// offset swings around it (turrets, hats). Direct x/y writes, velocity
 	// and position tweens are overwritten while attached; an active drag
 	// wins over the attachment, like it does over moving platforms.
-	// Applied by Scene.applyAttachments.
+	// Removing the target from the scene removes its attached sprites too
+	// (Scene.removeWithAttachments). Applied by Scene.applyAttachments.
 	public volatile Sprite attachTarget;
 	public volatile float attachOffsetX = 0f;
 	public volatile float attachOffsetY = 0f;

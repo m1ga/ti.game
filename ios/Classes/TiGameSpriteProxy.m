@@ -1022,7 +1022,8 @@ static NSSet<NSString *> *toGroupSet(id value)
  * for the full contract (offset in the sprite's own space, rotate
  * swings the offset and copies the target's rotation, drags win while
  * the finger is down, cross-space attach converts automatically).
- * attachTo(null) detaches.
+ * attachTo(null) detaches. Removing the target from the scene also
+ * removes every sprite attached to it (recursively).
  */
 - (void)attachTo:(id)args
 {

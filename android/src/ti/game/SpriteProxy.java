@@ -1429,7 +1429,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	 * velocity and position tweens are overwritten each frame; an active
 	 * drag wins until the finger lifts. Attaching across coordinate
 	 * spaces (screenFixed to world or back) converts automatically.
-	 * attachTo(null) detaches.
+	 * attachTo(null) detaches. Removing the target from the scene also
+	 * removes every sprite attached to it (recursively); detach() first
+	 * to keep one alive.
 	 */
 	// The target parameter is a plain Object, not SpriteProxy: a typed proxy
 	// parameter makes the generated JNI binding pass whatever JS sent

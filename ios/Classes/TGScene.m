@@ -234,11 +234,34 @@ static float bottomEdge(TGSprite *s)
 		return;
 	}
 	@synchronized (_sprites) {
-		if ([_sprites containsObject:sprite]) {
-			[_sprites removeObjectIdenticalTo:sprite];
-			sprite.scene = nil;
-			_snapshotCache = nil;
+		[self removeWithAttachmentsLocked:sprite];
+	}
+}
+
+// Removes a sprite and, recursively, every sprite attached to it — a
+// name tag or health bar never outlives its owner, and a chain (a hat
+// on the tag) goes with it. Cycle-safe: a sprite no longer in the list
+// is skipped. Caller holds the _sprites lock.
+- (void)removeWithAttachmentsLocked:(TGSprite *)sprite
+{
+	if (![_sprites containsObject:sprite]) {
+		return;
+	}
+	[_sprites removeObjectIdenticalTo:sprite];
+	sprite.scene = nil;
+	sprite.attachTarget = nil;
+	_snapshotCache = nil;
+	NSMutableArray<TGSprite *> *attached = nil;
+	for (TGSprite *s in _sprites) {
+		if (s.attachTarget == sprite) {
+			if (attached == nil) {
+				attached = [NSMutableArray array];
+			}
+			[attached addObject:s];
 		}
+	}
+	for (TGSprite *s in attached) {
+		[self removeWithAttachmentsLocked:s];
 	}
 }
 
@@ -247,6 +270,7 @@ static float bottomEdge(TGSprite *s)
 	@synchronized (_sprites) {
 		for (TGSprite *s in _sprites) {
 			s.scene = nil;
+			s.attachTarget = nil;
 		}
 		[_sprites removeAllObjects];
 		_snapshotCache = nil;
