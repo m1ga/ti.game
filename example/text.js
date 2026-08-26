@@ -15,6 +15,8 @@
 //   and scroll past like any sprite
 // - RESET is a text sprite with a tap listener — text buttons need no
 //   Titanium overlay views
+// - attachTo: the ball carries a name tag pinned above it natively —
+//   it tracks every drag and tween with no per-frame JS
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -116,6 +118,17 @@ module.exports = function () {
 			zIndex: 5
 		});
 		gameView.add(ball);
+
+		// --- attached label: pinned to the ball natively (attachTo) ---
+		// follows drags and physics every frame with no per-frame JS
+		var tag = Game.createText({
+			text: 'THE BALL',
+			scale: UNIT,
+			tintColor: '#7fd4ff',
+			zIndex: 6
+		});
+		tag.attachTo(ball, { offsetY: -(W * 0.09) });
+		gameView.add(tag);
 
 		gameView.cameraBounds = { minX: 0, minY: 0, maxX: WORLD_W, maxY: WORLD_H };
 		gameView.follow(ball, {

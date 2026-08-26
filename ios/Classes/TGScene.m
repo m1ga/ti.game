@@ -432,6 +432,7 @@ static float bottomEdge(TGSprite *s)
 	[self updateTimers:dt];
 	[self wrapSprites:list];
 	[self resolveSolids:list];
+	[self applyAttachments:list];
 	[self checkCollisions:list];
 	[self updateFollow:dt];
 	[self applyCameraBounds];
@@ -1101,6 +1102,61 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			[listener sprite:s landedOn:groundedOn];
 		}
 	}
+}
+
+/**
+ * Pins attached sprites to their targets' final positions — after
+ * physics and solid resolution, so a tag never lags its owner by a
+ * frame, and before collision checks, so an attached hitbox tests at
+ * its real position. Chains resolve parent-first via recursion
+ * (re-applying a parent is harmless, placement is absolute) and the
+ * depth cap breaks accidental cycles.
+ */
+- (void)applyAttachments:(NSArray<TGSprite *> *)list
+{
+	for (TGSprite *s in list) {
+		if (s.attachTarget != nil) {
+			[self applyAttachment:s depth:0];
+		}
+	}
+}
+
+- (void)applyAttachment:(TGSprite *)s depth:(int)depth
+{
+	TGSprite *target = s.attachTarget;
+	if (target == nil || target == s || target.scene != self || s.dragged) {
+		return; // orphaned or held by a finger — the finger outranks
+	}
+	if (target.attachTarget != nil && depth < 8) {
+		[self applyAttachment:target depth:depth + 1];
+	}
+	float ox = s.attachOffsetX;
+	float oy = s.attachOffsetY;
+	if (s.attachRotate) {
+		float rad = target.rotation * (float)M_PI / 180.0f;
+		float cosr = cosf(rad);
+		float sinr = sinf(rad);
+		float rx = ox * cosr - oy * sinr;
+		oy = ox * sinr + oy * cosr;
+		ox = rx;
+		s.rotation = target.rotation;
+	}
+	float tx = target.x;
+	float ty = target.y;
+	// Cross-space attach (screenFixed tag on a world sprite, or the
+	// reverse): convert the target position into this sprite's space,
+	// so the offset stays in the sprite's own coordinates.
+	if (s.screenFixed != target.screenFixed) {
+		if (s.screenFixed) {
+			tx = [self worldToScreenX:tx];
+			ty = [self worldToScreenY:ty];
+		} else {
+			tx = [self screenToWorldX:tx];
+			ty = [self screenToWorldY:ty];
+		}
+	}
+	s.x = tx + ox;
+	s.y = ty + oy;
 }
 
 /**

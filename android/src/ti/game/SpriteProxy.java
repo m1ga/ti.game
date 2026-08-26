@@ -1416,6 +1416,65 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			java.util.Arrays.copyOf(ys, count), smoothing, loop, rotate, speed);
 	}
 
+	// --- Attachment -------------------------------------------------------
+
+	/**
+	 * sprite.attachTo(target, { offsetX: 0, offsetY: -40, rotate: false }):
+	 * pins this sprite to another sprite natively — every frame, after
+	 * physics and solid resolution, its position becomes the target's
+	 * final position plus the offset, with no per-frame JS (name tags,
+	 * health bars, shadows). `rotate: true` also copies the target's
+	 * rotation and swings the offset around it (turrets, hats); by default
+	 * the sprite stays upright. While attached, direct x/y writes,
+	 * velocity and position tweens are overwritten each frame; an active
+	 * drag wins until the finger lifts. Attaching across coordinate
+	 * spaces (screenFixed to world or back) converts automatically.
+	 * attachTo(null) detaches.
+	 */
+	// The target parameter is a plain Object, not SpriteProxy: a typed proxy
+	// parameter makes the generated JNI binding pass whatever JS sent
+	// straight into the SpriteProxy slot, and a non-proxy value (a plain JS
+	// object arrives as a HashMap) aborts the whole app on the JNI type
+	// check. With Object + instanceof, a wrong target degrades to a warning.
+	@Kroll.method
+	public void attachTo(Object target, @Kroll.argument(optional = true) KrollDict options)
+	{
+		if (!(target instanceof SpriteProxy) || target == this) {
+			if (target != null) {
+				Log.w(LCAT, "attachTo: target is not a sprite; detaching");
+			}
+			sprite.attachTarget = null;
+			return;
+		}
+		float offsetX = 0f;
+		float offsetY = 0f;
+		boolean rotate = false;
+		if (options != null) {
+			offsetX = TiConvert.toFloat(options.get("offsetX"), 0f);
+			offsetY = TiConvert.toFloat(options.get("offsetY"), 0f);
+			rotate = TiConvert.toBoolean(options.get("rotate"), false);
+		}
+		sprite.attachOffsetX = offsetX;
+		sprite.attachOffsetY = offsetY;
+		sprite.attachRotate = rotate;
+		sprite.attachTarget = ((SpriteProxy) target).getSprite();
+	}
+
+	/** Releases the sprite where it is; x/y are writable again. */
+	@Kroll.method
+	public void detach()
+	{
+		sprite.attachTarget = null;
+	}
+
+	@Kroll.getProperty
+	public SpriteProxy getAttachedTo()
+	{
+		Sprite target = sprite.attachTarget;
+		return (target != null && target.proxy instanceof SpriteProxy)
+			? (SpriteProxy) target.proxy : null;
+	}
+
 	// --- Native engine callbacks (GL thread; fireEvent is thread-safe) ----
 
 	@Override

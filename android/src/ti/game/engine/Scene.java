@@ -694,6 +694,7 @@ public class Scene
 		updateTimers(dt);
 		wrapSprites(list);
 		resolveSolids(list);
+		applyAttachments(list);
 		checkCollisions(list);
 		updateCamera(dt);
 		updateShake(dt);
@@ -1000,6 +1001,61 @@ public class Scene
 		}
 		s.x += ground.frameDeltaX;
 		s.y += ground.frameDeltaY;
+	}
+
+	/**
+	 * Pins attached sprites to their targets' final positions — after
+	 * physics and solid resolution, so a tag never lags its owner by a
+	 * frame, and before collision checks, so an attached hitbox tests at
+	 * its real position. Chains resolve parent-first via recursion
+	 * (re-applying a parent is harmless, placement is absolute) and the
+	 * depth cap breaks accidental cycles.
+	 */
+	private void applyAttachments(List<Sprite> list)
+	{
+		for (Sprite s : list) {
+			if (s.attachTarget != null) {
+				applyAttachment(s, 0);
+			}
+		}
+	}
+
+	private void applyAttachment(Sprite s, int depth)
+	{
+		Sprite target = s.attachTarget;
+		if (target == null || target == s || target.scene != this || s.dragged) {
+			return; // orphaned or held by a finger — the finger outranks
+		}
+		if (target.attachTarget != null && depth < 8) {
+			applyAttachment(target, depth + 1);
+		}
+		float ox = s.attachOffsetX;
+		float oy = s.attachOffsetY;
+		if (s.attachRotate) {
+			double rad = Math.toRadians(target.rotation);
+			float cos = (float) Math.cos(rad);
+			float sin = (float) Math.sin(rad);
+			float rx = ox * cos - oy * sin;
+			oy = ox * sin + oy * cos;
+			ox = rx;
+			s.rotation = target.rotation;
+		}
+		float tx = target.x;
+		float ty = target.y;
+		// Cross-space attach (screenFixed tag on a world sprite, or the
+		// reverse): convert the target position into this sprite's space,
+		// so the offset stays in the sprite's own coordinates.
+		if (s.screenFixed != target.screenFixed) {
+			if (s.screenFixed) {
+				tx = worldToScreenX(tx);
+				ty = worldToScreenY(ty);
+			} else {
+				tx = screenToWorldX(tx);
+				ty = screenToWorldY(ty);
+			}
+		}
+		s.x = tx + ox;
+		s.y = ty + oy;
 	}
 
 	/**

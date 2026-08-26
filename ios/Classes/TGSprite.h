@@ -65,6 +65,20 @@
 // x/y, physics and collisions stay in plain world coordinates.
 @property (atomic, assign) float scrollFactor;
 
+// Attachment: while attachTarget is set, this sprite is pinned to the
+// target natively — each frame, after physics and solid resolution, its
+// x/y are driven from the target's final position plus the offset, so a
+// name tag or health bar tracks its owner with no per-frame JS. With
+// attachRotate the sprite also copies the target's rotation and the
+// offset swings around it (turrets, hats). Direct x/y writes, velocity
+// and position tweens are overwritten while attached; an active drag
+// wins over the attachment, like it does over moving platforms.
+// Applied by TGScene applyAttachments.
+@property (atomic, weak) TGSprite *attachTarget;
+@property (atomic, assign) float attachOffsetX;
+@property (atomic, assign) float attachOffsetY;
+@property (atomic, assign) BOOL attachRotate;
+
 // Tint: multiplies the frame's colors (white = art unchanged) — damage
 // flashes, team colors, day/night shading. Parsed 0..1 channels.
 @property (atomic, assign) float tintR;

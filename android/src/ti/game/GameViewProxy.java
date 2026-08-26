@@ -267,13 +267,18 @@ public class GameViewProxy extends TiViewProxy
 	 * target by that fraction of the remaining distance per 1/60 s.
 	 * Each call resets unspecified options to their defaults.
 	 */
+	// Object, not SpriteProxy: a typed proxy parameter makes the generated
+	// JNI binding pass non-proxy values (a plain JS object arrives as a
+	// HashMap) straight into the typed slot, aborting the app on the JNI
+	// type check — see SpriteProxy.attachTo.
 	@Kroll.method
-	public void follow(SpriteProxy spriteProxy, @Kroll.argument(optional = true) KrollDict options)
+	public void follow(Object target, @Kroll.argument(optional = true) KrollDict options)
 	{
-		if (spriteProxy == null) {
+		if (!(target instanceof SpriteProxy)) {
 			scene.followTarget = null;
 			return;
 		}
+		SpriteProxy spriteProxy = (SpriteProxy) target;
 		scene.followTopFraction = 0.33f;
 		scene.followBottomFraction = 0.7f;
 		scene.followLeftFraction = -1f;
