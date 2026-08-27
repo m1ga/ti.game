@@ -383,12 +383,32 @@ solids to *block*, collision events to *react*.
   but is 47% wider than he is. He needs `0.62` on X and `0.92` on Y.
   Because they multiply, `hitboxScale` stays the overall adjustment and
   these two are corrections on top of it.
+- `hitboxShape: 'rotatedRect'` keeps the collision rect turned with the
+  sprite instead of re-boxing it to the screen axes. Rotating a plain
+  `'rect'` rotates the art but not the box: the box is rebuilt around the
+  turned corners, so it stays square to the screen and *grows* — a post
+  turned 45° gets a box 41% wider than itself, and a ball lands on a flat
+  top that is not there. With `'rotatedRect'` the contact normal comes out
+  perpendicular to the real face, which is what makes a ball glance off a
+  diamond and a crate slide down a ramp instead of standing on an invisible
+  ledge. It works for solids, for `collidesWith` overlap, for `raycast` and
+  under `swept: true`, and the debug overlay draws the turned box. Plain
+  `'rect'` is still the default, so nothing that exists moves differently.
+  `circles.js` puts a `'rotatedRect'` diamond next to a plain rect and a
+  circle; `slopes.js` rides two shapes down a tilted ramp.
 - `hitboxShape: 'circle'` makes the hitbox a circle (radius = half the
   smaller drawn side × `hitboxScale`; the per-axis scales are ignored,
   since a circle has no axes) — for balls and asteroids. Circle
   sprites also resolve against solids along the contact normal, so a
   ball bounces off a corner diagonally instead of like a box (the volley
-  ball and the asteroids use it), and their touch area is round.
+  ball and the asteroids use it), and their touch area is round. When
+  the **solid** carries a circle hitbox as well, the contact normal runs
+  from center to center — a round post deflects instead of showing flat
+  faces and corners that are not there — and `swept: true` sweeps the
+  pair as circles. A circle against a rectangular solid still sweeps as
+  a box. `circles.js` keeps one emitter over each of a rect post, a round
+  one and a rotated rectangle, while all emitted balls share the three solids
+  and use bilateral `push` contacts with one another.
 - **Fast movers tunnel** without help: a bullet that travels further per
   frame than a target is thick never overlaps it on any frame, so the
   discrete test misses. `swept: true` on the moving sprite tests its
@@ -587,6 +607,12 @@ a feature set — find the one closest to your game and start there:
 | `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` vs `'multiply'` vs `'screen'` (the multiply/screen rows sit on a bright meadow strip, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
 | `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
 | `swept.js` | Swept AABB comparison: two lanes fire identical bullets at a thin wall with rising speed — the `swept: false` lane starts tunneling straight through, the `swept: true` lane never misses |
+| `circles.js` | Three emitters stay aligned over their respective hitbox shapes, but every emitted ball can hit all three solids and collide with the other balls as a bilateral `'push'` body. Each falls vertically from a random horizontal point within its assigned shape: `'rect'` sends it off flat faces and corners, `'circle'` deflects along the center-to-center normal, and `'rotatedRect'` on a 45°-turned square catches it on its real faces instead of a grown axis-aligned box. Below, the same shot fired at both `solidMode` values keeps the `'block'`/`'push'` comparison side by side |
+| `slopes.js` | Tilted `'rotatedRect'` ramps with two riders that take different paths through the engine: a rect crate resolved by separating axes, and a circle taken into the ramp's own frame. Both settle on the face and slide down it instead of standing on an invisible ledge. The green surfaces — the floor and both side walls — carry a `restitution` of their own, so the same ball that slides down a ramp at 0.1 rebounds off them at 0.5. The bounce is a property of the surface, not only of what lands on it; leave the walls at 0 and everything ends up parked in a corner no matter how well the floor bounces |
+| `plinko.js` | A staggered wall of 86 circular solids: each peg is a `hitboxShape: 'circle'` sprite, so a ball comes off its shoulder along the center-to-center normal and which way it goes is decided by fractions of a pixel. As bounding boxes every peg would be a square with a flat top and the balls would stack instead of scatter. `swept: true` keeps a fast ball from stepping over a small peg between frames; the slots are trigger zones and the dividers plain rects |
+| `pool.js` | Bilateral circle solids: 16 balls on a felt table, all `solidMode: 'push'`, so each pair separates once and swaps its normal velocity — a break shot scatters the rack. Rails are ordinary rect solids, pockets are circular trigger zones, and `linearDamping` is the felt that brings everything to a stop. No shot gate at all: a strike adds to whatever the cue is already carrying, so you can catch it mid-roll |
+| `drum.js` | Bingo drum with inward containment: 25 balls inside one `solidMode: 'contain'` circle, with no ring of wall sprites — the boundary is analytic, so there are no seams to squeeze through. The balls are `push` too, so they pile up under gravity instead of overlapping. SHAKE kicks them once; TUMBLE uses a thin contact launcher at the bottom to feed impulses through the pile |
+| `wind.js` | `gravityX`: falling leaves drift sideways under a wind you change with buttons — every leaf answers at once with no per-frame JavaScript, because the value is read natively each tick the way `gravity` is. Below, the other use, which has nothing to do with wind: a top-down puck with `gravity: 0` whose only acceleration is horizontal, for a table seen from above |
 | `path.js` | Path & chain: a ship on a smoothed looping circuit (`rotate: true`), a guard patrolling a sharp rectangle while its walk loop plays, tap-to-chain (`play('hop', { then: 'walk' })`, array chains on the bird), and a dog running one-shot zig-zag paths to taps with `pathcomplete` |
 | `raycast.js` | Raycast playground: a guard's line-of-sight beam blocked by a draggable crate (beam shortens to `hit.distance` and turns red), a ledge-probing walker that turns before the platform edge, and a tap-fired turret hitscan that flashes `hit.sprite` and reports group + distance |
 | `zones.js` | `collision`/`collisionend` lifecycle: a water pool that tints the hero while he's inside, a pressure plate holding a door open exactly while the ball rests on it, and a remove-ball button showing that deleting a contact partner still fires the exit |
@@ -750,6 +776,8 @@ mid-drag or mid-tween. All can be passed at creation.
 |---|---|
 | `velocityX`, `velocityY` | px/s, integrated every frame |
 | `gravity` | px/s² applied to `velocityY` |
+| `gravityX` | px/s² applied to `velocityX` — wind, conveyors, a top-down game whose "down" is sideways. `gravity` stays the vertical one; this is its sibling, not half of a vector |
+| `linearDamping` | Fraction of speed shed per second to the surface (0 = none, the default; ~0.6 ≈ a pool ball on felt). Rolling friction for ordinary sprites — the car model's `drag` is the same idea but only applies inside `carMode`. Proportional on purpose: a fast body sheds a lot and a slow one very little, which is what a ball trickling to a halt looks like. A constant deceleration was tried and stops slow bodies dead, all at once, which reads as wrong. Below 4 px/s the sprite is stopped outright, since a proportion never reaches zero on its own |
 | `maxSpeed` | Speed cap in px/s for `thrust` and `carMode` (default 500) |
 
 #### Solids
@@ -758,9 +786,10 @@ mid-drag or mid-tween. All can be passed at creation.
 |---|---|
 | `solidWith` | Groups whose sprites block this one's movement (push-out along the axis of least penetration) |
 | `onGround` | true while standing on a solid (read-only — gate jumps on it) |
-| `restitution` | Bounciness against solids: 0 = stop dead, 0..1 = reflect with damping |
+| `restitution` | Bounciness of a contact: 0 = stop dead, 1 = give it all back. It reads off **both** sides — the springier of the two surfaces decides, the way Box2D mixes it — so a bouncy floor can be given `restitution: 0.5` and everything that lands on it rebounds, without touching the riders. Every solid defaults to 0, so a scene that never sets it on a surface behaves exactly as it always did: the mover's own value is the whole answer. The same mix applies between two `solidMode: 'push'` bodies; because push assumes equal masses there is no `mass` to weight it with. Small bounces are damped to a stop instead of buzzing, so below a low closing speed a body settles and grounds rather than reflecting |
 | `oneWay` | As a solid: catches landings on the top edge only — pass-through from below and sideways |
 | `carryRiders` | As a solid: riders inherit this sprite's movement (default true); false for world-scroll terrain |
+| `solidMode` | As a solid: `'block'` (default — an immovable wall, what every solid did before this existed), `'contain'` (inward circular boundary: matched circles are kept *inside* its circumference instead of outside — drums, bowls, lottery cages) or `'push'` (a body in its own right: a matched circle and this one share the separation and exchange momentum along the contact normal at equal mass). The last two are circle-on-circle only, and unknown values fall back to `'block'`. `'push'` is the only one that needs agreement: **both** sprites must be `'push'` with circle hitboxes and **each must list the other's `collisionGroup`** in its own `solidWith`, or the pair falls back to one body shoving an immovable one. `'contain'` is one-directional — only the ball lists the drum |
 
 #### Collision
 
@@ -770,7 +799,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `collidesWith` | Groups that fire `collision`/`collisionend` events on overlap |
 | `hitboxScale` | Shrinks the hitbox **around the anchor** (default 1, or `'80%'`); slightly small hitboxes feel fairer. Pair it with `anchor` to move which edge stays put. Collision only — the touch area stays the full drawn frame |
 | `hitboxScaleX` / `hitboxScaleY` | Per-axis corrections multiplied on top of `hitboxScale` (default 1), for art that fills its frame by a different fraction on each axis; ignored by circle hitboxes |
-| `hitboxShape` | `'rect'` (default) or `'circle'` — circles also bounce off solid corners along the contact normal |
+| `hitboxShape` | `'rect'` (default), `'circle'` or `'rotatedRect'`. Circles bounce off solid corners along the contact normal, and a circle solid is resolved as a circle instead of its bounding box. `'rotatedRect'` keeps the collision rect **turned with the sprite** (an oriented bounding box, OBB) instead of re-boxing it square to the screen every frame — a tilted platform or a diamond post is then hit on its real face, with the normal perpendicular to it. Only matters once `rotation` is non-zero; it costs a little more per test, which is why plain `'rect'` stays the default |
 | `swept` | Movement is collision-tested as a path (swept AABB) — fast bullets stop tunneling through thin targets and solids |
 | `debug` | Draw this sprite's collision shapes and anchor |
 

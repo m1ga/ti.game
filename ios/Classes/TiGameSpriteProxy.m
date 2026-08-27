@@ -488,6 +488,18 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.gravity);
 }
 
+/** Horizontal acceleration in px/s² (wind, conveyors). `gravity` stays the
+ *  vertical one — this is its sibling, not half of a vector. */
+- (void)setGravityX:(id)value
+{
+	self.sprite.gravityX = [TiUtils floatValue:value def:0];
+}
+
+- (NSNumber *)gravityX
+{
+	return @(self.sprite.gravityX);
+}
+
 - (void)setWrapX:(id)value
 {
 	self.sprite.wrapX = [TiUtils floatValue:value def:0];
@@ -688,12 +700,17 @@ static NSSet<NSString *> *toGroupSet(id value)
 /** 'rect' (default) or 'circle' — balls and asteroids want circles. */
 - (void)setHitboxShape:(id)value
 {
-	self.sprite.circleHitbox = [@"circle" isEqualToString:[TiUtils stringValue:value]];
+	NSString *shape = [TiUtils stringValue:value];
+	self.sprite.circleHitbox = [@"circle" isEqualToString:shape];
+	self.sprite.obbHitbox = [@"rotatedRect" isEqualToString:shape];
 }
 
 - (NSString *)hitboxShape
 {
-	return self.sprite.circleHitbox ? @"circle" : @"rect";
+	if (self.sprite.circleHitbox) {
+		return @"circle";
+	}
+	return self.sprite.obbHitbox ? @"rotatedRect" : @"rect";
 }
 
 /** Swept AABB: this sprite's movement is collision-tested as a path,
@@ -768,6 +785,48 @@ static NSSet<NSString *> *toGroupSet(id value)
 - (NSNumber *)oneWay
 {
 	return @(self.sprite.oneWay);
+}
+
+/** As a solid: 'block' (default, immovable wall), 'contain' (inward
+ *  circular boundary — matched circles are kept inside it) or 'push' (a
+ *  body in its own right: a matched circle and this one share the
+ *  separation and exchange momentum). The last two are circle-on-circle
+ *  only; anything else falls back to 'block'. */
+- (void)setSolidMode:(id)value
+{
+	NSString *mode = [TiUtils stringValue:value];
+	if ([@"contain" isEqualToString:mode]) {
+		self.sprite.solidMode = TGSolidContain;
+	} else if ([@"push" isEqualToString:mode]) {
+		self.sprite.solidMode = TGSolidPush;
+	} else {
+		self.sprite.solidMode = TGSolidBlock; // unknown values behave like today
+	}
+}
+
+- (NSString *)solidMode
+{
+	switch (self.sprite.solidMode) {
+		case TGSolidContain:
+			return @"contain";
+		case TGSolidPush:
+			return @"push";
+		default:
+			return @"block";
+	}
+}
+
+/** Fraction of speed shed per second to the surface (0 = none, the
+ *  default). Rolling friction for ordinary sprites — `drag` only ever
+ *  worked inside carMode. Stopped outright below 4 px/s. */
+- (void)setLinearDamping:(id)value
+{
+	self.sprite.linearDamping = MAX(0.0f, [TiUtils floatValue:value def:0.0f]);
+}
+
+- (NSNumber *)linearDamping
+{
+	return @(self.sprite.linearDamping);
 }
 
 /** As a solid: whether riders inherit this sprite's movement (moving

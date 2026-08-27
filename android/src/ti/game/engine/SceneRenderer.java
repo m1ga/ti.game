@@ -221,6 +221,8 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 
 	private final float[] debugAabb = new float[4];
 	private final float[] debugCenter = new float[2];
+	private final float[] debugBox = new float[5];
+	private final float[] debugCorners = new float[8];
 
 	/**
 	 * Debug visualization: green = collision AABB (with hitboxScale and the
@@ -250,6 +252,28 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 				batch.drawLine(white,
 					debugCenter[0] + r * (float) Math.cos(a0), debugCenter[1] + r * (float) Math.sin(a0),
 					debugCenter[0] + r * (float) Math.cos(a1), debugCenter[1] + r * (float) Math.sin(a1),
+					t, 0.2f, 1f, 0.4f, 0.9f);
+			}
+		} else if (s.obbHitbox) {
+			// The collision rect as it really sits: turned with the sprite,
+			// so the green shape and the blue bounds agree instead of the
+			// green one being an oversized square around the art
+			s.hitBox(debugBox);
+			float bc = (float) Math.cos(debugBox[4]);
+			float bs = (float) Math.sin(debugBox[4]);
+			float hx = debugBox[2];
+			float hy = debugBox[3];
+			for (int i = 0; i < 4; i++) {
+				float lx = ((i == 0 || i == 3) ? -hx : hx);
+				float ly = ((i < 2) ? -hy : hy);
+				debugCorners[i * 2] = debugBox[0] + ox + lx * bc - ly * bs;
+				debugCorners[i * 2 + 1] = debugBox[1] + oy + lx * bs + ly * bc;
+			}
+			for (int i = 0; i < 4; i++) {
+				int j = (i + 1) % 4;
+				batch.drawLine(white,
+					debugCorners[i * 2], debugCorners[i * 2 + 1],
+					debugCorners[j * 2], debugCorners[j * 2 + 1],
 					t, 0.2f, 1f, 0.4f, 0.9f);
 			}
 		} else {

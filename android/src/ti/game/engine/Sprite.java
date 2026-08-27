@@ -144,6 +144,12 @@ public class Sprite
 	public volatile float velocityY = 0f;
 	public volatile float gravity = 0f; // applied to velocityY
 
+	// Constant horizontal acceleration in px/s², the sibling of `gravity`
+	// (wind, a conveyor, a sideways pull, a top-down game whose "down" is
+	// a direction). `gravity` keeps its exact meaning: it is the vertical
+	// one, not a vector.
+	public volatile float gravityX = 0f;
+
 	// Newtonian flight (Asteroids-style): angularVelocity spins the sprite
 	// (deg/s); thrust accelerates along the current heading (px/s^2, speed
 	// capped at maxSpeed); wrapAround teleports the sprite to the opposite
@@ -193,6 +199,13 @@ public class Sprite
 	// corners naturally instead of like a box.
 	public volatile boolean circleHitbox = false;
 
+	// Oriented hitbox (hitboxShape: 'rotatedRect'): the collision rect turns
+	// with the sprite instead of being re-boxed axis-aligned every frame, so
+	// a tilted platform or a diamond post is hit on its real face and the
+	// contact normal comes out perpendicular to it. An axis-aligned rect is
+	// still the default — this only matters once rotation is non-zero.
+	public volatile boolean obbHitbox = false;
+
 	// Draws debug overlays: collision AABB (green), sprite/touch bounds
 	// (blue), anchor point (orange). Scene.debugAll enables it for everyone.
 	public volatile boolean debug = false;
@@ -212,6 +225,31 @@ public class Sprite
 	// falling onto its top edge — they jump up through it and are never
 	// blocked sideways or from below (pass-through floors).
 	public volatile boolean oneWay = false;
+
+	// As a solid: how this sprite acts on the bodies that hit it.
+	//   BLOCK   — immovable wall (the default, and what every solid did
+	//             before this existed)
+	//   CONTAIN — inward circular boundary: circles matched to it are kept
+	//             *inside* its circumference instead of outside (drums,
+	//             bowls, lottery cages). Circle-on-circle only.
+	//   PUSH    — a body in its own right: a matched circle and this one
+	//             share the separation and exchange momentum along the
+	//             contact normal (equal masses). Circle-on-circle only.
+	public static final int SOLID_BLOCK = 0;
+	public static final int SOLID_CONTAIN = 1;
+	public static final int SOLID_PUSH = 2;
+	public volatile int solidMode = SOLID_BLOCK;
+
+	// Fraction of speed shed per second to the surface (0 = none, the
+	// default; ~0.6 ≈ a pool ball on felt). Proportional, like the car
+	// model's `drag` but for ordinary sprites and outside carMode: a fast
+	// body sheds a lot and a slow one very little, which is what a ball
+	// trickling to a halt actually looks like. A constant deceleration was
+	// tried here instead and stops slow bodies dead, which reads as wrong.
+	// The trade is that a proportion never reaches zero on its own, so a
+	// body creeping below a twentieth of a pixel per frame is stopped
+	// outright rather than left crawling down an asymptote.
+	public volatile float linearDamping = 0f;
 
 	// As a solid: whether riders inherit this sprite's per-frame movement
 	// (moving platforms). Turn off for world-scroll terrain that moves
@@ -418,6 +456,20 @@ public class Sprite
 		if (gravity != 0f) {
 			velocityY += gravity * dt;
 		}
+		if (gravityX != 0f) {
+			velocityX += gravityX * dt;
+		}
+		if (linearDamping > 0f && (velocityX != 0f || velocityY != 0f)) {
+			// Clamped so a long frame can't reverse the sprite instead of
+			// slowing it
+			float keep = 1f - Math.min(1f, linearDamping * dt);
+			velocityX *= keep;
+			velocityY *= keep;
+			if (velocityX * velocityX + velocityY * velocityY < 16f) {
+				velocityX = 0f; // under 4 px/s: invisible, so stop for real
+				velocityY = 0f;
+			}
+		}
 		if (velocityX != 0f) {
 			x += velocityX * dt;
 		}
@@ -589,6 +641,30 @@ public class Sprite
 		float sin = (float) Math.sin(rad);
 		out[0] = x + lx * cos - ly * sin;
 		out[1] = y + lx * sin + ly * cos;
+	}
+
+	/**
+	 * Oriented hitbox: out = {centerX, centerY, halfWidth, halfHeight,
+	 * rotationRadians}. Same rect computeAABB() boxes — same scales, same
+	 * hitboxScale shrink around the anchor — but kept as a turned rectangle
+	 * instead of being re-boxed to the axes.
+	 */
+	public void hitBox(float[] out)
+	{
+		float w = drawWidth();
+		float h = drawHeight();
+		float sx = scaleX * hitboxScale * hitboxScaleX;
+		float sy = scaleY * hitboxScale * hitboxScaleY;
+		float lcx = (w / 2f - anchorX * w) * sx;
+		float lcy = (h / 2f - anchorY * h) * sy;
+		double rad = Math.toRadians(rotation);
+		float cos = (float) Math.cos(rad);
+		float sin = (float) Math.sin(rad);
+		out[0] = x + lcx * cos - lcy * sin;
+		out[1] = y + lcx * sin + lcy * cos;
+		out[2] = Math.abs(w * sx) / 2f;
+		out[3] = Math.abs(h * sy) / 2f;
+		out[4] = (float) rad;
 	}
 
 	/** World-space axis-aligned bounding box: out = {minX, minY, maxX, maxY}. */

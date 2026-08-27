@@ -38,6 +38,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	CFTimeInterval _lastFrameTime;
 	float _effectTime; // drives the glitch animation
 	float _debugAabb[4];
+	float _debugBox[5];
+	float _debugCorners[8];
 	NSMutableSet<TGSpriteSheet *> *_preparedSheets;
 }
 
@@ -240,6 +242,28 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 			[_batch drawLine:white
 					   fromX:center[0] + r * cosf(a0) y:center[1] + r * sinf(a0)
 						 toX:center[0] + r * cosf(a1) y:center[1] + r * sinf(a1)
+			   halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
+		}
+	} else if (s.obbHitbox) {
+		// The collision rect as it really sits: turned with the sprite, so
+		// the green shape and the blue bounds agree instead of the green one
+		// being an oversized square around the art
+		[s hitBox:_debugBox];
+		float bc = cosf(_debugBox[4]);
+		float bs = sinf(_debugBox[4]);
+		float hx = _debugBox[2];
+		float hy = _debugBox[3];
+		for (int i = 0; i < 4; i++) {
+			float lx = ((i == 0 || i == 3) ? -hx : hx);
+			float ly = ((i < 2) ? -hy : hy);
+			_debugCorners[i * 2] = _debugBox[0] + ox + lx * bc - ly * bs;
+			_debugCorners[i * 2 + 1] = _debugBox[1] + oy + lx * bs + ly * bc;
+		}
+		for (int i = 0; i < 4; i++) {
+			int j = (i + 1) % 4;
+			[_batch drawLine:white
+					   fromX:_debugCorners[i * 2] y:_debugCorners[i * 2 + 1]
+						 toX:_debugCorners[j * 2] y:_debugCorners[j * 2 + 1]
 			   halfThickness:t r:0.2f g:1.0f b:0.4f a:0.9f];
 		}
 	} else {
