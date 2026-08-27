@@ -10,6 +10,14 @@
 #import <float.h>
 #import <math.h>
 
+// Allowed penetration, in pixels. A body resting on a solid is pulled into
+// it by gravity every frame — at 1400 px/s² and 60 fps that is 0.39 px of
+// sink — and shoving it back out in full, 60 times a second, is what makes
+// a settled pile tremble. Overlaps under this are left alone; the closing
+// velocity is still cancelled, so the sink can never grow past it. Big
+// enough to swallow a frame of gravity, small enough to stay invisible.
+static const float TGSlop = 0.5f;
+
 static float bottomEdge(TGSprite *s)
 {
 	return s.y + [s drawHeight] * fabsf(s.scaleY) * (1.0f - s.anchorY);
@@ -43,6 +51,11 @@ static float bottomEdge(TGSprite *s)
 	float _aabbB[4];
 	float _centerA[2];
 	float _centerB[2];
+	float _boxA[5];   // oriented hitbox: cx, cy, hx, hy, radians
+	float _boxB[5];
+	float _satAxes[8];
+	float _contact[3]; // nx, ny, penetration
+
 	float _sweptResult[2]; // entry time in 0..1, entry axis (0 = x, 1 = y)
 
 	NSMutableArray<TGGameTimer *> *_timers; // guarded by @synchronized(_timers)
@@ -671,6 +684,27 @@ static float bottomEdge(TGSprite *s)
  * (slab method). Catches fast movers that would tunnel straight through
  * thin targets between frames. Render thread only.
  */
+/** Segment vs circle, same frame as the caller: smallest t in [0,1], or -1
+ *  when it misses. Starting inside counts as t = 0. */
+- (float)segmentFromX:(float)px y:(float)py dx:(float)dx dy:(float)dy
+			vsCircleX:(float)cx y:(float)cy radius:(float)radius
+{
+	float fx = px - cx;
+	float fy = py - cy;
+	if (fx * fx + fy * fy <= radius * radius) {
+		return 0.0f;
+	}
+	float a = dx * dx + dy * dy;
+	float b = 2.0f * (fx * dx + fy * dy);
+	float c = fx * fx + fy * fy - radius * radius;
+	float disc = b * b - 4.0f * a * c;
+	if (a < 1e-6f || disc < 0.0f) {
+		return -1.0f;
+	}
+	float t = (-b - sqrtf(disc)) / (2.0f * a);
+	return (t >= 0.0f && t <= 1.0f) ? t : -1.0f;
+}
+
 - (BOOL)sweptHitFromX:(float)cx y:(float)cy dx:(float)dx dy:(float)dy
 				 minX:(float)minX minY:(float)minY maxX:(float)maxX maxY:(float)maxY
 {
@@ -788,6 +822,37 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				bestNormalX = (nl > 1e-6f) ? (hx - center[0]) / nl : 0.0f;
 				bestNormalY = (nl > 1e-6f) ? (hy - center[1]) / nl : 0.0f;
 			}
+		} else if (s.obbHitbox) {
+			// Ray vs a turned rect: take the ray into the box's frame, run
+			// the same slab test, rotate the normal back out
+			float rayBox[5];
+			[s hitBox:rayBox];
+			float bc = cosf(rayBox[4]);
+			float bs = sinf(rayBox[4]);
+			float rx = x0 - rayBox[0];
+			float ry = y0 - rayBox[1];
+			float lx = rx * bc + ry * bs;
+			float ly = -rx * bs + ry * bc;
+			float ldx = dx * bc + dy * bs;
+			float ldy = -dx * bs + dy * bc;
+			if (!TGSegmentVsAabb(lx, ly, ldx, ldy,
+					-rayBox[2], -rayBox[3], rayBox[2], rayBox[3], entry)) {
+				continue;
+			}
+			if (entry[0] < bestT) {
+				bestT = entry[0];
+				best = s;
+				float lnx, lny;
+				if (entry[1] == 0.0f) {
+					lnx = (ldx > 0.0f) ? -1.0f : (ldx < 0.0f) ? 1.0f : 0.0f;
+					lny = 0.0f;
+				} else {
+					lnx = 0.0f;
+					lny = (ldy > 0.0f) ? -1.0f : (ldy < 0.0f) ? 1.0f : 0.0f;
+				}
+				bestNormalX = lnx * bc - lny * bs;
+				bestNormalY = lnx * bs + lny * bc;
+			}
 		} else {
 			[s computeAABB:box];
 			if (!TGSegmentVsAabb(x0, y0, dx, dy, box[0], box[1], box[2], box[3], entry)) {
@@ -862,6 +927,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
  * ordinary touch and handles push-out, restitution, onGround and the
  * land event exactly like a slow collision. Without this, a sprite
  * faster than a solid is thick teleports straight through it.
+ *
+ * Two circle hitboxes sweep as circles: the Minkowski sum of two circles
+ * is a circle of radius r1 + r2, so the test is the same ray vs circle
+ * the raycast API solves. Every other pairing — including a circle
+ * against a rectangular solid — stays on the inflated-AABB Minkowski box.
  */
 - (void)sweepAgainstSolids:(TGSprite *)s
 					inList:(NSArray<TGSprite *> *)list
@@ -873,21 +943,143 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	if (len2 < 1e-4f) {
 		return;
 	}
-	[s computeAABB:_aabbA];
-	float hw = (_aabbA[2] - _aabbA[0]) / 2.0f;
-	float hh = (_aabbA[3] - _aabbA[1]) / 2.0f;
-	float cx = (_aabbA[0] + _aabbA[2]) / 2.0f - dx; // center at frame start
-	float cy = (_aabbA[1] + _aabbA[3]) / 2.0f - dy;
+	BOOL circle = s.circleHitbox;
+	float r = 0.0f;
+	float cx, cy, hw = 0.0f, hh = 0.0f;
+	if (circle) {
+		[s hitCenter:_centerA];
+		r = [s hitRadius];
+		cx = _centerA[0] - dx; // center at frame start
+		cy = _centerA[1] - dy;
+	} else {
+		[s computeAABB:_aabbA];
+		hw = (_aabbA[2] - _aabbA[0]) / 2.0f;
+		hh = (_aabbA[3] - _aabbA[1]) / 2.0f;
+		cx = (_aabbA[0] + _aabbA[2]) / 2.0f - dx; // center at frame start
+		cy = (_aabbA[1] + _aabbA[3]) / 2.0f - dy;
+	}
 	float earliest = FLT_MAX;
 	for (TGSprite *solid in list) {
 		NSString *group = solid.collisionGroup;
-		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]) {
+		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]
+				|| solid.solidMode != TGSolidBlock) {
+			// contain would stop the ball against the OUTSIDE of the
+			// boundary, and push bodies are meant to move — neither is a
+			// wall, so neither belongs in a blocking sweep
+			continue;
+		}
+		if (solid.obbHitbox) {
+			// Take the whole sweep into the box's frame, where the box is
+			// axis-aligned again and the existing Minkowski segment test
+			// applies unchanged.
+			[solid hitBox:_boxB];
+			float bc = cosf(_boxB[4]);
+			float bs = sinf(_boxB[4]);
+			float rx = cx - _boxB[0];
+			float ry = cy - _boxB[1];
+			float lx = rx * bc + ry * bs;
+			float ly = -rx * bs + ry * bc;
+			float ldx = dx * bc + dy * bs;
+			float ldy = -dx * bs + dy * bc;
+			float best = FLT_MAX;
+			if (circle) {
+				// The Minkowski sum of a circle and a rect is a ROUNDED rect:
+				// the box grown on each axis, plus a quarter circle at each
+				// corner. Growing it as a square instead pokes out by 1.41r
+				// along the diagonal — which is exactly where a ball dropped
+				// on a turned box's tip arrives. It gets stopped short of a
+				// contact that then never happens, and hangs in mid-air for a
+				// quarter second until it drifts off the phantom corner.
+				if ([self sweptHitFromX:lx y:ly dx:ldx dy:ldy
+									minX:-_boxB[2] - r minY:-_boxB[3]
+									maxX:_boxB[2] + r maxY:_boxB[3]]) {
+					best = _sweptResult[0];
+				}
+				if ([self sweptHitFromX:lx y:ly dx:ldx dy:ldy
+									minX:-_boxB[2] minY:-_boxB[3] - r
+									maxX:_boxB[2] maxY:_boxB[3] + r]
+						&& _sweptResult[0] < best) {
+					best = _sweptResult[0];
+				}
+				for (int i = 0; i < 4; i++) {
+					float ccx = ((i & 1) == 0) ? -_boxB[2] : _boxB[2];
+					float ccy = (i < 2) ? -_boxB[3] : _boxB[3];
+					float t = [self segmentFromX:lx y:ly dx:ldx dy:ldy
+									   vsCircleX:ccx y:ccy radius:r];
+					if (t >= 0.0f && t < best) {
+						best = t;
+					}
+				}
+			} else if ([self sweptHitFromX:lx y:ly dx:ldx dy:ldy
+									   minX:-_boxB[2] - hw minY:-_boxB[3] - hh
+									   maxX:_boxB[2] + hw maxY:_boxB[3] + hh]) {
+				best = _sweptResult[0];
+			}
+			if (best == FLT_MAX || best <= 0.0f) {
+				// t = 0 means the sprite was already touching when the frame
+				// began, and you cannot tunnel out of a contact you are
+				// already in. Pulling it back for that is what pins a body
+				// resting on a slope: it is dragged back to where it started
+				// every frame while its speed along the surface keeps
+				// climbing, until it finally breaks loose and looks like it
+				// was launched. The static resolver owns this case.
+				continue;
+			}
+			if (solid.oneWay && (dy <= 0.0f || s.velocityY < 0.0f)) {
+				continue; // one-way: only a fall onto the upper face counts
+			}
+			if (best < earliest) {
+				earliest = best;
+			}
+			continue;
+		}
+		if (circle && solid.circleHitbox) {
+			[solid hitCenter:_centerB];
+			float sum = r + [solid hitRadius];
+			float fx = cx - _centerB[0];
+			float fy = cy - _centerB[1];
+			float t;
+			if (fx * fx + fy * fy <= sum * sum) {
+				continue; // already touching: nothing to sweep, see above
+			} else {
+				float a = dx * dx + dy * dy;
+				float b = 2.0f * (fx * dx + fy * dy);
+				float c = fx * fx + fy * fy - sum * sum;
+				float disc = b * b - 4.0f * a * c;
+				if (disc < 0.0f) {
+					continue;
+				}
+				t = (-b - sqrtf(disc)) / (2.0f * a);
+				if (t < 0.0f || t > 1.0f) {
+					continue;
+				}
+			}
+			if (solid.oneWay) {
+				// same top-face rule as the static resolver: the contact
+				// normal has to point up out of the solid
+				float hy = cy + dy * t - _centerB[1];
+				float nl = hypotf(cx + dx * t - _centerB[0], hy);
+				float ny = (nl > 1e-6f) ? hy / nl : -1.0f;
+				if (ny > -0.7f || s.velocityY < 0.0f) {
+					continue;
+				}
+			}
+			if (t < earliest) {
+				earliest = t;
+			}
 			continue;
 		}
 		[solid computeAABB:_aabbB];
 		if (![self sweptHitFromX:cx y:cy dx:dx dy:dy
 							minX:_aabbB[0] - hw minY:_aabbB[1] - hh
 							maxX:_aabbB[2] + hw maxY:_aabbB[3] + hh]) {
+			continue;
+		}
+		if (_sweptResult[0] <= 0.0f) {
+			// Already overlapping when the frame began. There is nothing to
+			// sweep out of a contact you are already in, and pulling the
+			// sprite back for it drags a resting body backwards every frame
+			// while its speed along the surface keeps building.
 			continue;
 		}
 		if (solid.oneWay
@@ -910,9 +1102,25 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	s.frameDeltaY -= dy * back;
 }
 
-/** Shape-aware overlap test (rect/rect, circle/circle, circle/rect). */
+/** Shape-aware overlap test (rect/rect, circle/circle, circle/rect, and
+ *  either of those against a rect that turns with its sprite). */
 - (BOOL)shapesOverlap:(TGSprite *)a with:(TGSprite *)b
 {
+	if (a.obbHitbox || b.obbHitbox) {
+		if (a.circleHitbox || b.circleHitbox) {
+			TGSprite *circle = a.circleHitbox ? a : b;
+			TGSprite *box = a.circleHitbox ? b : a;
+			[circle hitCenter:_centerA];
+			[box hitBox:_boxB];
+			// overlap only needs the yes/no, so the contact normal is moot here
+			return [self circleAtX:_centerA[0] y:_centerA[1]
+							radius:[circle hitRadius] vsObb:_boxB
+								vx:0.0f vy:0.0f out:_contact];
+		}
+		[a hitBox:_boxA];
+		[b hitBox:_boxB];
+		return [self obb:_boxA vsObb:_boxB out:_contact];
+	}
 	if (a.circleHitbox && b.circleHitbox) {
 		[a hitCenter:_centerA];
 		[b hitCenter:_centerB];
@@ -964,8 +1172,222 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	s.y += ground.frameDeltaY;
 }
 
+/**
+ * Circle against an oriented rect. The circle's center is taken into the
+ * box's own frame, where the box is axis-aligned and the existing
+ * closest-point test applies unchanged; the contact normal is rotated back
+ * out at the end. out = { nx, ny, penetration }, normal pointing from the
+ * box toward the circle. NO when they miss. See the Android twin.
+ */
+- (BOOL)circleAtX:(float)cx y:(float)cy radius:(float)r vsObb:(float *)box
+			   vx:(float)vx vy:(float)vy out:(float *)out
+{
+	float cos_ = cosf(box[4]);
+	float sin_ = sinf(box[4]);
+	float rx = cx - box[0];
+	float ry = cy - box[1];
+	float lx = rx * cos_ + ry * sin_;   // into the box's frame
+	float ly = -rx * sin_ + ry * cos_;
+	float hx = box[2];
+	float hy = box[3];
+	float clampedX = MIN(MAX(lx, -hx), hx);
+	float clampedY = MIN(MAX(ly, -hy), hy);
+	float dx = lx - clampedX;
+	float dy = ly - clampedY;
+	float d2 = dx * dx + dy * dy;
+	if (d2 >= r * r) {
+		return NO;
+	}
+	// A corner is a point, and a point cannot hold anything up. Left with the
+	// corner-to-center normal, a ball landing on the tip of a turned box takes
+	// the hit almost straight up: at high restitution it pops into the air and
+	// hangs there, at low restitution the bounce falls under the settle
+	// threshold and the ball perches on the point and creeps off. Both read as
+	// the ball freezing. Resolving against the face it is actually running
+	// into makes it glance off in a third of a second instead.
+	if (fabsf(fabsf(clampedX) - hx) < 1e-4f && fabsf(fabsf(clampedY) - hy) < 1e-4f) {
+		float lvx = vx * cos_ + vy * sin_;
+		float lvy = -vx * sin_ + vy * cos_;
+		float faceX = (clampedX < 0.0f) ? -1.0f : (clampedX > 0.0f) ? 1.0f : 0.0f;
+		float faceY = (clampedY < 0.0f) ? -1.0f : (clampedY > 0.0f) ? 1.0f : 0.0f;
+		BOOL useX = (lvx * faceX) < (lvy * faceY); // the one it runs into
+		float fnx = useX ? faceX : 0.0f;
+		float fny = useX ? 0.0f : faceY;
+		float gap = (lx * fnx + ly * fny) - (useX ? hx : hy);
+		float pen = r - gap;
+		if (pen > 0.0f) {
+			out[0] = fnx * cos_ - fny * sin_;
+			out[1] = fnx * sin_ + fny * cos_;
+			out[2] = pen;
+			return YES;
+		}
+	}
+	float lnx, lny, penetration;
+	if (d2 > 1e-6f) {
+		float d = sqrtf(d2);
+		lnx = dx / d;
+		lny = dy / d;
+		penetration = r - d;
+	} else {
+		// center inside the box — out through the nearest face
+		float toLeft = lx + hx;
+		float toRight = hx - lx;
+		float toTop = ly + hy;
+		float toBottom = hy - ly;
+		float minFace = MIN(MIN(toLeft, toRight), MIN(toTop, toBottom));
+		lnx = (minFace == toLeft) ? -1.0f : (minFace == toRight) ? 1.0f : 0.0f;
+		lny = (lnx != 0.0f) ? 0.0f : (minFace == toTop) ? -1.0f : 1.0f;
+		penetration = minFace + r;
+	}
+	out[0] = lnx * cos_ - lny * sin_;   // back into world space
+	out[1] = lnx * sin_ + lny * cos_;
+	out[2] = penetration;
+	return YES;
+}
+
+/**
+ * Two oriented rects, by separating axes. Rectangles only need four
+ * candidate axes — each box's own two — and if the boxes overlap on all
+ * four, the smallest of those overlaps is the shortest way out. An
+ * unrotated box is just an oriented one at zero radians, so this also
+ * covers a plain rect against a tilted platform. out = { nx, ny,
+ * penetration }, normal pointing from b toward a. NO when any axis
+ * separates them.
+ */
+- (BOOL)obb:(float *)a vsObb:(float *)b out:(float *)out
+{
+	float ca = cosf(a[4]);
+	float sa = sinf(a[4]);
+	float cb = cosf(b[4]);
+	float sb = sinf(b[4]);
+	_satAxes[0] = ca;   _satAxes[1] = sa;    // a's own two axes
+	_satAxes[2] = -sa;  _satAxes[3] = ca;
+	_satAxes[4] = cb;   _satAxes[5] = sb;    // b's
+	_satAxes[6] = -sb;  _satAxes[7] = cb;
+	float dx = a[0] - b[0];
+	float dy = a[1] - b[1];
+	float best = FLT_MAX;
+	float bestX = 0.0f;
+	float bestY = 0.0f;
+	for (int i = 0; i < 4; i++) {
+		float nx = _satAxes[i * 2];
+		float ny = _satAxes[i * 2 + 1];
+		// how far each box reaches along this axis from its own center
+		float ra = a[2] * fabsf(nx * ca + ny * sa) + a[3] * fabsf(-nx * sa + ny * ca);
+		float rb = b[2] * fabsf(nx * cb + ny * sb) + b[3] * fabsf(-nx * sb + ny * cb);
+		float along = dx * nx + dy * ny;
+		float overlap = ra + rb - fabsf(along);
+		if (overlap <= 0.0f) {
+			return NO; // a separating axis: they cannot be touching
+		}
+		if (overlap < best) {
+			best = overlap;
+			float sign = (along < 0.0f) ? -1.0f : 1.0f; // orient from b toward a
+			bestX = nx * sign;
+			bestY = ny * sign;
+		}
+	}
+	out[0] = bestX;
+	out[1] = bestY;
+	out[2] = best;
+	return YES;
+}
+
+/**
+ * Bilateral circle solids: a pair that lists each other's groups and whose
+ * sprites are both in `solidMode: 'push'` is resolved once, not once per
+ * direction. Each body takes half the separation, and the closing part of
+ * the relative velocity is exchanged at equal mass — for two equal circles
+ * with restitution 1 that is a straight swap of the normal components,
+ * which is what a break shot needs. Tangential velocity is untouched: no
+ * friction, no spin. See the Android twin.
+ *
+ * Runs before the one-sided resolver, which skips push solids, so a pair is
+ * never corrected twice in a frame.
+ */
+- (void)resolveBilateralPairs:(NSArray<TGSprite *> *)list
+{
+	NSUInteger n = list.count;
+	for (NSUInteger i = 0; i < n; i++) {
+		TGSprite *a = list[i];
+		NSSet<NSString *> *ga = a.solidWith;
+		if (!a.circleHitbox || !a.visible || ga.count == 0
+				|| a.solidMode != TGSolidPush) {
+			continue;
+		}
+		for (NSUInteger j = i + 1; j < n; j++) {
+			TGSprite *b = list[j];
+			if (![self isBilateralPair:a with:b groups:ga]) {
+				continue;
+			}
+			[a hitCenter:_centerA];
+			[b hitCenter:_centerB];
+			float dx = _centerA[0] - _centerB[0];
+			float dy = _centerA[1] - _centerB[1];
+			float sum = [a hitRadius] + [b hitRadius];
+			float d2 = dx * dx + dy * dy;
+			if (d2 >= sum * sum) {
+				continue;
+			}
+			float nx, ny, penetration;
+			if (d2 > 1e-6f) {
+				float d = sqrtf(d2);
+				nx = dx / d;
+				ny = dy / d;
+				penetration = sum - d;
+			} else {
+				// concentric — the geometry carries no direction
+				nx = 0.0f;
+				ny = -1.0f;
+				penetration = sum;
+			}
+			// Split the separation instead of moving one body all of it
+			if (penetration > TGSlop) {
+				float half = penetration * 0.5f;
+				a.x += nx * half;
+				a.y += ny * half;
+				b.x -= nx * half;
+				b.y -= ny * half;
+			}
+			float vn = (a.velocityX - b.velocityX) * nx
+					 + (a.velocityY - b.velocityY) * ny;
+			if (vn >= 0.0f) {
+				continue; // already separating — leave the velocities alone
+			}
+			// Equal masses: each body takes half of (1 + e) * vn, in opposite
+			// directions. The springier of the two wins — the same mix a body
+			// gets against a static surface.
+			float e = MAX(a.restitution, b.restitution);
+			float impulse = -(1.0f + e) * vn * 0.5f;
+			a.velocityX += impulse * nx;
+			a.velocityY += impulse * ny;
+			b.velocityX -= impulse * nx;
+			b.velocityY -= impulse * ny;
+		}
+	}
+}
+
+/** Both circles, both visible, both in push mode, and each listing the
+ *  other's group. Anything less falls through to the ordinary one-sided
+ *  resolver, so `solidWith` keeps its old meaning by default — including a
+ *  one-way pairing, where only one side names the other. */
+- (BOOL)isBilateralPair:(TGSprite *)a with:(TGSprite *)b groups:(NSSet<NSString *> *)ga
+{
+	if (!a.circleHitbox || !a.visible || a.solidMode != TGSolidPush) {
+		return NO;
+	}
+	if (!b.circleHitbox || !b.visible || b.solidMode != TGSolidPush) {
+		return NO;
+	}
+	NSSet<NSString *> *gb = b.solidWith;
+	return a.collisionGroup != nil && b.collisionGroup != nil
+		&& [ga containsObject:b.collisionGroup]
+		&& [gb containsObject:a.collisionGroup];
+}
+
 - (void)resolveSolids:(NSArray<TGSprite *> *)list
 {
+	[self resolveBilateralPairs:list];
 	for (TGSprite *s in list) {
 		NSSet<NSString *> *groups = s.solidWith;
 		if (groups.count == 0 || !s.visible) {
@@ -988,6 +1410,51 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]) {
 				continue;
 			}
+			// Bounciness belongs to the contact, not to one side of it: the
+			// springier of the two surfaces wins, the way Box2D mixes it.
+			// Every solid defaults to 0, so a scene that never sets it on a
+			// surface behaves exactly as before — but a floor can now be
+			// given a bounce of its own without making the ball bouncy
+			// everywhere else it touches.
+			float e = MAX(s.restitution, solid.restitution);
+			if (solid.obbHitbox || s.obbHitbox) {
+				// Separating axes instead of the two screen axes, so a
+				// tilted platform pushes along its own face — which is what
+				// lets a rider slide down a slope instead of standing on an
+				// invisible ledge.
+				[s hitBox:_boxA];
+				[solid hitBox:_boxB];
+				if (![self obb:_boxA vsObb:_boxB out:_contact]) {
+					continue;
+				}
+				float nx = _contact[0];
+				float ny = _contact[1];
+				float penetration = _contact[2];
+				if (solid.oneWay && (ny > -0.7f || s.velocityY < 0.0f)) {
+					continue; // one-way: riders only catch on the upper face
+				}
+				if (penetration > TGSlop) {
+					s.x += nx * penetration;
+					s.y += ny * penetration;
+				}
+				float vn = s.velocityX * nx + s.velocityY * ny;
+				if (vn < 0.0f) {
+					float bounce = -vn * e;
+					if (e > 0.0f && bounce > 40.0f) {
+						s.velocityX -= (1.0f + e) * vn * nx;
+						s.velocityY -= (1.0f + e) * vn * ny;
+					} else {
+						s.velocityX -= vn * nx;
+						s.velocityY -= vn * ny;
+						if (ny < -0.7f) {
+							grounded = YES;
+							groundedOn = solid;
+						}
+					}
+				}
+				[s computeAABB:_aabbA]; // position changed — refresh for the next solid
+				continue;
+			}
 			[solid computeAABB:_aabbB];
 			float overlapX = MIN(_aabbA[2], _aabbB[2]) - MAX(_aabbA[0], _aabbB[0]);
 			float overlapY = MIN(_aabbA[3], _aabbB[3]) - MAX(_aabbA[1], _aabbB[1]);
@@ -1007,8 +1474,8 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				// vertical resolution (compare AABB centers, *2 avoids the division)
 				if (fromAbove) {
 					s.y -= overlapY; // hit the solid from above
-					float bounce = (s.restitution > 0.0f && s.velocityY > 0.0f)
-						? s.velocityY * s.restitution : 0.0f;
+					float bounce = (e > 0.0f && s.velocityY > 0.0f)
+						? s.velocityY * e : 0.0f;
 					if (bounce > 40.0f) {
 						s.velocityY = -bounce; // rigid-body bounce
 					} else {
@@ -1021,7 +1488,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				} else {
 					s.y += overlapY; // bumped from below
 					if (s.velocityY < 0.0f) {
-						s.velocityY = (s.restitution > 0.0f) ? -s.velocityY * s.restitution : 0.0f;
+						s.velocityY = (e > 0.0f) ? -s.velocityY * e : 0.0f;
 					}
 				}
 			} else {
@@ -1030,13 +1497,13 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				// as soon as the wall ends
 				if (_aabbA[0] + _aabbA[2] < _aabbB[0] + _aabbB[2]) {
 					s.x -= overlapX;
-					if (s.restitution > 0.0f && s.velocityX > 0.0f) {
-						s.velocityX = -s.velocityX * s.restitution;
+					if (e > 0.0f && s.velocityX > 0.0f) {
+						s.velocityX = -s.velocityX * e;
 					}
 				} else {
 					s.x += overlapX;
-					if (s.restitution > 0.0f && s.velocityX < 0.0f) {
-						s.velocityX = -s.velocityX * s.restitution;
+					if (e > 0.0f && s.velocityX < 0.0f) {
+						s.velocityX = -s.velocityX * e;
 					}
 				}
 			}
@@ -1054,8 +1521,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 }
 
 /**
- * Circle-vs-AABB solid resolution: pushed out along the contact normal,
- * so the ball bounces off corners naturally — see the Android twin.
+ * Circle-vs-solid resolution: pushed out along the contact normal, so the
+ * ball bounces off corners naturally. A solid that declares a circle
+ * hitbox is resolved as a circle — normal from center to center, no
+ * phantom faces or corners — and every other solid keeps the
+ * closest-point-on-AABB normal. See the Android twin.
  */
 - (void)resolveCircleSolids:(TGSprite *)s
 					 inList:(NSArray<TGSprite *> *)list
@@ -1070,46 +1540,112 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]) {
 			continue;
 		}
+		if ([self isBilateralPair:s with:solid groups:groups]) {
+			continue; // already resolved once, in resolveBilateralPairs
+		}
+		// Bounciness belongs to the contact, not to one side of it: the
+		// springier of the two surfaces wins, the way Box2D mixes it.
+		// Every solid defaults to 0, so a scene that never sets it on a
+		// surface behaves exactly as before — but a floor can now be
+		// given a bounce of its own without making the ball bouncy
+		// everywhere else it touches.
+		float e = MAX(s.restitution, solid.restitution);
 		[s hitCenter:_centerA];
 		float cx = _centerA[0];
 		float cy = _centerA[1];
-		[solid computeAABB:_aabbB];
-		float closestX = MIN(MAX(cx, _aabbB[0]), _aabbB[2]);
-		float closestY = MIN(MAX(cy, _aabbB[1]), _aabbB[3]);
-		float dx = cx - closestX;
-		float dy = cy - closestY;
-		float d2 = dx * dx + dy * dy;
-		if (d2 >= r * r) {
-			continue;
-		}
 		float nx, ny, penetration;
-		if (d2 > 1e-6f) {
+		if (solid.solidMode == TGSolidContain && solid.circleHitbox) {
+			// Inward boundary: keep the ball's center within R - r of the
+			// container's. The correcting normal points back toward the
+			// center, so the whole tail below (push-out, restitution,
+			// grounding on the lower arc, land) works unchanged.
+			[solid hitCenter:_centerB];
+			float allowed = [solid hitRadius] - r;
+			float dx = cx - _centerB[0];
+			float dy = cy - _centerB[1];
+			float d2 = dx * dx + dy * dy;
+			if (allowed <= 0.0f || d2 <= allowed * allowed) {
+				continue; // ball still inside, or it does not fit at all
+			}
 			float d = sqrtf(d2);
-			nx = dx / d;
-			ny = dy / d;
-			penetration = r - d;
+			nx = -dx / d;
+			ny = -dy / d;
+			penetration = d - allowed;
+		} else if (solid.obbHitbox) {
+			// Rect that turns with its sprite: the normal comes out
+			// perpendicular to the real face, not to a phantom axis
+			[solid hitBox:_boxB];
+			if (![self circleAtX:cx y:cy radius:r vsObb:_boxB
+								 vx:s.velocityX vy:s.velocityY out:_contact]) {
+				continue;
+			}
+			nx = _contact[0];
+			ny = _contact[1];
+			penetration = _contact[2];
+		} else if (solid.circleHitbox) {
+			// Circle vs circle: the normal is the line between the two
+			// centers and the overlap is r1 + r2 - d.
+			[solid hitCenter:_centerB];
+			float sum = r + [solid hitRadius];
+			float dx = cx - _centerB[0];
+			float dy = cy - _centerB[1];
+			float d2 = dx * dx + dy * dy;
+			if (d2 >= sum * sum) {
+				continue;
+			}
+			if (d2 > 1e-6f) {
+				float d = sqrtf(d2);
+				nx = dx / d;
+				ny = dy / d;
+				penetration = sum - d;
+			} else {
+				// concentric — the geometry carries no direction, so pick
+				// a fixed one rather than dividing by zero
+				nx = 0.0f;
+				ny = -1.0f;
+				penetration = sum;
+			}
 		} else {
-			// center inside the solid — push out along the nearest face
-			float toLeft = cx - _aabbB[0];
-			float toRight = _aabbB[2] - cx;
-			float toTop = cy - _aabbB[1];
-			float toBottom = _aabbB[3] - cy;
-			float minFace = MIN(MIN(toLeft, toRight), MIN(toTop, toBottom));
-			nx = (minFace == toLeft) ? -1.0f : (minFace == toRight) ? 1.0f : 0.0f;
-			ny = (nx != 0.0f) ? 0.0f : (minFace == toTop) ? -1.0f : 1.0f;
-			penetration = minFace + r;
+			[solid computeAABB:_aabbB];
+			float closestX = MIN(MAX(cx, _aabbB[0]), _aabbB[2]);
+			float closestY = MIN(MAX(cy, _aabbB[1]), _aabbB[3]);
+			float dx = cx - closestX;
+			float dy = cy - closestY;
+			float d2 = dx * dx + dy * dy;
+			if (d2 >= r * r) {
+				continue;
+			}
+			if (d2 > 1e-6f) {
+				float d = sqrtf(d2);
+				nx = dx / d;
+				ny = dy / d;
+				penetration = r - d;
+			} else {
+				// center inside the solid — push out along the nearest face
+				float toLeft = cx - _aabbB[0];
+				float toRight = _aabbB[2] - cx;
+				float toTop = cy - _aabbB[1];
+				float toBottom = _aabbB[3] - cy;
+				float minFace = MIN(MIN(toLeft, toRight), MIN(toTop, toBottom));
+				nx = (minFace == toLeft) ? -1.0f : (minFace == toRight) ? 1.0f : 0.0f;
+				ny = (nx != 0.0f) ? 0.0f : (minFace == toTop) ? -1.0f : 1.0f;
+				penetration = minFace + r;
+			}
 		}
-		if (solid.oneWay && (ny > -0.7f || s.velocityY < 0.0f)) {
+		if (solid.oneWay && solid.solidMode == TGSolidBlock
+				&& (ny > -0.7f || s.velocityY < 0.0f)) {
 			continue; // one-way: balls only land on the top face
 		}
-		s.x += nx * penetration;
-		s.y += ny * penetration;
+		if (penetration > TGSlop) {
+			s.x += nx * penetration;
+			s.y += ny * penetration;
+		}
 		float vn = s.velocityX * nx + s.velocityY * ny;
 		if (vn < 0.0f) {
-			float bounce = -vn * s.restitution;
-			if (s.restitution > 0.0f && bounce > 40.0f) {
-				s.velocityX -= (1.0f + s.restitution) * vn * nx;
-				s.velocityY -= (1.0f + s.restitution) * vn * ny;
+			float bounce = -vn * e;
+			if (e > 0.0f && bounce > 40.0f) {
+				s.velocityX -= (1.0f + e) * vn * nx;
+				s.velocityY -= (1.0f + e) * vn * ny;
 			} else {
 				s.velocityX -= vn * nx;
 				s.velocityY -= vn * ny;

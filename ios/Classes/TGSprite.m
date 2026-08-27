@@ -209,6 +209,23 @@ static _Atomic int TGIdleSequence = 0;
 	if (gravity != 0.0f) {
 		self.velocityY += gravity * dt;
 	}
+	float gravityX = self.gravityX;
+	if (gravityX != 0.0f) {
+		self.velocityX += gravityX * dt;
+	}
+	float linearDamping = self.linearDamping;
+	if (linearDamping > 0.0f && (self.velocityX != 0.0f || self.velocityY != 0.0f)) {
+		// Clamped so a long frame can't reverse the sprite instead of slowing it
+		float keep = 1.0f - MIN(1.0f, linearDamping * dt);
+		float dvx = self.velocityX * keep;
+		float dvy = self.velocityY * keep;
+		if (dvx * dvx + dvy * dvy < 16.0f) {
+			dvx = 0.0f; // under 4 px/s: invisible, so stop for real
+			dvy = 0.0f;
+		}
+		self.velocityX = dvx;
+		self.velocityY = dvy;
+	}
 	float velocityX = self.velocityX;
 	if (velocityX != 0.0f) {
 		self.x += velocityX * dt;
@@ -384,6 +401,30 @@ static _Atomic int TGIdleSequence = 0;
 	float sinr = sinf(rad);
 	out[0] = self.x + lx * cosr - ly * sinr;
 	out[1] = self.y + lx * sinr + ly * cosr;
+}
+
+/**
+ * Oriented hitbox: out = {centerX, centerY, halfWidth, halfHeight,
+ * rotationRadians}. Same rect computeAABB boxes — same scales, same
+ * hitboxScale shrink around the anchor — but kept as a turned rectangle
+ * instead of being re-boxed to the axes.
+ */
+- (void)hitBox:(float *)out
+{
+	float w = [self drawWidth];
+	float h = [self drawHeight];
+	float sx = self.scaleX * self.hitboxScale * self.hitboxScaleX;
+	float sy = self.scaleY * self.hitboxScale * self.hitboxScaleY;
+	float lcx = (w / 2.0f - self.anchorX * w) * sx;
+	float lcy = (h / 2.0f - self.anchorY * h) * sy;
+	float rad = self.rotation * (float)M_PI / 180.0f;
+	float cos_ = cosf(rad);
+	float sin_ = sinf(rad);
+	out[0] = self.x + lcx * cos_ - lcy * sin_;
+	out[1] = self.y + lcx * sin_ + lcy * cos_;
+	out[2] = fabsf(w * sx) / 2.0f;
+	out[3] = fabsf(h * sy) / 2.0f;
+	out[4] = rad;
 }
 
 - (void)computeAABB:(float *)out

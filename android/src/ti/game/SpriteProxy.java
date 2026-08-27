@@ -187,6 +187,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("gravity")) {
 			sprite.gravity = TiConvert.toFloat(options.get("gravity"));
 		}
+		if (options.containsKey("gravityX")) {
+			sprite.gravityX = TiConvert.toFloat(options.get("gravityX"));
+		}
 		if (options.containsKey("wrapX")) {
 			sprite.wrapX = TiConvert.toFloat(options.get("wrapX"));
 		}
@@ -222,6 +225,12 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("oneWay")) {
 			sprite.oneWay = TiConvert.toBoolean(options.get("oneWay"), false);
+		}
+		if (options.containsKey("solidMode")) {
+			sprite.solidMode = solidModeFromString(TiConvert.toString(options.get("solidMode")));
+		}
+		if (options.containsKey("linearDamping")) {
+			sprite.linearDamping = Math.max(0f, TiConvert.toFloat(options.get("linearDamping")));
 		}
 		if (options.containsKey("carryRiders")) {
 			sprite.carryRiders = TiConvert.toBoolean(options.get("carryRiders"), true);
@@ -864,6 +873,20 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		sprite.gravity = value;
 	}
 
+	/** Horizontal acceleration in px/s² (wind, conveyors). `gravity` stays
+	 *  the vertical one — this is its sibling, not half of a vector. */
+	@Kroll.getProperty
+	public float getGravityX()
+	{
+		return sprite.gravityX;
+	}
+
+	@Kroll.setProperty
+	public void setGravityX(float value)
+	{
+		sprite.gravityX = value;
+	}
+
 	@Kroll.getProperty
 	public float getWrapX()
 	{
@@ -1102,13 +1125,14 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	@Kroll.getProperty
 	public String getHitboxShape()
 	{
-		return sprite.circleHitbox ? "circle" : "rect";
+		return sprite.circleHitbox ? "circle" : sprite.obbHitbox ? "rotatedRect" : "rect";
 	}
 
 	@Kroll.setProperty
 	public void setHitboxShape(String value)
 	{
 		sprite.circleHitbox = "circle".equals(value);
+		sprite.obbHitbox = "rotatedRect".equals(value);
 	}
 
 	/** Swept AABB: this sprite's movement is collision-tested as a path,
@@ -1212,6 +1236,56 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setOneWay(boolean value)
 	{
 		sprite.oneWay = value;
+	}
+
+	/** As a solid: 'block' (default, immovable wall), 'contain' (inward
+	 *  circular boundary — matched circles are kept inside it) or 'push'
+	 *  (a body in its own right: a matched circle and this one share the
+	 *  separation and exchange momentum). The last two are circle-on-circle
+	 *  only; anything else falls back to 'block'. */
+	@Kroll.getProperty
+	public String getSolidMode()
+	{
+		switch (sprite.solidMode) {
+			case Sprite.SOLID_CONTAIN:
+				return "contain";
+			case Sprite.SOLID_PUSH:
+				return "push";
+			default:
+				return "block";
+		}
+	}
+
+	@Kroll.setProperty
+	public void setSolidMode(String value)
+	{
+		sprite.solidMode = solidModeFromString(value);
+	}
+
+	private static int solidModeFromString(String value)
+	{
+		if ("contain".equals(value)) {
+			return Sprite.SOLID_CONTAIN;
+		}
+		if ("push".equals(value)) {
+			return Sprite.SOLID_PUSH;
+		}
+		return Sprite.SOLID_BLOCK; // unknown values behave like today
+	}
+
+	/** Fraction of speed shed per second to the surface (0 = none, the
+	 *  default). Rolling friction for ordinary sprites — `drag` only ever
+	 *  worked inside carMode. Stopped outright below 4 px/s. */
+	@Kroll.getProperty
+	public float getLinearDamping()
+	{
+		return sprite.linearDamping;
+	}
+
+	@Kroll.setProperty
+	public void setLinearDamping(float value)
+	{
+		sprite.linearDamping = Math.max(0f, value);
 	}
 
 	/** As a solid: whether riders inherit this sprite's movement (moving

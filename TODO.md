@@ -54,8 +54,30 @@ traffic in the loop.
 
 - [x] Circle hitboxes (`hitboxShape: 'circle'`) — circle/circle and
       circle/AABB collision events, contact-normal solid resolution
-      (corner bounces), round touch area, circle debug overlay. Volley
-      ball and asteroids use it.
+      (corner bounces), round touch area, circle debug overlay. A solid
+      that declares a circle hitbox resolves as a circle too, statically
+      and under `swept: true`; a circle against a rectangular solid still
+      sweeps as a box. Volley ball and asteroids use it, circles.js
+      compares a rect post against a round one.
+- [x] Bilateral circle-vs-circle response (`solidMode: 'push'`) — a pair
+      that lists each other is resolved once, splitting the separation and
+      exchanging the closing velocity at equal mass, so a struck ball
+      actually leaves. No masses, no spin, no friction. pool.js.
+- [x] Inward circular containment (`solidMode: 'contain'`) — a circular
+      solid that keeps matched circles inside it, analytically, with no
+      ring of wall sprites and no gaps. drum.js.
+- [x] Rolling friction for ordinary sprites (`linearDamping`) — `drag` only
+      ever worked inside carMode. Proportional, which is what a ball
+      trickling to a halt looks like; a constant deceleration was tried and
+      stops slow bodies dead, all together, which reads wrong. Stopped
+      outright below 4 px/s. pool.js and drum.js.
+- [x] Restitution read off both sides of a contact — a solid carries its own
+      `restitution` and the springier of the two surfaces decides the bounce,
+      the mix Box2D uses by default. Solids default to 0, so every existing
+      scene is unchanged; what it buys is a springy floor under riders that
+      are not themselves bouncy. slopes.js.
+- [x] Horizontal acceleration (`gravityX`) — the sibling of `gravity`;
+      `gravity` keeps its exact meaning. Default 0. wind.js.
 - [x] One-way platforms (jump up through, land on top) — `oneWay: true`
       on the solid; works for rect and circle riders. The platformer
       staircase uses it.
@@ -76,7 +98,21 @@ traffic in the loop.
       calls (own scratch, no GL-thread buffers). Discrete queries only
       (timers, taps) — not per-frame JS polling. raycast.js demos
       line of sight, ledge probes and tap hitscan.
-- [ ] Slopes (platformer terrain) — only if terrain games become a goal.
+- [x] Oriented rect hitboxes (`hitboxShape: 'rotatedRect'`) — the collision
+      rect turns with the sprite instead of being re-boxed to the screen
+      axes, so a tilted solid is hit on its real face and the normal comes
+      out perpendicular to it. Circle-vs-OBB by taking the circle into the
+      box's frame; rect-vs-OBB by separating axes (four, for rectangles),
+      with the smallest overlap as the way out. Covers solids, overlap
+      events, raycast, the swept pass and the debug overlay. Plain `'rect'`
+      stays the default. circles.js and slopes.js.
+- [ ] Slopes (platformer terrain) — a tilted `'rotatedRect'` solid already
+      carries a rider and resolves along its face (slopes.js). What is still
+      missing is the platformer feel on top of it: walking up a slope without
+      the step-up stutter, **surface friction that acts along the contact
+      only** (`linearDamping` bleeds speed in every direction, which is right
+      for a pool table and wrong for a hill), and terrain built from more
+      than one flat ramp.
 
 ## 4. Tile maps
 

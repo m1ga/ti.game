@@ -154,6 +154,12 @@
 @property (atomic, assign) float velocityY;
 @property (atomic, assign) float gravity; // applied to velocityY
 
+// Constant horizontal acceleration in px/s², the sibling of `gravity`
+// (wind, a conveyor, a sideways pull, a top-down game whose "down" is a
+// direction). `gravity` keeps its exact meaning: it is the vertical one,
+// not a vector.
+@property (atomic, assign) float gravityX;
+
 // Newtonian flight (Asteroids-style)
 @property (atomic, assign) float angularVelocity; // deg/s
 @property (atomic, assign) float thrust;          // px/s^2 along heading
@@ -190,6 +196,13 @@
 // x hitboxScale, centered on the sprite center) — balls, asteroids.
 @property (atomic, assign) BOOL circleHitbox;
 
+// Oriented hitbox (hitboxShape: 'rotatedRect'): the collision rect turns
+// with the sprite instead of being re-boxed axis-aligned every frame, so a
+// tilted platform or a diamond post is hit on its real face and the contact
+// normal comes out perpendicular to it. An axis-aligned rect is still the
+// default — this only matters once rotation is non-zero.
+@property (atomic, assign) BOOL obbHitbox;
+
 // Draws debug overlays; TGScene.debugAll enables it for everyone.
 @property (atomic, assign) BOOL debug;
 
@@ -206,6 +219,32 @@
 // falling onto its top edge — they jump up through it and are never
 // blocked sideways or from below (pass-through floors).
 @property (atomic, assign) BOOL oneWay;
+
+// As a solid: how this sprite acts on the bodies that hit it.
+//   TGSolidBlock   — immovable wall (the default, and what every solid
+//                    did before this existed)
+//   TGSolidContain — inward circular boundary: circles matched to it are
+//                    kept *inside* its circumference instead of outside
+//                    (drums, bowls, lottery cages). Circle-on-circle only.
+//   TGSolidPush    — a body in its own right: a matched circle and this
+//                    one share the separation and exchange momentum along
+//                    the contact normal (equal masses). Circle-on-circle only.
+typedef NS_ENUM(int, TGSolidMode) {
+	TGSolidBlock = 0,
+	TGSolidContain = 1,
+	TGSolidPush = 2
+};
+@property (atomic, assign) TGSolidMode solidMode;
+
+// Fraction of speed shed per second to the surface (0 = none, the default;
+// ~0.6 ≈ a pool ball on felt). Proportional, like the car model's `drag`
+// but for ordinary sprites and outside carMode: a fast body sheds a lot and
+// a slow one very little, which is what a ball trickling to a halt actually
+// looks like. A constant deceleration was tried here instead and stops slow
+// bodies dead, which reads as wrong. The trade is that a proportion never
+// reaches zero on its own, so a body creeping below a twentieth of a pixel
+// per frame is stopped outright rather than left crawling down an asymptote.
+@property (atomic, assign) float linearDamping;
 
 // As a solid: whether riders inherit this sprite's per-frame movement
 // (moving platforms). Turn off for world-scroll terrain that moves
@@ -286,6 +325,10 @@
 - (void)update:(float)dt;
 
 /** World-space axis-aligned bounding box: out = {minX, minY, maxX, maxY}. */
+/** Oriented hitbox: out = {centerX, centerY, halfWidth, halfHeight,
+ *  rotationRadians} — the same rect computeAABB boxes, kept turned. */
+- (void)hitBox:(float *)out;
+
 - (void)computeAABB:(float *)out;
 
 /** Collision radius for circle hitboxes. */

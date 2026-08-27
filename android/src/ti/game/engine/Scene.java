@@ -467,6 +467,19 @@ public class Scene
 	private final float[] centerB = new float[2];
 
 	// sweptHit result: entry time in 0..1, entry axis (0 = x, 1 = y)
+	private final float[] boxA = new float[5];   // oriented hitbox: cx, cy, hx, hy, radians
+	private final float[] boxB = new float[5];
+	private final float[] satAxes = new float[8];
+	private final float[] contact = new float[3]; // nx, ny, penetration
+
+	// Allowed penetration, in pixels. A body resting on a solid is pulled
+	// into it by gravity every frame — at 1400 px/s² and 60 fps that is
+	// 0.39 px of sink — and shoving it back out in full, 60 times a second,
+	// is what makes a settled pile tremble. Overlaps under this are left
+	// alone; the closing velocity is still cancelled, so the sink can never
+	// grow past it. Big enough to swallow a frame of gravity, small enough
+	// to stay invisible.
+	private static final float SLOP = 0.5f;
 	private final float[] sweptResult = new float[2];
 
 	/**
@@ -476,6 +489,27 @@ public class Scene
 	 * (slab method). Catches fast movers that would tunnel straight
 	 * through thin targets between frames. GL thread only.
 	 */
+	/** Segment vs circle, same frame as the caller: smallest t in [0,1], or
+	 *  -1 when it misses. Starting inside counts as t = 0. */
+	private float segmentVsCircle(float px, float py, float dx, float dy,
+								  float cx, float cy, float radius)
+	{
+		float fx = px - cx;
+		float fy = py - cy;
+		if (fx * fx + fy * fy <= radius * radius) {
+			return 0f;
+		}
+		float a = dx * dx + dy * dy;
+		float b = 2f * (fx * dx + fy * dy);
+		float c = fx * fx + fy * fy - radius * radius;
+		float disc = b * b - 4f * a * c;
+		if (a < 1e-6f || disc < 0f) {
+			return -1f;
+		}
+		float t = (-b - (float) Math.sqrt(disc)) / (2f * a);
+		return (t >= 0f && t <= 1f) ? t : -1f;
+	}
+
 	private boolean sweptHit(float cx, float cy, float dx, float dy,
 							 float minX, float minY, float maxX, float maxY)
 	{
@@ -564,6 +598,7 @@ public class Scene
 		float dy = y1 - y0;
 		float rayLength = (float) Math.hypot(dx, dy);
 		float[] box = new float[4];
+		float[] rayBox = new float[5];
 		float[] center = new float[2];
 		float[] entry = new float[2];
 		float bestT = Float.MAX_VALUE;
@@ -607,6 +642,36 @@ public class Scene
 					float nl = (float) Math.hypot(hx - center[0], hy - center[1]);
 					bestNormalX = (nl > 1e-6f) ? (hx - center[0]) / nl : 0f;
 					bestNormalY = (nl > 1e-6f) ? (hy - center[1]) / nl : 0f;
+				}
+			} else if (s.circleHitbox == false && s.obbHitbox) {
+				// Ray vs a turned rect: take the ray into the box's frame,
+				// run the same slab test, rotate the normal back out
+				s.hitBox(rayBox);
+				float bc = (float) Math.cos(rayBox[4]);
+				float bs = (float) Math.sin(rayBox[4]);
+				float rx = x0 - rayBox[0];
+				float ry = y0 - rayBox[1];
+				float lx = rx * bc + ry * bs;
+				float ly = -rx * bs + ry * bc;
+				float ldx = dx * bc + dy * bs;
+				float ldy = -dx * bs + dy * bc;
+				if (!segmentVsAabb(lx, ly, ldx, ldy,
+						-rayBox[2], -rayBox[3], rayBox[2], rayBox[3], entry)) {
+					continue;
+				}
+				if (entry[0] < bestT) {
+					bestT = entry[0];
+					best = s;
+					float lnx, lny;
+					if (entry[1] == 0f) {
+						lnx = (ldx > 0f) ? -1f : (ldx < 0f) ? 1f : 0f;
+						lny = 0f;
+					} else {
+						lnx = 0f;
+						lny = (ldy > 0f) ? -1f : (ldy < 0f) ? 1f : 0f;
+					}
+					bestNormalX = lnx * bc - lny * bs;
+					bestNormalY = lnx * bs + lny * bc;
 				}
 			} else {
 				s.computeAABB(box);
@@ -676,9 +741,23 @@ public class Scene
 			aabbB[0] - hw, aabbB[1] - hh, aabbB[2] + hw, aabbB[3] + hh);
 	}
 
-	/** Shape-aware overlap test (rect/rect, circle/circle, circle/rect). */
+	/** Shape-aware overlap test (rect/rect, circle/circle, circle/rect,
+	 *  and either of those against a rect that turns with its sprite). */
 	private boolean shapesOverlap(Sprite a, Sprite b)
 	{
+		if (a.obbHitbox || b.obbHitbox) {
+			if (a.circleHitbox || b.circleHitbox) {
+				Sprite circle = a.circleHitbox ? a : b;
+				Sprite box = a.circleHitbox ? b : a;
+				circle.hitCenter(centerA);
+				box.hitBox(boxB);
+				// overlap only needs the yes/no, so the contact normal is moot here
+				return circleVsObb(centerA[0], centerA[1], circle.hitRadius(), boxB, 0f, 0f, contact);
+			}
+			a.hitBox(boxA);
+			b.hitBox(boxB);
+			return obbVsObb(boxA, boxB, contact);
+		}
 		if (a.circleHitbox && b.circleHitbox) {
 			a.hitCenter(centerA);
 			b.hitCenter(centerB);
@@ -862,6 +941,221 @@ public class Scene
 	}
 
 	/**
+	 * Circle against an oriented rect. The circle's center is taken into the
+	 * box's own frame, where the box is axis-aligned and the existing
+	 * closest-point test applies unchanged; the contact normal is rotated
+	 * back out at the end. out = { nx, ny, penetration }, normal pointing
+	 * from the box toward the circle. False when they miss.
+	 */
+	private boolean circleVsObb(float cx, float cy, float r, float[] box,
+								float vx, float vy, float[] out)
+	{
+		float cos = (float) Math.cos(box[4]);
+		float sin = (float) Math.sin(box[4]);
+		float rx = cx - box[0];
+		float ry = cy - box[1];
+		float lx = rx * cos + ry * sin;   // into the box's frame
+		float ly = -rx * sin + ry * cos;
+		float hx = box[2];
+		float hy = box[3];
+		float clampedX = Math.min(Math.max(lx, -hx), hx);
+		float clampedY = Math.min(Math.max(ly, -hy), hy);
+		float dx = lx - clampedX;
+		float dy = ly - clampedY;
+		float d2 = dx * dx + dy * dy;
+		if (d2 >= r * r) {
+			return false;
+		}
+		// A corner is a point, and a point cannot hold anything up. Left with
+		// the corner-to-center normal, a ball landing on the tip of a turned
+		// box takes the hit almost straight up: at high restitution it pops
+		// into the air and hangs there, at low restitution the bounce falls
+		// under the settle threshold and the ball perches on the point and
+		// creeps off. Both read as the ball freezing. Resolving against the
+		// face it is actually running into makes it glance off in a third of
+		// a second instead.
+		if (Math.abs(Math.abs(clampedX) - hx) < 1e-4f
+				&& Math.abs(Math.abs(clampedY) - hy) < 1e-4f) {
+			float lvx = vx * cos + vy * sin;
+			float lvy = -vx * sin + vy * cos;
+			float faceX = Math.signum(clampedX);
+			float faceY = Math.signum(clampedY);
+			boolean useX = (lvx * faceX) < (lvy * faceY); // the one it runs into
+			float fnx = useX ? faceX : 0f;
+			float fny = useX ? 0f : faceY;
+			float gap = (lx * fnx + ly * fny) - (useX ? hx : hy);
+			float pen = r - gap;
+			if (pen > 0f) {
+				out[0] = fnx * cos - fny * sin;
+				out[1] = fnx * sin + fny * cos;
+				out[2] = pen;
+				return true;
+			}
+		}
+		float lnx, lny, penetration;
+		if (d2 > 1e-6f) {
+			float d = (float) Math.sqrt(d2);
+			lnx = dx / d;
+			lny = dy / d;
+			penetration = r - d;
+		} else {
+			// center inside the box — out through the nearest face
+			float toLeft = lx + hx;
+			float toRight = hx - lx;
+			float toTop = ly + hy;
+			float toBottom = hy - ly;
+			float min = Math.min(Math.min(toLeft, toRight), Math.min(toTop, toBottom));
+			lnx = (min == toLeft) ? -1f : (min == toRight) ? 1f : 0f;
+			lny = (lnx != 0f) ? 0f : (min == toTop) ? -1f : 1f;
+			penetration = min + r;
+		}
+		out[0] = lnx * cos - lny * sin;   // back into world space
+		out[1] = lnx * sin + lny * cos;
+		out[2] = penetration;
+		return true;
+	}
+
+	/**
+	 * Two oriented rects, by separating axes. Rectangles only need four
+	 * candidate axes — each box's own two — and if the boxes overlap on all
+	 * four, the smallest of those overlaps is the shortest way out. An
+	 * unrotated box is just an oriented one at zero radians, so this also
+	 * covers a plain rect against a tilted platform. out = { nx, ny,
+	 * penetration }, normal pointing from b toward a. False when any axis
+	 * separates them.
+	 */
+	private boolean obbVsObb(float[] a, float[] b, float[] out)
+	{
+		float ca = (float) Math.cos(a[4]);
+		float sa = (float) Math.sin(a[4]);
+		float cb = (float) Math.cos(b[4]);
+		float sb = (float) Math.sin(b[4]);
+		satAxes[0] = ca;   satAxes[1] = sa;    // a's own two axes
+		satAxes[2] = -sa;  satAxes[3] = ca;
+		satAxes[4] = cb;   satAxes[5] = sb;    // b's
+		satAxes[6] = -sb;  satAxes[7] = cb;
+		float dx = a[0] - b[0];
+		float dy = a[1] - b[1];
+		float best = Float.MAX_VALUE;
+		float bestX = 0f;
+		float bestY = 0f;
+		for (int i = 0; i < 4; i++) {
+			float nx = satAxes[i * 2];
+			float ny = satAxes[i * 2 + 1];
+			// how far each box reaches along this axis from its own center
+			float ra = a[2] * Math.abs(nx * ca + ny * sa) + a[3] * Math.abs(-nx * sa + ny * ca);
+			float rb = b[2] * Math.abs(nx * cb + ny * sb) + b[3] * Math.abs(-nx * sb + ny * cb);
+			float along = dx * nx + dy * ny;
+			float overlap = ra + rb - Math.abs(along);
+			if (overlap <= 0f) {
+				return false; // a separating axis: they cannot be touching
+			}
+			if (overlap < best) {
+				best = overlap;
+				float sign = (along < 0f) ? -1f : 1f; // orient from b toward a
+				bestX = nx * sign;
+				bestY = ny * sign;
+			}
+		}
+		out[0] = bestX;
+		out[1] = bestY;
+		out[2] = best;
+		return true;
+	}
+
+	/**
+	 * Bilateral circle solids: a pair that lists each other's groups and
+	 * whose sprites are both in `solidMode: 'push'` is resolved once, not
+	 * once per direction. Each body takes half the separation, and the
+	 * closing part of the relative velocity is exchanged at equal mass —
+	 * for two equal circles with restitution 1 that is a straight swap of
+	 * the normal components, which is what a break shot needs. Tangential
+	 * velocity is untouched: no friction, no spin.
+	 *
+	 * Runs before the one-sided resolver, which skips push solids, so a
+	 * pair is never corrected twice in a frame.
+	 */
+	private void resolveBilateralPairs(List<Sprite> list)
+	{
+		int n = list.size();
+		for (int i = 0; i < n; i++) {
+			Sprite a = list.get(i);
+			Set<String> ga = a.solidWith;
+			if (!a.circleHitbox || !a.visible || ga == null || ga.isEmpty()
+					|| a.solidMode != Sprite.SOLID_PUSH) {
+				continue;
+			}
+			for (int j = i + 1; j < n; j++) {
+				Sprite b = list.get(j);
+				if (!bilateralPair(a, b, ga)) {
+					continue;
+				}
+				a.hitCenter(centerA);
+				b.hitCenter(centerB);
+				float dx = centerA[0] - centerB[0];
+				float dy = centerA[1] - centerB[1];
+				float sum = a.hitRadius() + b.hitRadius();
+				float d2 = dx * dx + dy * dy;
+				if (d2 >= sum * sum) {
+					continue;
+				}
+				float nx, ny, penetration;
+				if (d2 > 1e-6f) {
+					float d = (float) Math.sqrt(d2);
+					nx = dx / d;
+					ny = dy / d;
+					penetration = sum - d;
+				} else {
+					// concentric — the geometry carries no direction
+					nx = 0f;
+					ny = -1f;
+					penetration = sum;
+				}
+				// Split the separation instead of moving one body all of it
+				if (penetration > SLOP) {
+					float half = penetration * 0.5f;
+					a.x += nx * half;
+					a.y += ny * half;
+					b.x -= nx * half;
+					b.y -= ny * half;
+				}
+				float vn = (a.velocityX - b.velocityX) * nx
+						 + (a.velocityY - b.velocityY) * ny;
+				if (vn >= 0f) {
+					continue; // already separating — leave the velocities alone
+				}
+				// Equal masses: each body takes half of (1 + e) * vn, in
+				// opposite directions. The springier of the two wins — the
+				// same mix a body gets against a static surface.
+				float e = Math.max(a.restitution, b.restitution);
+				float impulse = -(1f + e) * vn * 0.5f;
+				a.velocityX += impulse * nx;
+				a.velocityY += impulse * ny;
+				b.velocityX -= impulse * nx;
+				b.velocityY -= impulse * ny;
+			}
+		}
+	}
+
+	/** Both circles, both visible, both in push mode, and each listing the
+	 *  other's group. Anything less falls through to the ordinary one-sided
+	 *  resolver, so `solidWith` keeps its old meaning by default — including
+	 *  a one-way pairing, where only one side names the other. */
+	private boolean bilateralPair(Sprite a, Sprite b, Set<String> ga)
+	{
+		if (!a.circleHitbox || !a.visible || a.solidMode != Sprite.SOLID_PUSH) {
+			return false;
+		}
+		if (!b.circleHitbox || !b.visible || b.solidMode != Sprite.SOLID_PUSH) {
+			return false;
+		}
+		Set<String> gb = b.solidWith;
+		return ga != null && gb != null
+			&& a.collisionGroup != null && b.collisionGroup != null
+			&& ga.contains(b.collisionGroup) && gb.contains(a.collisionGroup);
+	}
+
+	/**
 	 * Platformer collision resolution: sprites with `solidWith` groups are
 	 * pushed out of overlapping solids along the axis of least penetration.
 	 * Landing on top zeroes downward velocity, sets onGround and fires the
@@ -869,6 +1163,7 @@ public class Scene
 	 */
 	private void resolveSolids(List<Sprite> list)
 	{
+		resolveBilateralPairs(list);
 		for (Sprite s : list) {
 			Set<String> groups = s.solidWith;
 			if (groups == null || groups.isEmpty() || !s.visible) {
@@ -891,6 +1186,51 @@ public class Scene
 				if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
 					continue;
 				}
+				// Bounciness belongs to the contact, not to one side of it: the
+				// springier of the two surfaces wins, the way Box2D mixes it.
+				// Every solid defaults to 0, so a scene that never sets it on a
+				// surface behaves exactly as before — but a floor can now be
+				// given a bounce of its own without making the ball bouncy
+				// everywhere else it touches.
+				float e = Math.max(s.restitution, solid.restitution);
+				if (solid.obbHitbox || s.obbHitbox) {
+					// Separating axes instead of the two screen axes, so a
+					// tilted platform pushes along its own face — which is
+					// what lets a rider slide down a slope instead of
+					// standing on an invisible ledge.
+					s.hitBox(boxA);
+					solid.hitBox(boxB);
+					if (!obbVsObb(boxA, boxB, contact)) {
+						continue;
+					}
+					float nx = contact[0];
+					float ny = contact[1];
+					float penetration = contact[2];
+					if (solid.oneWay && (ny > -0.7f || s.velocityY < 0f)) {
+						continue; // one-way: riders only catch on the upper face
+					}
+					if (penetration > SLOP) {
+						s.x += nx * penetration;
+						s.y += ny * penetration;
+					}
+					float vn = s.velocityX * nx + s.velocityY * ny;
+					if (vn < 0f) {
+						float bounce = -vn * e;
+						if (e > 0f && bounce > 40f) {
+							s.velocityX -= (1f + e) * vn * nx;
+							s.velocityY -= (1f + e) * vn * ny;
+						} else {
+							s.velocityX -= vn * nx;
+							s.velocityY -= vn * ny;
+							if (ny < -0.7f) {
+								grounded = true;
+								groundedOn = solid;
+							}
+						}
+					}
+					s.computeAABB(aabbA); // position changed — refresh for the next solid
+					continue;
+				}
 				solid.computeAABB(aabbB);
 				float overlapX = Math.min(aabbA[2], aabbB[2]) - Math.max(aabbA[0], aabbB[0]);
 				float overlapY = Math.min(aabbA[3], aabbB[3]) - Math.max(aabbA[1], aabbB[1]);
@@ -910,8 +1250,8 @@ public class Scene
 					// vertical resolution (compare AABB centers, *2 to avoid the division)
 					if (fromAbove) {
 						s.y -= overlapY; // hit the solid from above
-						float bounce = (s.restitution > 0f && s.velocityY > 0f)
-							? s.velocityY * s.restitution : 0f;
+						float bounce = (e > 0f && s.velocityY > 0f)
+							? s.velocityY * e : 0f;
 						if (bounce > 40f) {
 							s.velocityY = -bounce; // rigid-body bounce
 						} else {
@@ -924,7 +1264,7 @@ public class Scene
 					} else {
 						s.y += overlapY; // bumped from below
 						if (s.velocityY < 0f) {
-							s.velocityY = (s.restitution > 0f) ? -s.velocityY * s.restitution : 0f;
+							s.velocityY = (e > 0f) ? -s.velocityY * e : 0f;
 						}
 					}
 				} else {
@@ -933,13 +1273,13 @@ public class Scene
 					// as soon as the wall ends
 					if (aabbA[0] + aabbA[2] < aabbB[0] + aabbB[2]) {
 						s.x -= overlapX;
-						if (s.restitution > 0f && s.velocityX > 0f) {
-							s.velocityX = -s.velocityX * s.restitution;
+						if (e > 0f && s.velocityX > 0f) {
+							s.velocityX = -s.velocityX * e;
 						}
 					} else {
 						s.x += overlapX;
-						if (s.restitution > 0f && s.velocityX < 0f) {
-							s.velocityX = -s.velocityX * s.restitution;
+						if (e > 0f && s.velocityX < 0f) {
+							s.velocityX = -s.velocityX * e;
 						}
 					}
 				}
@@ -963,6 +1303,12 @@ public class Scene
 	 * ordinary touch and handles push-out, restitution, onGround and the
 	 * land event exactly like a slow collision. Without this, a sprite
 	 * faster than a solid is thick teleports straight through it.
+	 *
+	 * Two circle hitboxes sweep as circles: the Minkowski sum of two
+	 * circles is a circle of radius r1 + r2, so the test is the same ray
+	 * vs circle the raycast API solves. Every other pairing — including a
+	 * circle against a rectangular solid — stays on the inflated-AABB
+	 * Minkowski box.
 	 */
 	private void sweepAgainstSolids(Sprite s, List<Sprite> list, Set<String> groups)
 	{
@@ -972,20 +1318,139 @@ public class Scene
 		if (len2 < 1e-4f) {
 			return;
 		}
-		s.computeAABB(aabbA);
-		float hw = (aabbA[2] - aabbA[0]) / 2f;
-		float hh = (aabbA[3] - aabbA[1]) / 2f;
-		float cx = (aabbA[0] + aabbA[2]) / 2f - dx; // center at frame start
-		float cy = (aabbA[1] + aabbA[3]) / 2f - dy;
+		boolean circle = s.circleHitbox;
+		float r = 0f;
+		float cx, cy, hw = 0f, hh = 0f;
+		if (circle) {
+			s.hitCenter(centerA);
+			r = s.hitRadius();
+			cx = centerA[0] - dx; // center at frame start
+			cy = centerA[1] - dy;
+		} else {
+			s.computeAABB(aabbA);
+			hw = (aabbA[2] - aabbA[0]) / 2f;
+			hh = (aabbA[3] - aabbA[1]) / 2f;
+			cx = (aabbA[0] + aabbA[2]) / 2f - dx; // center at frame start
+			cy = (aabbA[1] + aabbA[3]) / 2f - dy;
+		}
 		float earliest = Float.MAX_VALUE;
 		for (Sprite solid : list) {
 			String group = solid.collisionGroup;
-			if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
+			if (solid == s || group == null || !solid.visible || !groups.contains(group)
+					|| solid.solidMode != Sprite.SOLID_BLOCK) {
+				// contain would stop the ball against the OUTSIDE of the
+				// boundary, and push bodies are meant to move — neither is a
+				// wall, so neither belongs in a blocking sweep
+				continue;
+			}
+			if (solid.obbHitbox) {
+				// Take the whole sweep into the box's frame, where the box is
+				// axis-aligned again and the existing Minkowski segment test
+				// applies unchanged.
+				solid.hitBox(boxB);
+				float bc = (float) Math.cos(boxB[4]);
+				float bs = (float) Math.sin(boxB[4]);
+				float rx = cx - boxB[0];
+				float ry = cy - boxB[1];
+				float lx = rx * bc + ry * bs;
+				float ly = -rx * bs + ry * bc;
+				float ldx = dx * bc + dy * bs;
+				float ldy = -dx * bs + dy * bc;
+				float best = Float.MAX_VALUE;
+				if (circle) {
+					// The Minkowski sum of a circle and a rect is a ROUNDED
+					// rect: the box grown on each axis, plus a quarter circle
+					// at each corner. Growing it as a square instead pokes out
+					// by 1.41r along the diagonal — which is exactly where a
+					// ball dropped on a turned box's tip arrives. It gets
+					// stopped short of a contact that then never happens, and
+					// hangs in mid-air for a quarter second until it drifts
+					// off the phantom corner.
+					if (sweptHit(lx, ly, ldx, ldy,
+							-boxB[2] - r, -boxB[3], boxB[2] + r, boxB[3])) {
+						best = sweptResult[0];
+					}
+					if (sweptHit(lx, ly, ldx, ldy,
+							-boxB[2], -boxB[3] - r, boxB[2], boxB[3] + r)
+							&& sweptResult[0] < best) {
+						best = sweptResult[0];
+					}
+					for (int i = 0; i < 4; i++) {
+						float ccx = ((i & 1) == 0) ? -boxB[2] : boxB[2];
+						float ccy = (i < 2) ? -boxB[3] : boxB[3];
+						float t = segmentVsCircle(lx, ly, ldx, ldy, ccx, ccy, r);
+						if (t >= 0f && t < best) {
+							best = t;
+						}
+					}
+				} else if (sweptHit(lx, ly, ldx, ldy,
+						-boxB[2] - hw, -boxB[3] - hh, boxB[2] + hw, boxB[3] + hh)) {
+					best = sweptResult[0];
+				}
+				if (best == Float.MAX_VALUE || best <= 0f) {
+					// t = 0 means the sprite was already touching when the
+					// frame began, and you cannot tunnel out of a contact you
+					// are already in. Pulling it back for that is what pins a
+					// body resting on a slope: it is dragged back to where it
+					// started every frame while its speed along the surface
+					// keeps climbing, until it finally breaks loose and looks
+					// like it was launched. The static resolver owns this case.
+					continue;
+				}
+				if (solid.oneWay && (dy <= 0f || s.velocityY < 0f)) {
+					continue; // one-way: only a fall onto the upper face counts
+				}
+				if (best < earliest) {
+					earliest = best;
+				}
+				continue;
+			}
+			if (circle && solid.circleHitbox) {
+				solid.hitCenter(centerB);
+				float sum = r + solid.hitRadius();
+				float fx = cx - centerB[0];
+				float fy = cy - centerB[1];
+				float t;
+				if (fx * fx + fy * fy <= sum * sum) {
+					continue; // already touching: nothing to sweep, see above
+				} else {
+					float a = dx * dx + dy * dy;
+					float b = 2f * (fx * dx + fy * dy);
+					float c = fx * fx + fy * fy - sum * sum;
+					float disc = b * b - 4f * a * c;
+					if (disc < 0f) {
+						continue;
+					}
+					t = (-b - (float) Math.sqrt(disc)) / (2f * a);
+					if (t < 0f || t > 1f) {
+						continue;
+					}
+				}
+				if (solid.oneWay) {
+					// same top-face rule as the static resolver: the contact
+					// normal has to point up out of the solid
+					float hy = cy + dy * t - centerB[1];
+					float nl = (float) Math.hypot(cx + dx * t - centerB[0], hy);
+					float ny = (nl > 1e-6f) ? hy / nl : -1f;
+					if (ny > -0.7f || s.velocityY < 0f) {
+						continue;
+					}
+				}
+				if (t < earliest) {
+					earliest = t;
+				}
 				continue;
 			}
 			solid.computeAABB(aabbB);
 			if (!sweptHit(cx, cy, dx, dy,
 					aabbB[0] - hw, aabbB[1] - hh, aabbB[2] + hw, aabbB[3] + hh)) {
+				continue;
+			}
+			if (sweptResult[0] <= 0f) {
+				// Already overlapping when the frame began. There is nothing
+				// to sweep out of a contact you are already in, and pulling
+				// the sprite back for it drags a resting body backwards every
+				// frame while its speed along the surface keeps building.
 				continue;
 			}
 			if (solid.oneWay
@@ -1095,9 +1560,11 @@ public class Scene
 	}
 
 	/**
-	 * Circle-vs-AABB solid resolution: the ball is pushed out along the
-	 * contact normal (closest point on the solid), so it bounces off
-	 * corners naturally. Velocity reflects about the normal with
+	 * Circle-vs-solid resolution: the ball is pushed out along the contact
+	 * normal, so it bounces off corners naturally. A solid that declares a
+	 * circle hitbox is resolved as a circle — normal from center to center,
+	 * no phantom faces or corners — and every other solid keeps the
+	 * closest-point-on-AABB normal. Velocity reflects about the normal with
 	 * restitution; small bounces come to rest and ground the sprite when
 	 * the normal points up.
 	 */
@@ -1112,46 +1579,111 @@ public class Scene
 			if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
 				continue;
 			}
+			if (bilateralPair(s, solid, groups)) {
+				continue; // already resolved once, in resolveBilateralPairs
+			}
+			// Bounciness belongs to the contact, not to one side of it: the
+			// springier of the two surfaces wins, the way Box2D mixes it.
+			// Every solid defaults to 0, so a scene that never sets it on a
+			// surface behaves exactly as before — but a floor can now be
+			// given a bounce of its own without making the ball bouncy
+			// everywhere else it touches.
+			float e = Math.max(s.restitution, solid.restitution);
 			s.hitCenter(centerA);
 			float cx = centerA[0];
 			float cy = centerA[1];
-			solid.computeAABB(aabbB);
-			float closestX = Math.min(Math.max(cx, aabbB[0]), aabbB[2]);
-			float closestY = Math.min(Math.max(cy, aabbB[1]), aabbB[3]);
-			float dx = cx - closestX;
-			float dy = cy - closestY;
-			float d2 = dx * dx + dy * dy;
-			if (d2 >= r * r) {
-				continue;
-			}
 			float nx, ny, penetration;
-			if (d2 > 1e-6f) {
+			if (solid.solidMode == Sprite.SOLID_CONTAIN && solid.circleHitbox) {
+				// Inward boundary: keep the ball's center within R - r of the
+				// container's. The correcting normal points back toward the
+				// center, so the whole tail below (push-out, restitution,
+				// grounding on the lower arc, land) works unchanged.
+				solid.hitCenter(centerB);
+				float allowed = solid.hitRadius() - r;
+				float dx = cx - centerB[0];
+				float dy = cy - centerB[1];
+				float d2 = dx * dx + dy * dy;
+				if (allowed <= 0f || d2 <= allowed * allowed) {
+					continue; // ball still inside, or it does not fit at all
+				}
 				float d = (float) Math.sqrt(d2);
-				nx = dx / d;
-				ny = dy / d;
-				penetration = r - d;
+				nx = -dx / d;
+				ny = -dy / d;
+				penetration = d - allowed;
+			} else if (solid.obbHitbox) {
+				// Rect that turns with its sprite: the normal comes out
+				// perpendicular to the real face, not to a phantom axis
+				solid.hitBox(boxB);
+				if (!circleVsObb(cx, cy, r, boxB, s.velocityX, s.velocityY, contact)) {
+					continue;
+				}
+				nx = contact[0];
+				ny = contact[1];
+				penetration = contact[2];
+			} else if (solid.circleHitbox) {
+				// Circle vs circle: the normal is the line between the two
+				// centers and the overlap is r1 + r2 - d.
+				solid.hitCenter(centerB);
+				float sum = r + solid.hitRadius();
+				float dx = cx - centerB[0];
+				float dy = cy - centerB[1];
+				float d2 = dx * dx + dy * dy;
+				if (d2 >= sum * sum) {
+					continue;
+				}
+				if (d2 > 1e-6f) {
+					float d = (float) Math.sqrt(d2);
+					nx = dx / d;
+					ny = dy / d;
+					penetration = sum - d;
+				} else {
+					// concentric — the geometry carries no direction, so pick
+					// a fixed one rather than dividing by zero
+					nx = 0f;
+					ny = -1f;
+					penetration = sum;
+				}
 			} else {
-				// center inside the solid — push out along the nearest face
-				float toLeft = cx - aabbB[0];
-				float toRight = aabbB[2] - cx;
-				float toTop = cy - aabbB[1];
-				float toBottom = aabbB[3] - cy;
-				float min = Math.min(Math.min(toLeft, toRight), Math.min(toTop, toBottom));
-				nx = (min == toLeft) ? -1f : (min == toRight) ? 1f : 0f;
-				ny = (nx != 0f) ? 0f : (min == toTop) ? -1f : 1f;
-				penetration = min + r;
+				solid.computeAABB(aabbB);
+				float closestX = Math.min(Math.max(cx, aabbB[0]), aabbB[2]);
+				float closestY = Math.min(Math.max(cy, aabbB[1]), aabbB[3]);
+				float dx = cx - closestX;
+				float dy = cy - closestY;
+				float d2 = dx * dx + dy * dy;
+				if (d2 >= r * r) {
+					continue;
+				}
+				if (d2 > 1e-6f) {
+					float d = (float) Math.sqrt(d2);
+					nx = dx / d;
+					ny = dy / d;
+					penetration = r - d;
+				} else {
+					// center inside the solid — push out along the nearest face
+					float toLeft = cx - aabbB[0];
+					float toRight = aabbB[2] - cx;
+					float toTop = cy - aabbB[1];
+					float toBottom = aabbB[3] - cy;
+					float min = Math.min(Math.min(toLeft, toRight), Math.min(toTop, toBottom));
+					nx = (min == toLeft) ? -1f : (min == toRight) ? 1f : 0f;
+					ny = (nx != 0f) ? 0f : (min == toTop) ? -1f : 1f;
+					penetration = min + r;
+				}
 			}
-			if (solid.oneWay && (ny > -0.7f || s.velocityY < 0f)) {
+			if (solid.oneWay && solid.solidMode == Sprite.SOLID_BLOCK
+					&& (ny > -0.7f || s.velocityY < 0f)) {
 				continue; // one-way: balls only land on the top face
 			}
-			s.x += nx * penetration;
-			s.y += ny * penetration;
+			if (penetration > SLOP) {
+				s.x += nx * penetration;
+				s.y += ny * penetration;
+			}
 			float vn = s.velocityX * nx + s.velocityY * ny;
 			if (vn < 0f) {
-				float bounce = -vn * s.restitution;
-				if (s.restitution > 0f && bounce > 40f) {
-					s.velocityX -= (1f + s.restitution) * vn * nx;
-					s.velocityY -= (1f + s.restitution) * vn * ny;
+				float bounce = -vn * e;
+				if (e > 0f && bounce > 40f) {
+					s.velocityX -= (1f + e) * vn * nx;
+					s.velocityY -= (1f + e) * vn * ny;
 				} else {
 					s.velocityX -= vn * nx;
 					s.velocityY -= vn * ny;
