@@ -33,6 +33,7 @@
 var demos = [
 	{ title: 'Asteroids', start: require('/asteroids') },
 	{ title: 'Basic demo', start: require('/basic') },
+	{ title: 'Bingo drum', start: require('/drum') },
 	{ title: 'Blend & flash', start: require('/blend') },
 	{ title: 'Camera', start: require('/camera') },
 	{ title: 'Cards', start: require('/cards') },
@@ -40,7 +41,6 @@ var demos = [
 	{ title: 'Demoscene', start: require('/demoscene') },
 	{ title: 'Flappy pig', start: require('/flappy') },
 	{ title: 'Flip', start: require('/flip') },
-	{ title: 'Bingo drum', start: require('/drum') },
 	{ title: 'Hitbox', start: require('/hitbox') },
 	{ title: 'Maze (A*)', start: require('/maze') },
 	{ title: 'Particles', start: require('/particles') },
