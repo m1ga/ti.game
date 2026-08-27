@@ -664,7 +664,7 @@ Payload: `fps`, `averageCpuMs`, `p95CpuMs`, `maxCpuMs`, `averageUpdateMs`,
 
 Measuring is opt-in all the way down: with the HUD off and no
 `performance` listener attached, the renderer never reads a clock and the
-HUD costs nothing. `particles.js` and `bulkadd.js` have it switched on.
+HUD costs nothing. `particles.js` and `camera.js` have it switched on.
 
 ## Learn from the examples
 
@@ -705,7 +705,6 @@ a feature set — find the one closest to your game and start there:
 | `demoscene.js` | Old-school cracktro: per-character sine text scroller on rotated copies of one closed `followPath` loop, additive copper bars bobbing on circle paths (constant speed on a circle = perfect sine), glowing floating logo, tween-scrolled `tileRepeat` starfield, looping chiptune on the music backend |
 | `maze.js` | A* playground: tap a tile and `findPath` routes the player through a wall-tile maze (`cellSize` = tile size, so the grid matches the map) — faint dots show every grid cell of the raw route (`simplify: false`), gold dots the simplified waypoints handed to `followPath`; a hound re-paths to the player on a `gameView.every` timer and sends you `flash`ing back on contact |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going; a GAME clock on `gameView.every(1000, ...)` freezes with the scene while a REAL `setInterval` clock keeps ticking |
-| `bulkadd.js` | One `add([...])` call for a mixed sprite/emitter/rope array, add/remove buttons, debug HUD on |
 
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
