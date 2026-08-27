@@ -30,7 +30,8 @@ module.exports = function () {
 	});
 	var gameView = Game.createGameView({
 		backgroundColor: '#8ed8f8'
-		// debug: true  // show collision shapes for every sprite
+		// debug: true                              // collision shapes for every sprite
+		// debug: { hitbox: true, hud: 'topRight' }  // ...plus the performance HUD
 	});
 
 	var playerSheet = Game.createSpriteSheet({ image: 'assets/player.png', frameWidth: 64, frameHeight: 64 });

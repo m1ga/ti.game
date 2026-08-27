@@ -23,7 +23,8 @@ module.exports = function () {
 	});
 	var gameView = Game.createGameView({
 		backgroundColor: '#74bae8'
-		// debug: true  // show collision shapes for every sprite
+		// debug: true                              // collision shapes for every sprite
+		// debug: { hitbox: true, hud: 'topRight' }  // ...plus the performance HUD
 	});
 
 	var bgSheet = Game.createSpriteSheet({ image: 'assets/meadow.png', frameWidth: 270, frameHeight: 480, smoothing: false });
