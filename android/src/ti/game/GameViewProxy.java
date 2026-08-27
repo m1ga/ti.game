@@ -51,6 +51,12 @@ public class GameViewProxy extends TiViewProxy
 		gameView.getLayoutParams().autoFillsWidth = true;
 		gameView.getLayoutParams().autoFillsHeight = true;
 		gameView.getRenderer().setMaxFps(maxFps);
+		// Titanium only delivers eventListenerAdded once the proxy has a view
+		// (KrollProxy drops MSG_LISTENER_ADDED while modelListener is null), so
+		// a listener attached in the natural order — create the view, wire it
+		// up, then add it to the window — is never announced. Ask directly
+		// now that the view exists, or measuring stays off forever.
+		refreshStats();
 		return gameView;
 	}
 
@@ -262,7 +268,11 @@ public class GameViewProxy extends TiViewProxy
 
 	private void refreshStats()
 	{
-		scene.stats.enabled = scene.hud.enabled || performanceListening;
+		// hasListeners() is the truth; performanceListening only caches what
+		// the callbacks told us, and those do not fire before the view exists.
+		scene.stats.enabled = scene.hud.enabled
+			|| performanceListening
+			|| hasListeners("performance");
 	}
 
 	@Override
