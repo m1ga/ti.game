@@ -99,8 +99,9 @@ public class TileLayerProxy extends KrollProxy
 		}
 		// Grid inputs, in dependency order: the legend and gid offset shape
 		// the ids, the id sets shape the flags, the data needs all of them
-		if (options.containsKey("legend") && options.get("legend") instanceof KrollDict) {
-			legend = (KrollDict) options.get("legend");
+		if (options.containsKey("legend")) {
+			// nested JS objects arrive as plain HashMaps, not KrollDicts
+			legend = options.getKrollDict("legend");
 		}
 		if (options.containsKey("firstGid")) {
 			firstGid = TiConvert.toInt(options.get("firstGid"), 0);
