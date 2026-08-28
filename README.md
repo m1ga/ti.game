@@ -314,7 +314,8 @@ Notes:
   transition (`side`, `other`, `group`). Gate a wall jump on them and kick
   `velocityX` away from the wall — note a sprite only stays "on" a wall
   while something moves it into it (a held direction, a moving solid), so
-  check the flags in the jump handler, not on a timer.
+  check the flags in the jump handler, not on a timer. `wallSlideSpeed`
+  turns that contact into a wall slide (capped fall speed) natively.
 - **One-way platforms**: `oneWay: true` on a solid makes it pass-through
   except for landings on its top edge — riders jump up through it and
   are never blocked sideways or from below (classic platformer floors).
@@ -951,6 +952,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `solidWith` | Groups whose sprites — and tile layers' solid cells — block this one's movement (push-out along the axis of least penetration) |
 | `onGround` | true while standing on a solid (read-only — gate jumps on it) |
 | `onWallLeft` / `onWallRight` | true while pressed against a solid's side this frame — a rect pushed out horizontally, or a circle/OBB contact whose normal is mostly horizontal (read-only — gate wall jumps on them; a wall only counts while movement pushes into it) |
+| `wallSlideSpeed` | Wall slide: while `onWallLeft`/`onWallRight`, downward velocity is capped at this many px/s, so a player holding into a wall clings and drifts down instead of dropping (0 = off, the default). Native, no per-frame JS |
 | `restitution` | Bounciness of a contact: 0 = stop dead, 1 = give it all back. It reads off **both** sides — the springier of the two surfaces decides, the way Box2D mixes it — so a bouncy floor can be given `restitution: 0.5` and everything that lands on it rebounds, without touching the riders. Every solid defaults to 0, so a scene that never sets it on a surface behaves exactly as it always did: the mover's own value is the whole answer. The same mix applies between two `solidMode: 'push'` bodies; because push assumes equal masses there is no `mass` to weight it with. Small bounces are damped to a stop instead of buzzing, so below a low closing speed a body settles and grounds rather than reflecting |
 | `oneWay` | As a solid: catches landings on the top edge only — pass-through from below and sideways |
 | `carryRiders` | As a solid: riders inherit this sprite's movement (default true); false for world-scroll terrain |

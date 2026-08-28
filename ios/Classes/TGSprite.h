@@ -223,6 +223,11 @@
 // transition into a wall (or flipping sides) fires 'wallhit'.
 @property (atomic, assign) NSInteger wallSide;
 
+// Wall slide: while pressed against a wall, downward velocity is capped
+// at this many px/s (0 = off, fall at full speed). Applied by the solid
+// resolver right after the wall contact is known.
+@property (atomic, assign) float wallSlideSpeed;
+
 // One-way platform: as a solid, this sprite only catches riders
 // falling onto its top edge — they jump up through it and are never
 // blocked sideways or from below (pass-through floors).

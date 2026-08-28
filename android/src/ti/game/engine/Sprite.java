@@ -228,6 +228,12 @@ public class Sprite
 	// transition into a wall (or flipping sides) fires 'wallhit'.
 	public volatile int wallSide = 0;
 
+	// Wall slide: while pressed against a wall, downward velocity is capped
+	// at this many px/s (0 = off, fall at full speed). Applied by the solid
+	// resolver right after the wall contact is known, so JS never runs per
+	// frame for it.
+	public volatile float wallSlideSpeed = 0f;
+
 	// One-way platform: as a solid, this sprite only catches riders
 	// falling onto its top edge — they jump up through it and are never
 	// blocked sideways or from below (pass-through floors).

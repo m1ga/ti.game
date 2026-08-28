@@ -1910,6 +1910,10 @@ public class Scene
 		s.groundSprite = grounded ? groundedOn : null;
 		s.wallSide = wall;
 		s.wallSprite = (wall != 0) ? wallOn : null;
+		float slide = s.wallSlideSpeed;
+		if (wall != 0 && slide > 0f && s.velocityY > slide) {
+			s.velocityY = slide; // wall slide: cling and drift down slowly
+		}
 		Sprite.SpriteEventListener listener = s.eventListener;
 		if (listener == null) {
 			return;

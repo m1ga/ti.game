@@ -864,6 +864,17 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.restitution);
 }
 
+/** Max fall speed (px/s) while pressed against a wall; 0 = no wall slide. */
+- (void)setWallSlideSpeed:(id)value
+{
+	self.sprite.wallSlideSpeed = MAX(0.0f, [TiUtils floatValue:value def:0]);
+}
+
+- (NSNumber *)wallSlideSpeed
+{
+	return @(self.sprite.wallSlideSpeed);
+}
+
 #pragma mark Idle animation
 
 - (void)setIdleAnimation:(id)value

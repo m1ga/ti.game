@@ -51,6 +51,10 @@ static void TGFinishContacts(TGSprite *s, BOOL wasOnGround, BOOL grounded, TGSpr
 	s.groundSprite = grounded ? groundedOn : nil;
 	s.wallSide = wall;
 	s.wallSprite = (wall != 0) ? wallOn : nil;
+	float slide = s.wallSlideSpeed;
+	if (wall != 0 && slide > 0.0f && s.velocityY > slide) {
+		s.velocityY = slide; // wall slide: cling and drift down slowly
+	}
 	id<TGSpriteEventListener> listener = s.eventListener;
 	if (listener == nil) {
 		return;

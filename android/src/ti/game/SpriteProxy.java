@@ -238,6 +238,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("restitution")) {
 			sprite.restitution = Values.ratio(options.get("restitution"), sprite.restitution);
 		}
+		if (options.containsKey("wallSlideSpeed")) {
+			sprite.wallSlideSpeed = Math.max(0f, TiConvert.toFloat(options.get("wallSlideSpeed")));
+		}
 		if (options.containsKey("carMode")) {
 			sprite.carMode = TiConvert.toBoolean(options.get("carMode"), false);
 		}
@@ -1327,6 +1330,19 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setRestitution(Object value)
 	{
 		sprite.restitution = Values.ratio(value, sprite.restitution);
+	}
+
+	/** Max fall speed (px/s) while pressed against a wall; 0 = no wall slide. */
+	@Kroll.getProperty
+	public float getWallSlideSpeed()
+	{
+		return sprite.wallSlideSpeed;
+	}
+
+	@Kroll.setProperty
+	public void setWallSlideSpeed(float value)
+	{
+		sprite.wallSlideSpeed = Math.max(0f, value);
 	}
 
 	// --- Idle animation ---------------------------------------------------
