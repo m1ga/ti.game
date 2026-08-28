@@ -297,16 +297,24 @@ module.exports = function () {
 
 	win.add(gameView);
 	// Back — return to the launcher
-	var backButton = Ti.UI.createButton({
-		title: 'Back',
+	var backButton = Ti.UI.createLabel({
+		text: '‹  EXAMPLES',
 		top: Ti.Platform.osname === 'android' ? 10 : 40,
-		left: 10,
-		color: '#fff',
-		backgroundColor: '#000',
-		borderColor: '#fff',
+		left: 12,
+		width: 96,
+		height: 38,
+		color: '#eaf5f6',
+		backgroundColor: '#18394d',
+		borderColor: '#41697b',
 		borderWidth: 1,
-		font: { fontSize: 12 }
+		borderRadius: 19,
+		font: { fontSize: 12, fontWeight: 'bold' },
+		textAlign: 'center',
+		zIndex: 100
 	});
+	backButton.addEventListener('touchstart', function () { backButton.backgroundColor = '#28576d'; });
+	backButton.addEventListener('touchend', function () { backButton.backgroundColor = '#18394d'; });
+	backButton.addEventListener('touchcancel', function () { backButton.backgroundColor = '#18394d'; });
 	backButton.addEventListener('click', function () {
 		win.close();
 	});
