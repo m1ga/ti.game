@@ -17,6 +17,10 @@
 //   1.35x camera speed (closer to the camera than the ground), and a
 //   sun glow sits at scrollFactor 0 — pinned to the view like a HUD,
 //   but still part of the zooming world (unlike screenFixed)
+// - the debug HUD is on in the top-right corner. This demo is the one
+//   place every camera feature meets it at once: walk around, zoom with
+//   − / +, hit 💥 and cycle 🎛 — the panel does not move, because it
+//   draws in screen space after the effect shader. Tap it to expand it.
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -29,7 +33,8 @@ module.exports = function () {
 		theme: 'Theme.Titanium.DayNight.NoTitleBar'
 	});
 	var gameView = Game.createGameView({
-		backgroundColor: '#1c2418'
+		backgroundColor: '#1c2418',
+		debug: { hud: 'topRight' }   // the zoom/shake controls own the bottom strip
 	});
 
 	var groundSheet = Game.createSpriteSheet({ image: 'assets/ground.png', frameWidth: 64, frameHeight: 64, repeat: true });

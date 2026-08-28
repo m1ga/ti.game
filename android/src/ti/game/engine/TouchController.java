@@ -65,6 +65,10 @@ public class TouchController implements View.OnTouchListener
 	private boolean rotating = false;
 	private float lastAngle = 0f;
 
+	// Set while the first finger landed on the debug HUD: that gesture
+	// belongs to the HUD and reaches neither the sprites nor the view
+	private boolean hudCaptured = false;
+
 	public TouchController(Context context, Scene scene, KrollProxy viewProxy)
 	{
 		this.scene = scene;
@@ -97,6 +101,15 @@ public class TouchController implements View.OnTouchListener
 		switch (event.getActionMasked()) {
 			case MotionEvent.ACTION_DOWN: {
 				resetAll();
+				// The debug HUD is pinned to the surface, so it is tested in
+				// raw touch pixels — before anything maps them into world
+				// space. With the HUD off hitTest returns on a volatile read
+				// and the game never notices this branch exists.
+				hudCaptured = scene.hud.hitTest(event.getX(), event.getY());
+				if (hudCaptured) {
+					scene.hud.toggleExpanded();
+					return true;
+				}
 				// world space: hit-testing and drags must track camera + zoom
 				downX = scene.screenToWorldX(event.getX());
 				downY = scene.screenToWorldY(event.getY());
@@ -162,6 +175,11 @@ public class TouchController implements View.OnTouchListener
 			}
 
 			case MotionEvent.ACTION_UP: {
+				if (hudCaptured) {
+					hudCaptured = false;
+					resetAll();
+					return true;
+				}
 				float upX = scene.screenToWorldX(event.getX());
 				float upY = scene.screenToWorldY(event.getY());
 				if (event.getEventTime() - downTime < TAP_TIMEOUT_MS
@@ -175,6 +193,11 @@ public class TouchController implements View.OnTouchListener
 			}
 
 			case MotionEvent.ACTION_CANCEL: {
+				if (hudCaptured) {
+					hudCaptured = false;
+					resetAll();
+					return true;
+				}
 				fireOnView("release", scene.screenToWorldX(event.getX()), scene.screenToWorldY(event.getY()));
 				for (int i = 0; i < gestures.size(); i++) {
 					Gesture g = gestures.valueAt(i);
@@ -318,6 +341,7 @@ public class TouchController implements View.OnTouchListener
 		gestures.clear();
 		modifierTarget = null;
 		rotating = false;
+		hudCaptured = false;
 	}
 
 	private boolean isClaimed(Sprite sprite)

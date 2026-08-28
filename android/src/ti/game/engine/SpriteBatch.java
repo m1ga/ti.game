@@ -114,6 +114,13 @@ public class SpriteBatch
 	private float cameraTravelX;
 	private float cameraTravelY;
 
+	// Per-frame diagnostics, reset by begin(). Plain int increments: a
+	// branch to skip them would cost more than the increment does.
+	// Read them right after the scene's end(), not at the end of the
+	// frame — the screen-space pass calls begin() again and resets them.
+	public int drawCalls = 0;
+	public int textureSwitches = 0;
+
 	public SpriteBatch()
 	{
 		buffer = ByteBuffer.allocateDirect(vertices.length * 4)
@@ -172,6 +179,8 @@ public class SpriteBatch
 		currentTexture = -1;
 		activeProgram = 0;
 		blendMode = BLEND_NORMAL;
+		drawCalls = 0;
+		textureSwitches = 0;
 		useProgram(program);
 		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
 		GLES20.glEnable(GLES20.GL_BLEND);
@@ -281,6 +290,7 @@ public class SpriteBatch
 		if (texture != currentTexture) {
 			flush();
 			currentTexture = texture;
+			textureSwitches++;
 		}
 		if (quadCount >= MAX_QUADS) {
 			flush();
@@ -676,6 +686,7 @@ public class SpriteBatch
 		GLES20.glEnableVertexAttribArray(ATTR_COLOR);
 
 		GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount);
+		drawCalls++;
 		quadCount = 0;
 	}
 }

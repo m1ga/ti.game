@@ -50,6 +50,9 @@
 @property (atomic, strong) TGSprite *target;    // follow this sprite instead of x/y
 @property (atomic, assign) int maxParticles;    // clamped to [1, 1000]
 
+/** Live particles right now — read on the render thread for the debug HUD. */
+@property (nonatomic, readonly) int activeParticleCount;
+
 /** Queues a one-shot burst of n particles (main thread safe). */
 - (void)emit:(int)n;
 

@@ -12,7 +12,9 @@
 // - BUILD mode: tapping a water cell calls `setTile(col, row, ...)`
 //   and lays a plank — the art and the collision flag change together,
 //   live, in the running scene
-// - DEBUG outlines the solid cells in view
+// - DEBUG outlines the solid cells in view; the performance HUD (top
+//   right) shows the draw calls and frame time staying flat while the
+//   camera scrolls across the island
 //
 // Exports a start function; the demo opens its own window each time.
 
@@ -25,7 +27,8 @@ module.exports = function () {
 		theme: 'Theme.Titanium.DayNight.NoTitleBar'
 	});
 	var gameView = Game.createGameView({
-		backgroundColor: '#1c2430'
+		backgroundColor: '#1c2430',
+		debug: { hud: 'topRight' }   // draw calls / frame time: watch them stay flat while scrolling
 	});
 
 	// 16px art, chunky pixels
@@ -284,8 +287,10 @@ module.exports = function () {
 			tintColor: '#7ec8ff',
 			zIndex: 20
 		});
+		var hitboxes = false;
 		debugButton.addEventListener('tap', function () {
-			gameView.debug = !gameView.debug;
+			hitboxes = !hitboxes;
+			gameView.debug = { hitbox: hitboxes, hud: 'topRight' };
 		});
 		gameView.add(debugButton);
 	}

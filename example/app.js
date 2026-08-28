@@ -11,7 +11,8 @@
 //   Zelda: top-down tile level — solid house/water, depth-sorted trees
 //   Skate: endless skateboard runner — jump the walls and pits
 //   Point & click: adventure scene — tap to walk (A* around the tree), talk to the bird
-//   Particles: spark fountain, tap fireworks, smoke trail on a dragged ball
+//   Particles: spark fountain, tap fireworks, smoke trail on a dragged ball,
+//              with the debug HUD on
 //   Rhythm: DDR-style — catch falling gems on the beat pads
 //   Camera: dead-zone follow, bounds, zoom buttons and screen shake
 //   Circle solids: three emitters; every ball can hit any shape and push the other emitted balls

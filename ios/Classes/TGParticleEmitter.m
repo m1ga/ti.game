@@ -68,6 +68,11 @@ static const int kHardCap = 1000;
 	}
 }
 
+- (int)activeParticleCount
+{
+	return _count;
+}
+
 - (void)emit:(int)n
 {
 	if (n > 0) {

@@ -32,6 +32,12 @@ NSString *TGBlendModeName(TGBlendMode mode);
  */
 @interface TGSpriteBatch : NSObject
 
+/** Per-frame diagnostics, reset by begin. Read them right after the
+ *  scene's end, not at the end of the frame — the screen-space pass calls
+ *  begin again and resets them. */
+@property (nonatomic, readonly) int drawCalls;
+@property (nonatomic, readonly) int textureSwitches;
+
 /** (Re)creates shaders; call once the GL context is current. */
 - (void)createGLResources;
 

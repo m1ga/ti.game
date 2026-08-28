@@ -23,8 +23,17 @@ public class Scene
 	private final List<TileLayer> tileLayers = new ArrayList<>();
 	private volatile boolean zOrderDirty = false;
 
-	/** Renders debug overlays for every sprite (GameView.debug = true). */
+	/** Renders debug overlays for every sprite (GameView.debug = { hitbox: true }). */
 	public volatile boolean debugAll = false;
+
+	/** On-screen performance HUD (GameView.debug = { hud: 'topRight' }).
+	 *  Lives here because three threads reach it: the JS thread configures
+	 *  it, the GL thread lays it out, the UI thread hit-tests it. */
+	public final DebugHud hud = new DebugHud();
+
+	/** Render telemetry behind the HUD and the 'performance' event. Off
+	 *  until one of the two asks for it; see FrameStats. */
+	public final FrameStats stats = new FrameStats();
 
 	/** Fading skid-mark segments emitted by carMode sprites (skidMarks).
 	 *  Drawn above sprites with zIndex <= 0 and below everything else. */
@@ -263,7 +272,9 @@ public class Scene
 	// when another GameView creates its own context).
 	private volatile BitmapFont defaultFont;
 
-	private synchronized BitmapFont defaultFont()
+	/** Also used by the debug HUD, which shares this one texture rather
+	 *  than uploading a second copy of the same 1.2 KB atlas. */
+	public synchronized BitmapFont defaultFont()
 	{
 		BitmapFont font = defaultFont;
 		if (font == null) {
