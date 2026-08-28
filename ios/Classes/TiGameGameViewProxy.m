@@ -2,6 +2,7 @@
 #import "TGBitmapFont.h"
 #import "TGDebugHud.h"
 #import "TGFrameStats.h"
+#import "TGGamepadController.h"
 #import "TGPostEffect.h"
 #import "TGScene.h"
 #import "TGSceneRenderer.h"
@@ -286,6 +287,46 @@ static NSString *const kDebugHudFontKey = @"hudFont";
 {
 	TiGameGameView *view = [self gameView];
 	return @(view != nil ? view.renderer.surfaceHeight : 0);
+}
+
+#pragma mark Game controllers
+
+/** Radial dead zone for the analog sticks, 0..0.9 (default 0.2). The
+ *  setter is the view's setGamepadDeadzone_: via the property path. */
+- (NSNumber *)gamepadDeadzone
+{
+	id value = [self valueForUndefinedKey:@"gamepadDeadzone"];
+	return @([TiUtils floatValue:value def:0.2f]);
+}
+
+/** Left-stick press/release thresholds (defaults 0.5 / 0.4); setters are
+ *  the view's setGamepadStickPress_: / setGamepadStickRelease_:. */
+- (NSNumber *)gamepadStickPress
+{
+	id value = [self valueForUndefinedKey:@"gamepadStickPress"];
+	return @([TiUtils floatValue:value def:0.5f]);
+}
+
+- (NSNumber *)gamepadStickRelease
+{
+	id value = [self valueForUndefinedKey:@"gamepadStickRelease"];
+	return @([TiUtils floatValue:value def:0.4f]);
+}
+
+/** Connected game controllers: [{ id, name }]. */
+- (NSArray *)gamepads
+{
+	return [TGGamepadController connectedGamepads];
+}
+
+/** Snapshot of the most recently used pad — { id, name, leftX, leftY,
+ *  rightX, rightY, l2, r2, buttons: { a: true, ... } } — for polling
+ *  from a game timer; null until a pad has sent something. */
+- (id)gamepad
+{
+	TiGameGameView *view = [self gameView];
+	NSDictionary *snapshot = view != nil ? [view.gamepadController snapshot] : nil;
+	return snapshot != nil ? snapshot : [NSNull null];
 }
 
 #pragma mark Methods

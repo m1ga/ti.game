@@ -2,6 +2,7 @@
 #import "TGGLView.h"
 #import "TGScene.h"
 #import "TGSceneRenderer.h"
+#import "TGGamepadController.h"
 #import "TGTouchController.h"
 #import "TiGameGameViewProxy.h"
 #import <objc/runtime.h>
@@ -27,6 +28,10 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 	TGGLView *_glView;
 	TGTouchController *_touchController;
 	__weak id<TiEvaluator> _runtimeContext;
+	float _gamepadDeadzone; // held until the controller exists (0 is a valid value)
+	float _gamepadStickPress;
+	float _gamepadStickRelease;
+	BOOL _gamepadDeadzoneSet;
 	BOOL _renderingShutdown;
 	BOOL _wasAttachedToWindow;
 	int _maxFps; // held until the GL view exists
@@ -157,6 +162,11 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 				viewProxy:self.proxy
 			 contentScale:_glView.contentScaleFactor];
 		self.multipleTouchEnabled = YES;
+		// Bluetooth game controllers (GameController.framework) — like the
+		// Window hook on Android, independent of which view has focus
+		_gamepadController = [[TGGamepadController alloc] initWithViewProxy:self.proxy];
+		_gamepadController.deadzone = _gamepadDeadzoneSet ? _gamepadDeadzone : 0.2f;
+		[self applyStickThresholds];
 		[_glView setMaxFps:_maxFps];
 		[self addSubview:_glView];
 		[_glView startRendering];
@@ -218,6 +228,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 
 	[TiGameGameView unregisterActiveView:self];
 	[glView stopRendering];
+	[_gamepadController shutdown];
 
 	void (^releaseViewResources)(void) = ^{
 		[glView removeFromSuperview];
@@ -225,6 +236,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 			if (_glView == glView) {
 				_glView = nil;
 				_touchController = nil;
+				_gamepadController = nil;
 				_renderer = nil;
 			}
 		}
@@ -252,6 +264,39 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 	scene.bgGreen = (float)g;
 	scene.bgBlue = (float)b;
 	scene.bgAlpha = (float)a;
+}
+
+/** Radial dead zone for the analog sticks, 0..0.9 (default 0.2). */
+- (void)setGamepadDeadzone_:(id)value
+{
+	_gamepadDeadzone = MAX(0.0f, MIN(0.9f, [TiUtils floatValue:value def:0.2f]));
+	_gamepadDeadzoneSet = YES;
+	_gamepadController.deadzone = _gamepadDeadzone;
+}
+
+/** Left-stick deflection that presses a direction (default 0.5) and the
+ *  lower value that releases it (default 0.4) — twin of GameViewProxy. */
+- (void)setGamepadStickPress_:(id)value
+{
+	_gamepadStickPress = [TiUtils floatValue:value def:0.5f];
+	[self applyStickThresholds];
+}
+
+- (void)setGamepadStickRelease_:(id)value
+{
+	_gamepadStickRelease = [TiUtils floatValue:value def:0.4f];
+	[self applyStickThresholds];
+}
+
+- (void)applyStickThresholds
+{
+	if (_gamepadController == nil) {
+		return;
+	}
+	float press = MAX(0.1f, MIN(0.95f, _gamepadStickPress > 0 ? _gamepadStickPress : 0.5f));
+	float release = _gamepadStickRelease > 0 ? _gamepadStickRelease : 0.4f;
+	_gamepadController.stickPress = press;
+	_gamepadController.stickRelease = MAX(0.05f, MIN(press, release));
 }
 
 /** Frame rate cap (e.g. 60 on a 120 Hz ProMotion display); 0 = display default. */

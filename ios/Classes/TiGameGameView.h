@@ -10,9 +10,12 @@
  * render thread (the native game loop); the TGTouchController handles all
  * interaction on the main thread. App lifecycle pauses/resumes the loop.
  */
+@class TGGamepadController;
+
 @interface TiGameGameView : TiUIView
 
 @property (nonatomic, readonly) TGSceneRenderer *renderer;
+@property (nonatomic, readonly) TGGamepadController *gamepadController;
 
 + (void)installLiveViewRestartHook;
 + (void)activateRuntimeContext:(id<TiEvaluator>)context;
