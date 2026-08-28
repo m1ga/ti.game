@@ -41,7 +41,7 @@ public class Pathfinder
 	 * instead) — or null when the bounds are degenerate, the grid would
 	 * exceed MAX_CELLS, or no route exists.
 	 */
-	public static float[] find(List<Sprite> sprites, Set<String> groups,
+	public static float[] find(List<Sprite> sprites, List<TileLayer> layers, Set<String> groups,
 							   float startX, float startY, float goalX, float goalY,
 							   float cellSize, float clearance,
 							   float minX, float minY, float maxX, float maxY,
@@ -57,6 +57,7 @@ public class Pathfinder
 		}
 		boolean[] blocked = new boolean[cols * rows];
 		rasterize(sprites, groups, blocked, cols, rows, cellSize, clearance, minX, minY);
+		rasterizeTiles(layers, groups, blocked, cols, rows, cellSize, clearance, minX, minY);
 
 		int rawStart = cellFor(startY, minY, cellSize, rows) * cols
 			+ cellFor(startX, minX, cellSize, cols);
@@ -201,6 +202,65 @@ public class Pathfinder
 					int base = cy * cols;
 					for (int cx = cx0; cx <= cx1; cx++) {
 						blocked[base + cx] = true;
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Marks every grid cell a solid tile (inflated by `clearance`) touches,
+	 * for the layers whose collisionGroup matches. One-way platforms are
+	 * left open — a walker passes through them. Only the tiles inside the
+	 * search bounds are visited, so a huge map with a small query stays
+	 * cheap.
+	 */
+	private static void rasterizeTiles(List<TileLayer> layers, Set<String> groups,
+									   boolean[] blocked, int cols, int rows,
+									   float cellSize, float clearance, float minX, float minY)
+	{
+		if (layers == null) {
+			return;
+		}
+		float maxX = minX + cols * cellSize;
+		float maxY = minY + rows * cellSize;
+		for (TileLayer layer : layers) {
+			if (!layer.matches(groups)) {
+				continue;
+			}
+			float tw = layer.cellWidth();
+			float th = layer.cellHeight();
+			if (tw <= 0f || th <= 0f) {
+				continue;
+			}
+			int tc0 = Math.max(0, (int) Math.floor((minX - clearance - layer.x) / tw));
+			int tc1 = Math.min(layer.cols() - 1, (int) Math.floor((maxX + clearance - layer.x) / tw));
+			int tr0 = Math.max(0, (int) Math.floor((minY - clearance - layer.y) / th));
+			int tr1 = Math.min(layer.rows() - 1, (int) Math.floor((maxY + clearance - layer.y) / th));
+			for (int row = tr0; row <= tr1; row++) {
+				for (int col = tc0; col <= tc1; col++) {
+					if (!layer.isSolid(col, row)) {
+						continue;
+					}
+					float bx0 = layer.x + col * tw;
+					float by0 = layer.y + row * th;
+					// same half-open edge rule as sprite boxes
+					int cx0 = (int) Math.floor((bx0 - clearance - minX) / cellSize + EDGE_EPS);
+					int cy0 = (int) Math.floor((by0 - clearance - minY) / cellSize + EDGE_EPS);
+					int cx1 = (int) Math.ceil((bx0 + tw + clearance - minX) / cellSize - EDGE_EPS) - 1;
+					int cy1 = (int) Math.ceil((by0 + th + clearance - minY) / cellSize - EDGE_EPS) - 1;
+					if (cx1 < 0 || cy1 < 0 || cx0 >= cols || cy0 >= rows) {
+						continue;
+					}
+					cx0 = Math.max(cx0, 0);
+					cy0 = Math.max(cy0, 0);
+					cx1 = Math.min(cx1, cols - 1);
+					cy1 = Math.min(cy1, rows - 1);
+					for (int cy = cy0; cy <= cy1; cy++) {
+						int base = cy * cols;
+						for (int cx = cx0; cx <= cx1; cx++) {
+							blocked[base + cx] = true;
+						}
 					}
 				}
 			}

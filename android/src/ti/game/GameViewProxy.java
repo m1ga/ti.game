@@ -20,6 +20,7 @@ import android.graphics.Color;
 import ti.game.engine.PostEffect;
 import ti.game.engine.ParticleEmitter;
 import ti.game.engine.Rope;
+import ti.game.engine.TileLayer;
 import ti.game.engine.Scene;
 import ti.game.engine.Sprite;
 
@@ -218,6 +219,8 @@ public class GameViewProxy extends TiViewProxy
 			scene.addEmitter(((EmitterProxy) proxy).getEmitter());
 		} else if (proxy instanceof RopeProxy) {
 			scene.addRope(((RopeProxy) proxy).getRope());
+		} else if (proxy instanceof TileLayerProxy) {
+			scene.addTileLayer(((TileLayerProxy) proxy).getLayer());
 		}
 	}
 
@@ -226,6 +229,7 @@ public class GameViewProxy extends TiViewProxy
 		List<Sprite> sprites = new ArrayList<>();
 		List<ParticleEmitter> emitters = new ArrayList<>();
 		List<Rope> ropes = new ArrayList<>();
+		List<TileLayer> layers = new ArrayList<>();
 		for (Object proxy : proxies) {
 			if (proxy instanceof SpriteProxy) {
 				sprites.add(((SpriteProxy) proxy).getSprite());
@@ -233,9 +237,11 @@ public class GameViewProxy extends TiViewProxy
 				emitters.add(((EmitterProxy) proxy).getEmitter());
 			} else if (proxy instanceof RopeProxy) {
 				ropes.add(((RopeProxy) proxy).getRope());
+			} else if (proxy instanceof TileLayerProxy) {
+				layers.add(((TileLayerProxy) proxy).getLayer());
 			}
 		}
-		scene.addAll(sprites, emitters, ropes);
+		scene.addAll(sprites, emitters, ropes, layers);
 	}
 
 	@Kroll.method
@@ -247,6 +253,8 @@ public class GameViewProxy extends TiViewProxy
 			scene.removeEmitter(((EmitterProxy) proxy).getEmitter());
 		} else if (proxy instanceof RopeProxy) {
 			scene.removeRope(((RopeProxy) proxy).getRope());
+		} else if (proxy instanceof TileLayerProxy) {
+			scene.removeTileLayer(((TileLayerProxy) proxy).getLayer());
 		}
 	}
 

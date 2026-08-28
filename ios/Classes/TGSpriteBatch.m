@@ -276,6 +276,16 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 		? s.y + (1.0f - s.scrollFactor) * _cameraTravelY : s.y;
 }
 
+- (float)parallaxOffsetX:(float)scrollFactor
+{
+	return (scrollFactor != 1.0f) ? (1.0f - scrollFactor) * _cameraTravelX : 0.0f;
+}
+
+- (float)parallaxOffsetY:(float)scrollFactor
+{
+	return (scrollFactor != 1.0f) ? (1.0f - scrollFactor) * _cameraTravelY : 0.0f;
+}
+
 - (void)ensureCapacity:(GLint)texture
 {
 	if (texture != _currentTexture) {

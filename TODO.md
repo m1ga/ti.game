@@ -116,11 +116,25 @@ traffic in the loop.
 
 ## 4. Tile maps
 
-- [ ] First-class native tilemap layer: Tiled JSON import, batched quads
-      from one texture, any map size (topdown.js builds a sprite per tile
-      — fine at 16x12, dead at 200x200).
-- [ ] Collision layer: solid tiles feed the existing solidWith/collision
-      systems without per-tile sprites.
+- [x] First-class native tilemap layer: `Game.createTileLayer({ sheet,
+      data, tileWidth, tileHeight, ... })` — one grid of frame indices,
+      only the cells inside the camera are drawn (one batch run per
+      layer), any map size. `data` takes rows of ids, a flat array, or
+      strings + `legend`; Tiled JSON works through `firstGid` (gid 0 =
+      empty, flip bits masked). Cells edited live with setTile/getTile,
+      tileAt/cellAt map between world points and cells. tilemap.js draws
+      a 120x90 island (topdown.js still builds a sprite per tile — fine
+      at 16x12, dead at 200x200).
+- [x] Collision layer: `collisionGroup` + `solid`/`oneWay` tile id lists
+      (or `setBlocked` per cell) feed solidWith — rect, circle and swept
+      movers, restitution, onGround/land — and findPath, with no per-tile
+      sprites. A mover only tests the cells under its own hitbox, and
+      faces shared between two solid cells are skipped so a slide along a
+      tiled floor never snags on the seams.
+- [ ] Tile map follow-ups: animated tiles (frame cycling per id),
+      `raycast` against solid cells, `collision` events for trigger
+      tiles (water, lava), a Tiled loader helper that resolves tileset
+      images and multiple layers from one JSON.
 - [x] A* pathfinding: `gameView.findPath(from, to, { cellSize, groups,
       clearance, bounds, diagonals, simplify })` returns waypoints ready
       for `followPath` — a discrete query like `raycast`, no per-frame

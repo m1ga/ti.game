@@ -58,6 +58,7 @@ var demos = [
 	{ title: 'Slopes', start: require('/slopes') },
 	{ title: 'Swept collision', start: require('/swept') },
 	{ title: 'Text', start: require('/text') },
+	{ title: 'Tile map (120x90)', start: require('/tilemap') },
 	{ title: 'Time scale', start: require('/timescale') },
 	{ title: 'Top-Down Level', start: require('/topdown') },
 	{ title: 'Trigger zones', start: require('/zones') },

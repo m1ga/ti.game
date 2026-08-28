@@ -6,6 +6,7 @@
 @class TGParticleEmitter;
 @class TGRope;
 @class TGSkidTrail;
+@class TGTileLayer;
 @class TGSprite;
 
 /** Receives expired game-clock timer ids on the render thread. */
@@ -118,7 +119,8 @@
 /** Adds a group in one protected scene mutation. */
 - (void)addSprites:(NSArray<TGSprite *> *)sprites
 		  emitters:(NSArray<TGParticleEmitter *> *)emitters
-			 ropes:(NSArray<TGRope *> *)ropes;
+			 ropes:(NSArray<TGRope *> *)ropes
+			layers:(NSArray<TGTileLayer *> *)layers;
 - (void)remove:(TGSprite *)sprite;
 - (void)clear;
 - (void)markZOrderDirty;
@@ -133,6 +135,11 @@
 /** Snapshot sorted by zIndex (ropes are few; sorted every call). */
 - (NSArray<TGRope *> *)ropesSnapshot;
 
+- (void)addTileLayer:(TGTileLayer *)layer;
+- (void)removeTileLayer:(TGTileLayer *)layer;
+/** Snapshot sorted by zIndex (layers are few; sorted every call). */
+- (NSArray<TGTileLayer *> *)tileLayersSnapshot;
+
 /** Re-scan for ySort sprites; while any exist, draw order re-sorts every frame. */
 - (void)recomputeYSort;
 
@@ -146,7 +153,8 @@
  */
 - (NSArray<TGSprite *> *)prepareFrame:(float)dt
 							 emitters:(NSArray<TGParticleEmitter *> **)emitters
-								ropes:(NSArray<TGRope *> **)ropes;
+								ropes:(NSArray<TGRope *> **)ropes
+							   layers:(NSArray<TGTileLayer *> **)layers;
 
 /** Ticks physics, animations and tweens, then checks collisions. Render thread. */
 - (void)update:(float)dt;

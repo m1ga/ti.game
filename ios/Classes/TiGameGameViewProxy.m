@@ -7,6 +7,7 @@
 #import "TiGameGameView.h"
 #import "TiGameRopeProxy.h"
 #import "TiGameSpriteProxy.h"
+#import "TiGameTileLayerProxy.h"
 #import <float.h>
 #import "TGValues.h"
 
@@ -220,10 +221,11 @@
 				 sprites:(NSMutableArray *)sprites
 			 emitters:(NSMutableArray *)emitters
 				ropes:(NSMutableArray *)ropes
+			   layers:(NSMutableArray *)layers
 {
 	if ([value isKindOfClass:[NSArray class]]) {
 		for (id item in value) {
-			[self collectGameObjects:item proxies:proxies sprites:sprites emitters:emitters ropes:ropes];
+			[self collectGameObjects:item proxies:proxies sprites:sprites emitters:emitters ropes:ropes layers:layers];
 		}
 		return;
 	}
@@ -236,6 +238,9 @@
 	} else if ([value isKindOfClass:[TiGameRopeProxy class]]) {
 		[proxies addObject:value];
 		[ropes addObject:((TiGameRopeProxy *)value).rope];
+	} else if ([value isKindOfClass:[TiGameTileLayerProxy class]]) {
+		[proxies addObject:value];
+		[layers addObject:((TiGameTileLayerProxy *)value).layer];
 	}
 }
 
@@ -245,14 +250,15 @@
 	NSMutableArray *sprites = [NSMutableArray array];
 	NSMutableArray *emitters = [NSMutableArray array];
 	NSMutableArray *ropes = [NSMutableArray array];
-	[self collectGameObjects:arg proxies:proxies sprites:sprites emitters:emitters ropes:ropes];
+	NSMutableArray *layers = [NSMutableArray array];
+	[self collectGameObjects:arg proxies:proxies sprites:sprites emitters:emitters ropes:ropes layers:layers];
 
 	if (proxies.count > 0) {
 		// Keep every proxy alive on the JS side while its native object is in the scene.
 		for (id proxy in proxies) {
 			[self rememberProxy:proxy];
 		}
-		[self.scene addSprites:sprites emitters:emitters ropes:ropes];
+		[self.scene addSprites:sprites emitters:emitters ropes:ropes layers:layers];
 		return;
 	}
 	[super add:arg];
@@ -277,6 +283,12 @@
 		TiGameRopeProxy *ropeProxy = value;
 		[self.scene removeRope:ropeProxy.rope];
 		[self forgetProxy:ropeProxy];
+		return;
+	}
+	if ([value isKindOfClass:[TiGameTileLayerProxy class]]) {
+		TiGameTileLayerProxy *layerProxy = value;
+		[self.scene removeTileLayer:layerProxy.layer];
+		[self forgetProxy:layerProxy];
 		return;
 	}
 	[super remove:arg];

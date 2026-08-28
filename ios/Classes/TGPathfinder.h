@@ -4,6 +4,7 @@
 #import <Foundation/Foundation.h>
 
 @class TGSprite;
+@class TGTileLayer;
 
 /**
  * Grid A* over the scene's collision sprites (gameView.findPath): visible
@@ -24,6 +25,7 @@
  * too large, or no route exists.
  */
 + (NSArray<NSNumber *> *)findInSprites:(NSArray<TGSprite *> *)sprites
+								layers:(NSArray<TGTileLayer *> *)layers
 								groups:(NSSet<NSString *> *)groups
 								startX:(float)startX startY:(float)startY
 								 goalX:(float)goalX goalY:(float)goalY

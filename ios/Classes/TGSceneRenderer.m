@@ -8,6 +8,7 @@
 #import "TGSpriteBatch.h"
 #import "TGSpriteSheet.h"
 #import "TGTextureManager.h"
+#import "TGTileLayer.h"
 #import <OpenGLES/ES2/gl.h>
 #import <QuartzCore/QuartzCore.h>
 #import <TitaniumKit/TitaniumKit.h>
@@ -101,7 +102,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 
 	NSArray<TGParticleEmitter *> *emitters;
 	NSArray<TGRope *> *ropes;
-	NSArray<TGSprite *> *sprites = [_scene prepareFrame:dt emitters:&emitters ropes:&ropes];
+	NSArray<TGTileLayer *> *layers;
+	NSArray<TGSprite *> *sprites = [_scene prepareFrame:dt emitters:&emitters ropes:&ropes layers:&layers];
 	_effectTime += dt;
 
 	// Camera effect: render the whole scene into an offscreen texture,
@@ -117,7 +119,9 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	float top = [_scene viewOriginY] + _scene.shakeOffsetY;
 	float visibleW = _surfaceWidth / scale;
 	float visibleH = _surfaceHeight / scale;
-	orthoM(_projection, left, left + visibleW, top + visibleH, top, -1.0f, 1.0f);
+	float right = left + visibleW;
+	float bottom = top + visibleH;
+	orthoM(_projection, left, right, bottom, top, -1.0f, 1.0f);
 	orthoM(_screenProjection, 0.0f, _surfaceWidth, _surfaceHeight, 0.0f, -1.0f, 1.0f);
 
 	glClearColor(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
@@ -138,6 +142,9 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	for (TGRope *rope in ropes) {
 		[self ensureSheetLoadedOnce:rope.sheet];
 	}
+	for (TGTileLayer *layer in layers) {
+		[self ensureSheetLoadedOnce:layer.sheet];
+	}
 
 	// Camera travel (position + shake, without the zoom-centering term)
 	// — the share of it that parallax sprites give back at draw time
@@ -149,10 +156,16 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	// and foreground sprites (the car), so they overlay the road but
 	// stay under whatever drives across them. Emitters merge into the
 	// sprite pass by zIndex; on equal zIndex, particles draw on top.
+	// Tile layers merge the same way but draw UNDER sprites of equal
+	// zIndex — a floor is the backdrop of whatever stands on it.
 	BOOL trailDrawn = NO;
 	NSUInteger nextEmitter = 0;
 	NSUInteger nextRope = 0;
+	NSUInteger nextLayer = 0;
 	for (TGSprite *s in sprites) {
+		while (nextLayer < layers.count && layers[nextLayer].zIndex <= s.zIndex) {
+			[layers[nextLayer++] draw:_batch viewLeft:left viewTop:top viewRight:right viewBottom:bottom];
+		}
 		if (!trailDrawn && s.zIndex > 0) {
 			[self drawSkidTrail];
 			trailDrawn = YES;
@@ -173,10 +186,19 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	while (nextEmitter < emitters.count) {
 		[emitters[nextEmitter++] draw:_batch];
 	}
+	while (nextLayer < layers.count) {
+		[layers[nextLayer++] draw:_batch viewLeft:left viewTop:top viewRight:right viewBottom:bottom];
+	}
 	while (nextRope < ropes.count) {
 		[ropes[nextRope++] draw:_batch];
 	}
 	BOOL debugAll = _scene.debugAll;
+	for (TGTileLayer *layer in layers) {
+		if (debugAll || layer.debug) {
+			[layer drawDebug:_batch whiteTexture:[_textures whiteTexture]
+					viewLeft:left viewTop:top viewRight:right viewBottom:bottom];
+		}
+	}
 	for (TGSprite *s in sprites) {
 		if (debugAll || s.debug) {
 			[self drawDebugOverlay:s];
