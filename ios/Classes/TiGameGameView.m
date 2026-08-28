@@ -147,6 +147,9 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 		TGScene *scene = ((TiGameGameViewProxy *)self.proxy).scene;
 		_renderer = [[TGSceneRenderer alloc] initWithScene:scene viewProxy:self.proxy];
 		_glView = [[TGGLView alloc] initWithFrame:self.bounds renderer:_renderer];
+		// The surface is in drawable pixels; the HUD sizes itself in points
+		// so it reads the same at 1x and on a 3x Retina drawable
+		_renderer.screenScale = (float)_glView.contentScaleFactor;
 		// Touches must be scaled by the drawable's actual scale, not the
 		// screen's — the GL view renders at 1x in the simulator
 		_touchController = [[TGTouchController alloc]

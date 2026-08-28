@@ -2,6 +2,7 @@
 //  ti.game — engine (iOS twin of android/src/ti/game/engine/SceneRenderer.java)
 //
 #import <Foundation/Foundation.h>
+#import <QuartzCore/QuartzCore.h>
 
 @class TGScene;
 @class TiProxy;
@@ -19,6 +20,10 @@
 
 @property (atomic, readonly) int surfaceWidth;
 @property (atomic, readonly) int surfaceHeight;
+
+/** Drawable content scale, so the HUD reads the same size at 1x and on a
+ *  3x Retina drawable (the surface is in drawable pixels, not points). */
+@property (atomic, assign) float screenScale;
 
 - (instancetype)initWithScene:(TGScene *)scene viewProxy:(TiProxy *)viewProxy;
 
@@ -40,5 +45,23 @@
 
 /** Forget the last frame time; the next frame ticks with dt = 0 (use after a pause). */
 - (void)resetClock;
+
+/**
+ * Whether this frame is worth measuring — the HUD is on, or JS is
+ * listening for 'performance'. TGGLView reads it once per tick so it can
+ * skip its own clock calls too.
+ */
+- (BOOL)isMeasuring;
+
+/**
+ * Closes per-frame telemetry once the drawable has been presented, which
+ * is the only place the swap can be timed. Call only when isMeasuring
+ * said yes.
+ */
+- (void)recordFrameCpuMs:(double)cpuMs
+			   presentMs:(double)presentMs
+			   presented:(BOOL)presented
+				interval:(CFTimeInterval)interval
+				  target:(CFTimeInterval)target;
 
 @end

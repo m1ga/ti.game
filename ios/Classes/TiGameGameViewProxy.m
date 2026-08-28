@@ -1,9 +1,14 @@
 #import "TiGameGameViewProxy.h"
+#import "TGBitmapFont.h"
+#import "TGDebugHud.h"
+#import "TGFrameStats.h"
 #import "TGPostEffect.h"
 #import "TGScene.h"
 #import "TGSceneRenderer.h"
+#import "TGScreenOverlay.h"
 #import "TGSprite.h"
 #import "TiGameEmitterProxy.h"
+#import "TiGameFontProxy.h"
 #import "TiGameGameView.h"
 #import "TiGameRopeProxy.h"
 #import "TiGameSpriteProxy.h"
@@ -119,15 +124,84 @@
 	return @(self.scene.effectIntensity);
 }
 
-/** Renders debug overlays (collision box, bounds, anchor) for every sprite. */
+// Developer aids, both off by default:
+//   debug: true                        collision shapes for every sprite
+//   debug: { hitbox: true }            the same, spelled out
+//   debug: { hud: true }               performance HUD in the default corner
+//   debug: { hud: 'topRight' }         ...in the corner you pick
+//   debug: { hud: true, hudFont: f }   ...in the game's own typeface
+// The HUD key name is not settled with the maintainer yet; it appears
+// here and in the Android twin, nowhere else.
+static NSString *const kDebugHitboxKey = @"hitbox";
+static NSString *const kDebugHudKey = @"hud";
+static NSString *const kDebugHudFontKey = @"hudFont";
+
 - (void)setDebug:(id)value
 {
-	self.scene.debugAll = [TiUtils boolValue:value def:NO];
+	if ([value isKindOfClass:[NSDictionary class]]) {
+		NSDictionary *options = value;
+		self.scene.debugAll = [TiUtils boolValue:options[kDebugHitboxKey] def:NO];
+		[self applyHud:options[kDebugHudKey]];
+		id fontValue = options[kDebugHudFontKey];
+		self.scene.hud.font = [fontValue isKindOfClass:[TiGameFontProxy class]]
+			? ((TiGameFontProxy *)fontValue).font : nil;
+	} else {
+		// debug: true — the shorthand that predates the object form
+		self.scene.debugAll = [TiUtils boolValue:value def:NO];
+		[self applyHud:nil];
+		self.scene.hud.font = nil;
+	}
+	[self refreshStats];
 }
 
-- (NSNumber *)debug
+/**
+ * Reads back the normalized form, whichever form was written:
+ * { hitbox: <boolean>, hud: false | 'topLeft' | ... }.
+ */
+- (id)debug
 {
-	return @(self.scene.debugAll);
+	TGDebugHud *hud = self.scene.hud;
+	return @{
+		kDebugHitboxKey: @(self.scene.debugAll),
+		kDebugHudKey: hud.enabled ? (id) [TGScreenOverlay cornerName:hud.corner] : (id) @NO
+	};
+}
+
+- (void)applyHud:(id)value
+{
+	TGDebugHud *hud = self.scene.hud;
+	if (value == nil || value == [NSNull null]) {
+		hud.enabled = NO;
+		return;
+	}
+	if ([value isKindOfClass:[NSString class]]) {
+		hud.corner = [TGScreenOverlay cornerFromName:value fallback:TGOverlayCornerTopLeft];
+		hud.enabled = YES;
+		return;
+	}
+	hud.enabled = [TiUtils boolValue:value def:NO];
+}
+
+// Measuring costs nothing while nobody is looking: the flag only goes up
+// for the HUD or for a live 'performance' listener. TiProxy has no
+// listener-added hook of its own (the one in TiProxyDelegate belongs to
+// the view), so the two JS entry points are where the state is refreshed —
+// the Android twin overrides eventListenerAdded/Removed instead.
+- (void)refreshStats
+{
+	self.scene.stats.enabled = self.scene.hud.enabled || [self _hasListeners:@"performance"];
+}
+
+- (void)addEventListener:(NSArray *)args
+{
+	[super addEventListener:args];
+	[self refreshStats];
+}
+
+- (void)removeEventListener:(NSArray *)args
+{
+	[super removeEventListener:args];
+	[self refreshStats];
 }
 
 - (void)setCameraX:(id)value

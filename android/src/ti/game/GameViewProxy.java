@@ -21,6 +21,7 @@ import ti.game.engine.PostEffect;
 import ti.game.engine.ParticleEmitter;
 import ti.game.engine.Rope;
 import ti.game.engine.Scene;
+import ti.game.engine.ScreenOverlay;
 import ti.game.engine.Sprite;
 
 /**
@@ -50,6 +51,12 @@ public class GameViewProxy extends TiViewProxy
 		gameView.getLayoutParams().autoFillsWidth = true;
 		gameView.getLayoutParams().autoFillsHeight = true;
 		gameView.getRenderer().setMaxFps(maxFps);
+		// Titanium only delivers eventListenerAdded once the proxy has a view
+		// (KrollProxy drops MSG_LISTENER_ADDED while modelListener is null), so
+		// a listener attached in the natural order — create the view, wire it
+		// up, then add it to the window — is never announced. Ask directly
+		// now that the view exists, or measuring stays off forever.
+		refreshStats();
 		return gameView;
 	}
 
@@ -73,7 +80,7 @@ public class GameViewProxy extends TiViewProxy
 	{
 		super.handleCreationDict(options);
 		if (options.containsKey("debug")) {
-			scene.debugAll = TiConvert.toBoolean(options.get("debug"), false);
+			applyDebug(options.get("debug"));
 		}
 		if (options.containsKey("cameraEffect")) {
 			setCameraEffect(TiConvert.toString(options.get("cameraEffect")));
@@ -192,17 +199,100 @@ public class GameViewProxy extends TiViewProxy
 		scene.effectIntensity = Values.ratio(value, scene.effectIntensity);
 	}
 
-	/** Renders debug overlays (collision box, bounds, anchor) for every sprite. */
+	// Developer aids, both off by default:
+	//   debug: true                        collision shapes for every sprite
+	//   debug: { hitbox: true }            the same, spelled out
+	//   debug: { hud: true }               performance HUD in the default corner
+	//   debug: { hud: 'topRight' }         ...in the corner you pick
+	//   debug: { hud: true, hudFont: f }   ...in the game's own typeface
+	// The HUD key name is not settled with the maintainer yet; it appears
+	// here and in the iOS twin, nowhere else.
+	private static final String KEY_HITBOX = "hitbox";
+	private static final String KEY_HUD = "hud";
+	private static final String KEY_HUD_FONT = "hudFont";
+
+	/**
+	 * Reads back the normalized form, whichever form was written:
+	 * { hitbox: <boolean>, hud: false | 'topLeft' | ... }.
+	 */
 	@Kroll.getProperty
-	public boolean getDebug()
+	public Object getDebug()
 	{
-		return scene.debugAll;
+		org.appcelerator.kroll.KrollDict value = new org.appcelerator.kroll.KrollDict();
+		value.put(KEY_HITBOX, scene.debugAll);
+		value.put(KEY_HUD, scene.hud.enabled ? ScreenOverlay.cornerName(scene.hud.corner) : Boolean.FALSE);
+		return value;
 	}
 
 	@Kroll.setProperty
-	public void setDebug(boolean value)
+	public void setDebug(Object value)
 	{
-		scene.debugAll = value;
+		applyDebug(value);
+	}
+
+	private void applyDebug(Object value)
+	{
+		if (value instanceof java.util.Map) {
+			java.util.Map<?, ?> options = (java.util.Map<?, ?>) value;
+			scene.debugAll = TiConvert.toBoolean(options.get(KEY_HITBOX), false);
+			applyHud(options.get(KEY_HUD));
+			Object fontValue = options.get(KEY_HUD_FONT);
+			scene.hud.font = (fontValue instanceof FontProxy)
+				? ((FontProxy) fontValue).getFont() : null;
+		} else {
+			// debug: true — the shorthand that predates the object form
+			scene.debugAll = TiConvert.toBoolean(value, false);
+			applyHud(null);
+			scene.hud.font = null;
+		}
+		refreshStats();
+	}
+
+	private void applyHud(Object value)
+	{
+		if (value == null) {
+			scene.hud.enabled = false;
+			return;
+		}
+		if (value instanceof String) {
+			scene.hud.corner = ScreenOverlay.cornerFromName((String) value, ScreenOverlay.TOP_LEFT);
+			scene.hud.enabled = true;
+			return;
+		}
+		scene.hud.enabled = TiConvert.toBoolean(value, false);
+	}
+
+	// Measuring costs nothing while nobody is looking: the flag only goes
+	// up for the HUD or for a live 'performance' listener.
+	private boolean performanceListening = false;
+
+	private void refreshStats()
+	{
+		// hasListeners() is the truth; performanceListening only caches what
+		// the callbacks told us, and those do not fire before the view exists.
+		scene.stats.enabled = scene.hud.enabled
+			|| performanceListening
+			|| hasListeners("performance");
+	}
+
+	@Override
+	public void eventListenerAdded(String event, int count, org.appcelerator.kroll.KrollProxy proxy)
+	{
+		super.eventListenerAdded(event, count, proxy);
+		if ("performance".equals(event)) {
+			performanceListening = count > 0;
+			refreshStats();
+		}
+	}
+
+	@Override
+	public void eventListenerRemoved(String event, int count, org.appcelerator.kroll.KrollProxy proxy)
+	{
+		super.eventListenerRemoved(event, count, proxy);
+		if ("performance".equals(event)) {
+			performanceListening = count > 0;
+			refreshStats();
+		}
 	}
 
 	@Kroll.method

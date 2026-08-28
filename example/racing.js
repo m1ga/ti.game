@@ -24,7 +24,8 @@ module.exports = function () {
 	});
 	var gameView = Game.createGameView({
 		backgroundColor: '#4e8846'
-		// debug: true  // show collision shapes for every sprite
+		// debug: true                              // collision shapes for every sprite
+		// debug: { hitbox: true, hud: 'topRight' }  // ...plus the performance HUD
 	});
 
 	// HUD as a GL text sprite (built-in pixel font) — screenFixed keeps it

@@ -20,23 +20,29 @@ import javax.microedition.khronos.opengles.GL10;
 public class SceneRenderer implements GLSurfaceView.Renderer
 {
 	private final Scene scene;
-	private final org.appcelerator.kroll.KrollProxy viewProxy; // fires 'resize'
+	private final org.appcelerator.kroll.KrollProxy viewProxy; // fires 'resize', 'performance'
 	private final SpriteBatch batch = new SpriteBatch();
 	private final TextureManager textures = new TextureManager();
 	private final PostEffect postEffect = new PostEffect();
+	private final ScreenOverlay overlay = new ScreenOverlay();
+	private final FrameStats stats; // scene.stats — the proxy toggles it
 	private final float[] projection = new float[16];
 	private final float[] screenProjection = new float[16]; // screenFixed sprites
 
 	private long lastFrameNanos = 0;
 	private float effectTime = 0f; // drives the glitch animation
+	private boolean wasMeasuring = false;
 	private volatile int surfaceWidth = 0;
 	private volatile int surfaceHeight = 0;
 	private volatile int maxFps = 0; // 0 = display refresh rate
+	private volatile float displayRefreshRate = 0f; // 0 = unknown, assume 60
+	private volatile float screenScale = 1f; // display density: HUD sizing
 
 	public SceneRenderer(Scene scene, org.appcelerator.kroll.KrollProxy viewProxy)
 	{
 		this.scene = scene;
 		this.viewProxy = viewProxy;
+		this.stats = scene.stats;
 	}
 
 	public int surfaceWidth()
@@ -55,6 +61,22 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		maxFps = Math.max(0, fps);
 	}
 
+	/** Display refresh rate in Hz — the baseline the dropped-frame count is
+	 *  measured against. Pushed from the UI thread; Display.getRefreshRate
+	 *  can't be called from the GL thread. */
+	public void setDisplayRefreshRate(float hz)
+	{
+		displayRefreshRate = hz;
+	}
+
+	/** Display density, so the HUD reads the same size on a 1x tablet and a
+	 *  3x phone (the surface is in real pixels, not dp). */
+	public void setScreenScale(float scale)
+	{
+		screenScale = Math.max(0.5f, scale);
+	}
+
+
 	@Override
 	public void onSurfaceCreated(GL10 unused, EGLConfig config)
 	{
@@ -63,6 +85,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		batch.createGLResources();
 		postEffect.createGLResources();
 		lastFrameNanos = 0;
+		stats.reset();
 	}
 
 	@Override
@@ -74,6 +97,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		scene.worldHeight = height;
 		GLES20.glViewport(0, 0, width, height);
 		Matrix.orthoM(projection, 0, 0f, width, height, 0f, -1f, 1f);
+		overlay.surfaceChanged(width, height);
 
 		// The real scene coordinate space — build/relayout levels on this,
 		// not on the display size (which includes system bars)
@@ -103,15 +127,30 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			}
 		}
 
+		// Read after the sleep above: a frame rate cap is not work, and
+		// timing it as such would make every capped frame look expensive
 		long now = System.nanoTime();
-		float dt = (lastFrameNanos == 0) ? 0f : (now - lastFrameNanos) / 1_000_000_000f;
+		long intervalNanos = (lastFrameNanos == 0) ? 0L : now - lastFrameNanos;
+		float dt = (lastFrameNanos == 0) ? 0f : intervalNanos / 1_000_000_000f;
 		lastFrameNanos = now;
 		// Clamp so a paused/debugged app doesn't fast-forward animations
 		if (dt > 0.1f) {
 			dt = 0.1f;
 		}
 
+		// One volatile read decides whether this frame is measured at all.
+		// Everything below that reads a clock sits behind it.
+		final boolean measuring = stats.enabled;
+		if (!measuring && wasMeasuring) {
+			stats.reset();
+		}
+		wasMeasuring = measuring;
+
+		long phaseStart = measuring ? System.nanoTime() : 0L;
 		scene.update(dt);
+		if (measuring) {
+			stats.updateMs = (System.nanoTime() - phaseStart) / 1_000_000.0;
+		}
 		effectTime += dt;
 
 		// Camera effect: render the whole scene into an offscreen texture,
@@ -141,6 +180,9 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		textures.deleteDisposed();
 
 		// Lazy texture upload happens here, on the GL thread
+		if (measuring) {
+			phaseStart = System.nanoTime();
+		}
 		for (Sprite s : sprites) {
 			ensureSheetLoaded(s.sheet);
 		}
@@ -149,6 +191,10 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		}
 		for (Rope rope : ropes) {
 			ensureSheetLoaded(rope.sheet);
+		}
+		if (measuring) {
+			stats.texturePrepareMs = (System.nanoTime() - phaseStart) / 1_000_000.0;
+			phaseStart = System.nanoTime();
 		}
 
 		// Camera travel (position + shake, without the zoom-centering term)
@@ -162,6 +208,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		boolean trailDrawn = false;
 		int nextEmitter = 0;
 		int nextRope = 0;
+		int visibleSprites = 0;
 		for (Sprite s : sprites) {
 			if (!trailDrawn && s.zIndex > 0) {
 				drawSkidTrail();
@@ -174,6 +221,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 				ropes.get(nextRope++).draw(batch);
 			}
 			if (s.visible && s.effectiveOpacity() > 0f) {
+				visibleSprites++;
 				batch.draw(s);
 			}
 		}
@@ -194,11 +242,99 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		}
 		batch.end();
 
+		// Counters have to be read here, before the screen-space pass calls
+		// begin() again and resets them — otherwise the HUD would be
+		// reporting its own cost back to itself.
+		if (measuring) {
+			stats.batchMs = (System.nanoTime() - phaseStart) / 1_000_000.0;
+			stats.drawCalls = batch.drawCalls + (effectActive ? 1 : 0);
+			stats.textureSwitches = batch.textureSwitches;
+			stats.sprites = sprites.size();
+			stats.visibleSprites = visibleSprites;
+			stats.emitters = emitters.size();
+			int particles = 0;
+			for (ParticleEmitter e : emitters) {
+				particles += e.getActiveParticleCount();
+			}
+			stats.particles = particles;
+		}
+
 		if (effectActive) {
 			postEffect.finish(effectMode,
 				scene.effectTintR, scene.effectTintG, scene.effectTintB,
 				scene.effectIntensity, effectTime);
 		}
+
+		// Screen-space pass, last of all: drawn any earlier, the glitch
+		// shader would smear exactly the numbers the HUD exists to show.
+		// A second begin() only re-uploads the projection uniform and
+		// re-enables blending — the batcher needs no other state.
+		DebugHud hud = scene.hud;
+		if (hud.enabled) {
+			// The HUD's own font if it was given one, else the scene's
+			// built-in pixel font — the same instance createText() falls
+			// back to, so there is only ever one copy of that texture.
+			BitmapFont hudFont = (hud.font != null) ? hud.font : scene.defaultFont();
+			ensureSheetLoaded(hudFont.sheet);
+			// Screen space ignores camera travel, so the parallax terms are 0.
+			batch.begin(projection, screenProjection, left, top, scale, 0f, 0f);
+			batch.setScreenSpace(true);
+			hud.draw(batch, textures.whiteTexture(), hudFont, surfaceWidth, surfaceHeight, screenScale);
+			batch.end();
+		}
+
+		if (measuring) {
+			long frameEnd = System.nanoTime();
+			stats.addFrame((frameEnd - now) / 1_000_000.0, frameEnd, intervalNanos, targetFrameNanos());
+			if (stats.windowClosed(frameEnd)) {
+				FrameStats.Snapshot snapshot = stats.closeWindow(frameEnd);
+				hud.update(snapshot);
+				firePerformance(snapshot);
+			}
+		}
+	}
+
+	/** Expected frame interval: the cap if one is set, else the display's. */
+	private long targetFrameNanos()
+	{
+		int fps = maxFps;
+		if (fps > 0) {
+			return 1_000_000_000L / fps;
+		}
+		float hz = displayRefreshRate;
+		return (hz > 1f) ? (long) (1_000_000_000f / hz) : 1_000_000_000L / 60L;
+	}
+
+	/**
+	 * At most one event per second, and only while JS is listening.
+	 * averagePresentMs and presentFailures are iOS-only: GLSurfaceView
+	 * swaps buffers on its own thread after onDrawFrame returns, so there
+	 * is nothing here to time. The keys are left out rather than sent as
+	 * zero — undefined is how JS says "not on this platform".
+	 */
+	private void firePerformance(FrameStats.Snapshot s)
+	{
+		if (viewProxy == null || !viewProxy.hasListeners("performance")) {
+			return;
+		}
+		org.appcelerator.kroll.KrollDict data = new org.appcelerator.kroll.KrollDict();
+		data.put("fps", s.fps);
+		data.put("averageCpuMs", s.averageCpuMs);
+		data.put("p95CpuMs", s.p95CpuMs);
+		data.put("maxCpuMs", s.maxCpuMs);
+		data.put("averageUpdateMs", s.averageUpdateMs);
+		data.put("averageTexturePrepareMs", s.averageTexturePrepareMs);
+		data.put("averageBatchMs", s.averageBatchMs);
+		data.put("droppedFrames", s.droppedFrames);
+		data.put("sprites", s.sprites);
+		data.put("visibleSprites", s.visibleSprites);
+		data.put("emitters", s.emitters);
+		data.put("particles", s.particles);
+		data.put("drawCalls", s.drawCalls);
+		data.put("textureSwitches", s.textureSwitches);
+		data.put("surfaceWidth", surfaceWidth);
+		data.put("surfaceHeight", surfaceHeight);
+		viewProxy.fireEvent("performance", data);
 	}
 
 	private void ensureSheetLoaded(SpriteSheet sheet)

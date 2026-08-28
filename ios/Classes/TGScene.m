@@ -1,4 +1,6 @@
 #import "TGScene.h"
+#import "TGDebugHud.h"
+#import "TGFrameStats.h"
 #import "TGParticleEmitter.h"
 #import "TGPathfinder.h"
 #import "TGRope.h"
@@ -69,6 +71,8 @@ static float bottomEdge(TGSprite *s)
 		_emitters = [NSMutableArray array];
 		_ropes = [NSMutableArray array];
 		_skidTrail = [[TGSkidTrail alloc] init];
+		_hud = [[TGDebugHud alloc] init];
+		_stats = [[TGFrameStats alloc] init];
 		_effectTintR = 1.0f;
 		_effectTintG = 1.0f;
 		_effectTintB = 1.0f;

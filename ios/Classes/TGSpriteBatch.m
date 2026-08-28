@@ -202,6 +202,8 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	_currentTexture = -1;
 	_activeProgram = 0;
 	_blendMode = TGBlendModeNormal;
+	_drawCalls = 0;
+	_textureSwitches = 0;
 	[self useProgram:_program];
 	glActiveTexture(GL_TEXTURE0);
 	glEnable(GL_BLEND);
@@ -281,6 +283,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	if (texture != _currentTexture) {
 		[self flush];
 		_currentTexture = texture;
+		_textureSwitches++;
 	}
 	if (_quadCount >= kMaxQuads) {
 		[self flush];
@@ -641,6 +644,7 @@ static inline float *putVertex(float *v, float x, float y, float u, float uv,
 	glEnableVertexAttribArray(kAttrColor);
 
 	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+	_drawCalls++;
 	// TGPostEffect draws with client-side pointers — leave no buffer bound
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	_quadCount = 0;

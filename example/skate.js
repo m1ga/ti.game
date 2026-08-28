@@ -34,7 +34,8 @@ module.exports = function () {
 	});
 	var gameView = Game.createGameView({
 		backgroundColor: '#4a4278'
-		// debug: true  // show collision shapes for every sprite
+		// debug: true                              // collision shapes for every sprite
+		// debug: { hitbox: true, hud: 'topRight' }  // ...plus the performance HUD
 	});
 
 	var skaterSheet = Game.createSpriteSheet({ image: 'assets/skater.png', frameWidth: 32, frameHeight: 32, smoothing: false });

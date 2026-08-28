@@ -10,6 +10,9 @@
 // Both emitters draw white particle art (spark.png) tinted at runtime,
 // so one tiny texture covers every color used here.
 //
+// The debug HUD is on (`debug: { hud: 'topRight' }`) — the particle count
+// climbs with every firework. Tap it to expand it.
+//
 // Exports a start function; the demo opens its own window each time.
 
 var Game = require('ti.game');
@@ -21,7 +24,8 @@ module.exports = function () {
 		theme: 'Theme.Titanium.DayNight.NoTitleBar'
 	});
 	var gameView = Game.createGameView({
-		backgroundColor: '#181828'
+		backgroundColor: '#181828',
+		debug: { hud: 'topRight' }   // tap the HUD to expand it
 	});
 
 	// white particle frames (0 = soft puff, 1 = pixel spark)

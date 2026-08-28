@@ -1,4 +1,5 @@
 #import "TGTouchController.h"
+#import "TGDebugHud.h"
 #import "TGRope.h"
 #import "TGScene.h"
 #import "TGSprite.h"
@@ -42,6 +43,10 @@ static const NSTimeInterval kTapTimeout = 0.3;
 	BOOL _rotating;
 	float _lastAngle;
 	float _lastPinchDistance;
+
+	// Set while the first finger landed on the debug HUD: that gesture
+	// belongs to the HUD and reaches neither the sprites nor the view
+	BOOL _hudCaptured;
 }
 
 - (instancetype)initWithScene:(TGScene *)scene
@@ -61,12 +66,19 @@ static const NSTimeInterval kTapTimeout = 0.3;
 
 // --- Geometry helpers ---------------------------------------------------
 
+/** Touch in surface pixels — what the screen-space overlay is laid out in. */
+- (CGPoint)surfacePoint:(UITouch *)touch inView:(UIView *)view
+{
+	CGPoint p = [touch locationInView:view];
+	return CGPointMake(p.x * _contentScale, p.y * _contentScale);
+}
+
 /** Touch in world space: surface pixels mapped through camera + zoom. */
 - (CGPoint)worldPoint:(UITouch *)touch inView:(UIView *)view
 {
-	CGPoint p = [touch locationInView:view];
-	return CGPointMake([_scene screenToWorldX:(float)(p.x * _contentScale)],
-					   [_scene screenToWorldY:(float)(p.y * _contentScale)]);
+	CGPoint p = [self surfacePoint:touch inView:view];
+	return CGPointMake([_scene screenToWorldX:(float)p.x],
+					   [_scene screenToWorldY:(float)p.y]);
 }
 
 /** Gestures track coordinates in the sprite's own space, so drags on
@@ -178,6 +190,16 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 		if (_activeTouches.count == 1) {
 			// ACTION_DOWN — world space: hit-testing and drags track the camera
 			[self resetAll];
+			// The debug HUD is pinned to the surface, so it is tested in
+			// surface pixels — before anything maps them into world space.
+			// With the HUD off hitTest returns on an atomic read and the
+			// game never notices this branch exists.
+			CGPoint surface = [self surfacePoint:touch inView:view];
+			_hudCaptured = [_scene.hud hitTestX:(float)surface.x y:(float)surface.y];
+			if (_hudCaptured) {
+				[_scene.hud toggleExpanded];
+				continue;
+			}
 			_downX = wx;
 			_downY = wy;
 			_downTime = touch.timestamp;
@@ -347,6 +369,11 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 		}
 
 		// ACTION_UP — last finger left the screen
+		if (_hudCaptured) {
+			_hudCaptured = NO;
+			[self resetAll];
+			continue;
+		}
 		if (touch.timestamp - _downTime < kTapTimeout
 				&& distanceBetween(upX, upY, _downX, _downY) <= _touchSlop) {
 			[self fireOnView:@"tap" x:upX y:upY];
@@ -361,6 +388,11 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 {
 	for (UITouch *touch in touches) {
 		[_activeTouches removeObjectIdenticalTo:touch];
+	}
+	if (_hudCaptured && _activeTouches.count == 0) {
+		_hudCaptured = NO;
+		[self resetAll];
+		return;
 	}
 	if (_activeTouches.count == 0) {
 		// ACTION_CANCEL
@@ -416,6 +448,7 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	_modifierTarget = nil;
 	_rotating = NO;
 	_lastPinchDistance = 0.0f;
+	_hudCaptured = NO;
 }
 
 @end

@@ -20,7 +20,8 @@ module.exports = function () {
 	});
 	var gameView = Game.createGameView({
 		backgroundColor: '#1c2430'
-		// debug: true  // show collision shapes for every sprite
+		// debug: true                              // collision shapes for every sprite
+		// debug: { hitbox: true, hud: 'topRight' }  // ...plus the performance HUD
 	});
 
 	// 16px art upscaled ~5x with smoothing: false = chunky retro pixels

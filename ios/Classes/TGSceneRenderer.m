@@ -1,8 +1,12 @@
 #import "TGSceneRenderer.h"
+#import "TGBitmapFont.h"
+#import "TGDebugHud.h"
+#import "TGFrameStats.h"
 #import "TGParticleEmitter.h"
 #import "TGPostEffect.h"
 #import "TGRope.h"
 #import "TGScene.h"
+#import "TGScreenOverlay.h"
 #import "TGSkidTrail.h"
 #import "TGSprite.h"
 #import "TGSpriteBatch.h"
@@ -29,10 +33,12 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 
 @implementation TGSceneRenderer {
 	TGScene *_scene;
-	__weak TiProxy *_viewProxy; // fires 'resize'
+	__weak TiProxy *_viewProxy; // fires 'resize', 'performance'
 	TGSpriteBatch *_batch;
 	TGTextureManager *_textures;
 	TGPostEffect *_postEffect;
+	TGScreenOverlay *_overlay;
+	TGFrameStats *_stats; // scene.stats — the proxy toggles it
 	float _projection[16];
 	float _screenProjection[16]; // screenFixed sprites
 	CFTimeInterval _lastFrameTime;
@@ -40,6 +46,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	float _debugAabb[4];
 	float _debugBox[5];
 	float _debugCorners[8];
+	BOOL _wasMeasuring;
 	NSMutableSet<TGSpriteSheet *> *_preparedSheets;
 }
 
@@ -51,9 +58,17 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		_batch = [[TGSpriteBatch alloc] init];
 		_textures = [[TGTextureManager alloc] init];
 		_postEffect = [[TGPostEffect alloc] init];
+		_overlay = [[TGScreenOverlay alloc] init];
+		_stats = scene.stats;
 		_preparedSheets = [NSMutableSet set];
+		_screenScale = 1.0f;
 	}
 	return self;
+}
+
+- (BOOL)isMeasuring
+{
+	return _stats.enabled;
 }
 
 - (void)surfaceCreated
@@ -63,6 +78,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	[_batch createGLResources];
 	[_postEffect createGLResources];
 	_lastFrameTime = 0;
+	[_stats reset];
 }
 
 - (void)surfaceChangedWithWidth:(int)width height:(int)height
@@ -73,6 +89,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	_scene.worldHeight = height;
 	glViewport(0, 0, width, height);
 	orthoM(_projection, 0.0f, width, height, 0.0f, -1.0f, 1.0f);
+	[_overlay surfaceChangedWithWidth:width height:height];
 
 	// The real scene coordinate space — build/relayout levels on this,
 	// not on the display size
@@ -99,9 +116,21 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		dt = 0.1f;
 	}
 
+	// One atomic read decides whether this frame is measured at all.
+	// Everything below that reads a clock sits behind it.
+	const BOOL measuring = _stats.enabled;
+	if (!measuring && _wasMeasuring) {
+		[_stats reset];
+	}
+	_wasMeasuring = measuring;
+
+	CFTimeInterval phaseStart = measuring ? CACurrentMediaTime() : 0;
 	NSArray<TGParticleEmitter *> *emitters;
 	NSArray<TGRope *> *ropes;
 	NSArray<TGSprite *> *sprites = [_scene prepareFrame:dt emitters:&emitters ropes:&ropes];
+	if (measuring) {
+		_stats.updateMs = (CACurrentMediaTime() - phaseStart) * 1000.0;
+	}
 	_effectTime += dt;
 
 	// Camera effect: render the whole scene into an offscreen texture,
@@ -128,6 +157,9 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 
 	// Lazy texture upload happens here, on the render thread. A shared sheet
 	// is prepared once per frame even when many sprites reference it.
+	if (measuring) {
+		phaseStart = CACurrentMediaTime();
+	}
 	[_preparedSheets removeAllObjects];
 	for (TGSprite *s in sprites) {
 		[self ensureSheetLoadedOnce:s.sheet];
@@ -137,6 +169,10 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 	for (TGRope *rope in ropes) {
 		[self ensureSheetLoadedOnce:rope.sheet];
+	}
+	if (measuring) {
+		_stats.texturePrepareMs = (CACurrentMediaTime() - phaseStart) * 1000.0;
+		phaseStart = CACurrentMediaTime();
 	}
 
 	// Camera travel (position + shake, without the zoom-centering term)
@@ -152,6 +188,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	BOOL trailDrawn = NO;
 	NSUInteger nextEmitter = 0;
 	NSUInteger nextRope = 0;
+	int visibleSprites = 0;
 	for (TGSprite *s in sprites) {
 		if (!trailDrawn && s.zIndex > 0) {
 			[self drawSkidTrail];
@@ -164,6 +201,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 			[ropes[nextRope++] draw:_batch];
 		}
 		if (s.visible && [s effectiveOpacity] > 0.0f) {
+			visibleSprites++;
 			[_batch draw:s];
 		}
 	}
@@ -184,11 +222,95 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 	[_batch end];
 
+	// Counters have to be read here, before the screen-space pass calls
+	// begin again and resets them — otherwise the HUD would be reporting
+	// its own cost back to itself.
+	if (measuring) {
+		_stats.batchMs = (CACurrentMediaTime() - phaseStart) * 1000.0;
+		_stats.drawCalls = _batch.drawCalls + (effectActive ? 1 : 0);
+		_stats.textureSwitches = _batch.textureSwitches;
+		_stats.sprites = (int)sprites.count;
+		_stats.visibleSprites = visibleSprites;
+		_stats.emitters = (int)emitters.count;
+		int particles = 0;
+		for (TGParticleEmitter *emitter in emitters) {
+			particles += MAX(0, emitter.activeParticleCount);
+		}
+		_stats.particles = particles;
+	}
+
 	if (effectActive) {
 		[_postEffect finish:effectMode
 					  tintR:_scene.effectTintR tintG:_scene.effectTintG tintB:_scene.effectTintB
 				  intensity:_scene.effectIntensity time:_effectTime];
 	}
+
+	// Screen-space pass, last of all: drawn any earlier, the glitch shader
+	// would smear exactly the numbers the HUD exists to show. A second
+	// begin only re-uploads the projection uniform and re-enables
+	// blending — the batcher needs no other state.
+	TGDebugHud *hud = _scene.hud;
+	if (hud.enabled) {
+		// The HUD's own font if it was given one, else the scene's built-in
+		// pixel font — the same instance createText() falls back to, so
+		// there is only ever one copy of that texture.
+		TGBitmapFont *hudFont = (hud.font != nil) ? hud.font : [_scene defaultFont];
+		[self ensureSheetLoadedOnce:hudFont.sheet];
+		// Screen space ignores camera travel, so the parallax terms are 0.
+		[_batch begin:_projection screenProjection:_screenProjection
+			  originX:left originY:top screenScale:scale
+			  travelX:0.0f travelY:0.0f];
+		[_batch setScreenSpace:YES];
+		[hud draw:_batch texture:[_textures whiteTexture] font:hudFont
+	   surfaceWidth:_surfaceWidth surfaceHeight:_surfaceHeight
+		screenScale:self.screenScale];
+		[_batch end];
+	}
+}
+
+- (void)recordFrameCpuMs:(double)cpuMs
+			   presentMs:(double)presentMs
+			   presented:(BOOL)presented
+				interval:(CFTimeInterval)interval
+				  target:(CFTimeInterval)target
+{
+	CFTimeInterval now = CACurrentMediaTime();
+	[_stats addFrameCpuMs:cpuMs presentMs:presentMs presented:presented
+					  now:now interval:interval target:target];
+	if ([_stats windowClosed:now]) {
+		TGFrameStatsSnapshot snapshot = [_stats closeWindow:now];
+		[_scene.hud update:snapshot];
+		[self firePerformance:snapshot];
+	}
+}
+
+/** At most one event per second, and only while JS is listening. */
+- (void)firePerformance:(TGFrameStatsSnapshot)s
+{
+	TiProxy *proxy = _viewProxy;
+	if (proxy == nil || ![proxy _hasListeners:@"performance"]) {
+		return;
+	}
+	[proxy fireEvent:@"performance" withObject:@{
+		@"fps": @(s.fps),
+		@"averageCpuMs": @(s.averageCpuMs),
+		@"p95CpuMs": @(s.p95CpuMs),
+		@"maxCpuMs": @(s.maxCpuMs),
+		@"averageUpdateMs": @(s.averageUpdateMs),
+		@"averageTexturePrepareMs": @(s.averageTexturePrepareMs),
+		@"averageBatchMs": @(s.averageBatchMs),
+		@"averagePresentMs": @(s.averagePresentMs),
+		@"droppedFrames": @(s.droppedFrames),
+		@"presentFailures": @(s.presentFailures),
+		@"sprites": @(s.sprites),
+		@"visibleSprites": @(s.visibleSprites),
+		@"emitters": @(s.emitters),
+		@"particles": @(s.particles),
+		@"drawCalls": @(s.drawCalls),
+		@"textureSwitches": @(s.textureSwitches),
+		@"surfaceWidth": @(_surfaceWidth),
+		@"surfaceHeight": @(_surfaceHeight)
+	}];
 }
 
 - (void)ensureSheetLoadedOnce:(TGSpriteSheet *)sheet
