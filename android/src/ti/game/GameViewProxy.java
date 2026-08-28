@@ -17,6 +17,7 @@ import org.appcelerator.titanium.view.TiUIView;
 
 import android.graphics.Color;
 
+import ti.game.engine.GamepadController;
 import ti.game.engine.PostEffect;
 import ti.game.engine.ParticleEmitter;
 import ti.game.engine.Rope;
@@ -38,6 +39,9 @@ public class GameViewProxy extends TiViewProxy
 	private final Scene scene = new Scene();
 	private TiGameView gameView;
 	private int maxFps = 0;
+	private float gamepadDeadzone = 0.2f;
+	private float gamepadStickPress = 0.5f;
+	private float gamepadStickRelease = 0.4f;
 	private final ConcurrentHashMap<Integer, KrollFunction> timerCallbacks = new ConcurrentHashMap<>();
 
 	public GameViewProxy()
@@ -52,6 +56,8 @@ public class GameViewProxy extends TiViewProxy
 		gameView.getLayoutParams().autoFillsWidth = true;
 		gameView.getLayoutParams().autoFillsHeight = true;
 		gameView.getRenderer().setMaxFps(maxFps);
+		gameView.getGamepadController().setDeadzone(gamepadDeadzone);
+		gameView.getGamepadController().setStickThresholds(gamepadStickPress, gamepadStickRelease);
 		// Titanium only delivers eventListenerAdded once the proxy has a view
 		// (KrollProxy drops MSG_LISTENER_ADDED while modelListener is null), so
 		// a listener attached in the natural order — create the view, wire it
@@ -98,6 +104,84 @@ public class GameViewProxy extends TiViewProxy
 		if (options.containsKey("maxFps")) {
 			setMaxFps(TiConvert.toInt(options.get("maxFps")));
 		}
+		if (options.containsKey("gamepadDeadzone")) {
+			setGamepadDeadzone(options.get("gamepadDeadzone"));
+		}
+		if (options.containsKey("gamepadStickPress")) {
+			setGamepadStickPress(options.get("gamepadStickPress"));
+		}
+		if (options.containsKey("gamepadStickRelease")) {
+			setGamepadStickRelease(options.get("gamepadStickRelease"));
+		}
+	}
+
+	// --- Game controllers -------------------------------------------------
+
+	/** Radial dead zone for the analog sticks, 0..0.9 (default 0.2). */
+	@Kroll.setProperty
+	public void setGamepadDeadzone(Object value)
+	{
+		gamepadDeadzone = Values.ratio(value, gamepadDeadzone);
+		if (gameView != null) {
+			gameView.getGamepadController().setDeadzone(gamepadDeadzone);
+		}
+	}
+
+	@Kroll.getProperty
+	public float getGamepadDeadzone()
+	{
+		return gamepadDeadzone;
+	}
+
+	/** Left-stick deflection that counts as pressing a direction (0.1..0.95, default 0.5). */
+	@Kroll.setProperty
+	public void setGamepadStickPress(Object value)
+	{
+		gamepadStickPress = Values.ratio(value, gamepadStickPress);
+		applyStickThresholds();
+	}
+
+	@Kroll.getProperty
+	public float getGamepadStickPress()
+	{
+		return gamepadStickPress;
+	}
+
+	/** Deflection below which a stick-pressed direction releases again (default 0.4). */
+	@Kroll.setProperty
+	public void setGamepadStickRelease(Object value)
+	{
+		gamepadStickRelease = Values.ratio(value, gamepadStickRelease);
+		applyStickThresholds();
+	}
+
+	@Kroll.getProperty
+	public float getGamepadStickRelease()
+	{
+		return gamepadStickRelease;
+	}
+
+	private void applyStickThresholds()
+	{
+		if (gameView != null) {
+			gameView.getGamepadController().setStickThresholds(gamepadStickPress, gamepadStickRelease);
+		}
+	}
+
+	/** Connected game controllers: [{ id, name }]. */
+	@Kroll.getProperty
+	public Object[] getGamepads()
+	{
+		return GamepadController.connectedGamepads();
+	}
+
+	/** Snapshot of the most recently used pad — { id, name, leftX, leftY,
+	 *  rightX, rightY, l2, r2, buttons: { a: true, ... } } — for polling
+	 *  from a game timer; null until a pad has sent something. */
+	@Kroll.getProperty
+	public KrollDict getGamepad()
+	{
+		return (gameView != null) ? gameView.getGamepadController().snapshot() : null;
 	}
 
 	/** Frame rate cap (e.g. 60 on a 120 Hz display); 0 = display refresh rate. */

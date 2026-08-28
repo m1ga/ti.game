@@ -1,6 +1,7 @@
 // ti.game platformer demo — ground, platforms, and a little slime guy.
 //
 // - hold ◀ / ▶ to run, press ⬆ to jump (only while standing on something)
+// - or use a Bluetooth gamepad: d-pad / left stick to run, A or up to jump
 // - jumping onto the platforms works: the engine's `solidWith` collision
 //   resolution pushes the player out of solids and tracks `onGround`
 // - the staircase platforms are one-way (oneWay: true): jump up through
@@ -271,6 +272,31 @@ module.exports = function () {
 		win.add(leftButton);
 		win.add(jumpButton);
 		win.add(rightButton);
+
+		// --- Gamepad (Bluetooth/USB controller) --------------------------
+		// The engine normalizes every pad to the same button names and
+		// turns the d-pad AND the left stick into up/down/left/right, so
+		// one table maps controls to game actions. Holding a direction is
+		// a buttondown/buttonup pair — same shape as the touch buttons.
+		var padActions = {
+			left: { down: function () { moveDir = -1; applyMovement(); },
+			        up: function () { if (moveDir === -1) { moveDir = 0; applyMovement(); } } },
+			right: { down: function () { moveDir = 1; applyMovement(); },
+			         up: function () { if (moveDir === 1) { moveDir = 0; applyMovement(); } } },
+			a: { down: jump },
+			up: { down: jump }
+		};
+		gameView.addEventListener('buttondown', function (e) {
+			var action = padActions[e.button];
+			if (action && action.down) { action.down(); }
+		});
+		gameView.addEventListener('buttonup', function (e) {
+			var action = padActions[e.button];
+			if (action && action.up) { action.up(); }
+		});
+		gameView.addEventListener('gamepadconnected', function (e) {
+			Ti.API.info('gamepad connected: ' + e.name + ' (#' + e.gamepad + ')');
+		});
 	}
 
 	win.add(gameView);

@@ -57,6 +57,8 @@
 		A1B2C3D40904000000000000 /* TGTextureManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40902000000000000 /* TGTextureManager.m */; };
 		A1B2C3D40A03000000000000 /* TGTouchController.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40A01000000000000 /* TGTouchController.h */; };
 		A1B2C3D40A04000000000000 /* TGTouchController.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40A02000000000000 /* TGTouchController.m */; };
+		A1B2C3D42703000000000000 /* TGGamepadController.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42701000000000000 /* TGGamepadController.h */; };
+		A1B2C3D42704000000000000 /* TGGamepadController.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42702000000000000 /* TGGamepadController.m */; };
 		A1B2C3D40B03000000000000 /* TGTween.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40B01000000000000 /* TGTween.h */; };
 		A1B2C3D40B04000000000000 /* TGTween.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40B02000000000000 /* TGTween.m */; };
 		A1B2C3D42403000000000000 /* TGValues.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42401000000000000 /* TGValues.h */; };
@@ -151,6 +153,8 @@
 		A1B2C3D40902000000000000 /* TGTextureManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTextureManager.m"; path = "Classes/TGTextureManager.m"; sourceTree = "<group>"; };
 		A1B2C3D40A01000000000000 /* TGTouchController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTouchController.h"; path = "Classes/TGTouchController.h"; sourceTree = "<group>"; };
 		A1B2C3D40A02000000000000 /* TGTouchController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTouchController.m"; path = "Classes/TGTouchController.m"; sourceTree = "<group>"; };
+		A1B2C3D42701000000000000 /* TGGamepadController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGGamepadController.h"; path = "Classes/TGGamepadController.h"; sourceTree = "<group>"; };
+		A1B2C3D42702000000000000 /* TGGamepadController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGGamepadController.m"; path = "Classes/TGGamepadController.m"; sourceTree = "<group>"; };
 		A1B2C3D40B01000000000000 /* TGTween.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTween.h"; path = "Classes/TGTween.h"; sourceTree = "<group>"; };
 		A1B2C3D40B02000000000000 /* TGTween.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTween.m"; path = "Classes/TGTween.m"; sourceTree = "<group>"; };
 		A1B2C3D42401000000000000 /* TGValues.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGValues.h"; path = "Classes/TGValues.h"; sourceTree = "<group>"; };
@@ -269,6 +273,8 @@
 				A1B2C3D40902000000000000 /* TGTextureManager.m */,
 				A1B2C3D40A01000000000000 /* TGTouchController.h */,
 				A1B2C3D40A02000000000000 /* TGTouchController.m */,
+				A1B2C3D42701000000000000 /* TGGamepadController.h */,
+				A1B2C3D42702000000000000 /* TGGamepadController.m */,
 				A1B2C3D40B01000000000000 /* TGTween.h */,
 				A1B2C3D40B02000000000000 /* TGTween.m */,
 				A1B2C3D42401000000000000 /* TGValues.h */,
@@ -370,6 +376,7 @@
 				A1B2C3D40803000000000000 /* TGSpriteSheet.h in Headers */,
 				A1B2C3D40903000000000000 /* TGTextureManager.h in Headers */,
 				A1B2C3D40A03000000000000 /* TGTouchController.h in Headers */,
+				A1B2C3D42703000000000000 /* TGGamepadController.h in Headers */,
 				A1B2C3D40B03000000000000 /* TGTween.h in Headers */,
 				A1B2C3D42403000000000000 /* TGValues.h in Headers */,
 				A1B2C3D40C03000000000000 /* TiGameGameView.h in Headers */,
@@ -479,6 +486,7 @@
 				A1B2C3D40804000000000000 /* TGSpriteSheet.m in Sources */,
 				A1B2C3D40904000000000000 /* TGTextureManager.m in Sources */,
 				A1B2C3D40A04000000000000 /* TGTouchController.m in Sources */,
+				A1B2C3D42704000000000000 /* TGGamepadController.m in Sources */,
 				A1B2C3D40B04000000000000 /* TGTween.m in Sources */,
 				A1B2C3D42404000000000000 /* TGValues.m in Sources */,
 				A1B2C3D40C04000000000000 /* TiGameGameView.m in Sources */,

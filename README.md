@@ -14,6 +14,8 @@ identical on both platforms.
 
 - Sprite sheets (grid or TexturePacker atlas), frame animations, tweens
 - Touch: tap, press, drag & drop, pinch-to-scale, two-finger rotate
+- Gamepads: Bluetooth/USB controllers as named `buttondown`/`buttonup`
+  and throttled `stick` events — d-pad and left stick unified
 - Physics: velocity + gravity, platformer solids, bouncing (restitution),
   arcade car model with drifting + skid marks, Newtonian flight (thrust)
 - Collision groups with events, invisible trigger zones, hitbox tuning,
@@ -292,6 +294,77 @@ The GameView also fires `press` / `tap` / `release` for *every* touch
 not available on the game view — but ordinary Titanium buttons/views
 overlaid on top work normally, and separate views receive simultaneous
 pointers, which is how the demos do multitouch d-pads (hold ▶ + jump).
+
+### Gamepads
+
+A Bluetooth or USB controller (Stadia, Xbox, PlayStation, any MFi pad)
+reaches JS as a few discrete events on the GameView — no polling, no
+per-frame traffic:
+
+```js
+var actions = {
+	left:  { down: function () { run(-1); }, up: function () { stop(-1); } },
+	right: { down: function () { run(1); },  up: function () { stop(1); } },
+	a:     { down: jump },
+	start: { down: togglePause }
+};
+gameView.addEventListener('buttondown', function (e) {
+	if (actions[e.button] && actions[e.button].down) { actions[e.button].down(); }
+});
+gameView.addEventListener('buttonup', function (e) {
+	if (actions[e.button] && actions[e.button].up) { actions[e.button].up(); }
+});
+gameView.addEventListener('stick', function (e) { // analog, ~20 Hz while moving
+	if (e.stick === 'left') { ship.thrust = -e.y; ship.turn = e.x; }
+});
+```
+
+Button names are the same on every controller: `a` `b` `x` `y` `l1` `r1`
+`l2` `r2` `l3` `r3` `start` `select` `home` and `up` `down` `left`
+`right`. The four directions arrive from the **d-pad** (whether the pad
+reports it as keys or as a hat) *and* from the **left stick** once it is
+pushed past `gamepadStickPress` (default 0.5), releasing again below
+`gamepadStickRelease` (default 0.4 — the gap is hysteresis against
+flicker; lower both for a twitchier stick). `e.input` tells them apart
+(`'dpad'`, `'leftstick'`, `'button'`, `'trigger'`; `e.source` is
+Titanium's own key and holds the view) — so a single `buttondown` table
+covers both without caring which one the player uses. Each name is
+reported down once, however many physical controls map to it. Analog
+triggers count as `l2`/`r2` buttons past half travel and also fire
+`trigger` events with their `value`.
+
+`stick` (`{ stick: 'left'|'right', x, y, gamepad }`) and `trigger`
+(`{ trigger: 'l2'|'r2', value, gamepad }`) are throttled to ~20 Hz per
+channel while the value changes and always end with the rest value, so a
+stick released between events still reports `0, 0`. Transitions skip the
+throttle — leaving rest, returning to rest and crossing zero are reported
+the moment they happen, so a released stick stops the hero right away and
+only the in-between wiggle is rate-limited. `y` follows the
+engine's y-down coordinates (`-1` = up). `gamepadDeadzone` (default 0.2)
+is a radial dead zone with rescaling, so small values start at 0 rather
+than jumping.
+
+`gamepadconnected` / `gamepaddisconnected` (`{ gamepad, name }`) track
+pads; one already paired when the view was created announces itself on
+its first input, so a connected event always precedes that pad's
+buttons. `gameView.gamepads` lists what is attached right now, and
+`gameView.gamepad` is a snapshot of the most recently used pad (`leftX`,
+`leftY`, `rightX`, `rightY`, `l2`, `r2`, `buttons: { a: true, ... }`)
+for the rare case where polling from a `gameView.every()` timer fits
+better than events. Everything held is released (`buttonup`, and a
+final rest-value `stick`/`trigger` event) when the app goes to the
+background or a pad disconnects, so a direction never sticks.
+
+On Android, gamepad buttons are captured at the activity window — the
+game view does not need focus, and the mapped buttons are consumed so B
+does not act as Back and the d-pad does not move focus between your
+overlay buttons; unmapped keys (Back, volume) pass through untouched.
+`platformer.js` runs on either the on-screen buttons or a pad. Android
+normally batches joystick motion and delivers it once per display frame
+(keys arrive at once, which is why a stick release used to trail a d-pad
+release by a frame); on Android 11+ the module opts the window out of
+that batching for joysticks, so stick changes reach JS as soon as the pad
+reports them.
 
 ### Move things (pick the model that fits your game)
 
@@ -751,7 +824,7 @@ a feature set — find the one closest to your game and start there:
 | `basic.js` | Sheets, animations, drag/pinch/rotate, tween chaining |
 | `puzzle.js` | Drag & drop with snapping, press-to-lift, tween-back-home, multi-touch (one piece per finger) |
 | `flappy.js` | Gravity + tap impulse, trigger zones, parallax wrapping |
-| `platformer.js` | `solidWith`, `onGround`/`land` (trampolines via the landed-on solid), one-way staircase (`oneWay`), tween-driven moving platform that carries the player, camera `follow`, multitouch d-pad buttons |
+| `platformer.js` | `solidWith`, `onGround`/`land` (trampolines via the landed-on solid), one-way staircase (`oneWay`), tween-driven moving platform that carries the player, camera `follow`, multitouch d-pad buttons, Bluetooth gamepad via one `buttondown`/`buttonup` action table |
 | `volley.js` | `restitution` ball, JS-driven hit response, simple AI timer |
 | `racing.js` | `carMode` drifting, skid marks, pixel art, lap/checkpoint logic |
 | `cards.js` | Deck dealing, fanned hand UI, selection tweens, idle wobble |
@@ -870,13 +943,21 @@ app down mid-frame.
 | `cameraEffect` | Fullscreen shader over the whole scene: `'none'` (default), `'tint'`, `'glitch'` |
 | `cameraTint` | Color for the `'tint'` effect, e.g. `'#4f8'` |
 | `cameraEffectIntensity` | Effect strength 0..1 (tint mix / glitch amount; default 1) |
+| `gamepads` | Connected game controllers as `[{ id, name }]` (read-only) |
+| `gamepad` | Snapshot of the most recently used controller: `{ id, name, leftX, leftY, rightX, rightY, l2, r2, buttons: { a: true, ... } }`, `null` until a pad has sent input — for polling from a game timer; prefer the events |
+| `gamepadDeadzone` | Radial dead zone for the analog sticks, 0..0.9 (default 0.2) |
+| `gamepadStickPress` / `gamepadStickRelease` | Left-stick deflection that presses a direction button (0.1..0.95, default 0.5) and the lower value that releases it again (default 0.4; clamped to at most `gamepadStickPress`) |
 | `debug` | Developer aids: `true` = collision shapes for every sprite (shorthand for `{ hitbox: true }`), or `{ hitbox, hud, hudFont }` where `hud` is `true`/`false` or a corner name (`'topLeft'`, `'topRight'`, `'bottomLeft'`, `'bottomRight'`) and `hudFont` is any `createFont` font — see [Debug HUD](#debug-hud). Reads back as the normalized object |
 
 Events: `press`, `tap`, `release` (any touch; payload `x`, `y`),
 `resize` (payload `width`, `height`), `timer` (payload `id` — only for
-`after()`/`every()` calls made without a callback) and `performance`
+`after()`/`every()` calls made without a callback), `performance`
 (render telemetry, at most once a second, only while a listener is
-attached — see [Debug HUD](#debug-hud)).
+attached — see [Debug HUD](#debug-hud)), and the controller events
+`buttondown` / `buttonup` (payload `button`, `input`, `gamepad`,
+`keyCode`), `stick` (`stick`, `x`, `y`, `gamepad`; ~20 Hz), `trigger`
+(`trigger`, `value`, `gamepad`; ~20 Hz), `gamepadconnected` /
+`gamepaddisconnected` (`gamepad`, `name`) — see [Gamepads](#gamepads).
 
 ### SpriteSheet
 

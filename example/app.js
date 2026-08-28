@@ -2,7 +2,7 @@
 //   Basic:  sprite playground (animations, drag, pinch/rotate, tweens)
 //   Puzzle: drag & drop pieces into a grid, snap or tween back home
 //   Flappy: flying pig — tap to flap, gravity, gates, parallax background
-//   Platformer: run & jump onto platforms with on-screen controls
+//   Platformer: run & jump onto platforms with on-screen controls or a Bluetooth gamepad
 //   Plinko: a staggered wall of circular solids — every peg is a circle hitbox
 //   Volley: Blobby Volley style — you vs. a simple computer player
 //   Racing: pixel top-down racer with pixel snapping, drifting, checkpoints and laps

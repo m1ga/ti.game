@@ -184,8 +184,18 @@ traffic in the loop.
       the demos. Both halves it needs already exist for the debug HUD:
       `ScreenOverlay` draws in surface pixels, and the touch controllers
       hit-test in surface pixels before converting to world space.
-- [ ] Gamepad support (Android key/motion events, iOS GCController) with
-      the same native binding plus discrete button events.
+- [x] Gamepad support (Android key/motion events hooked at the activity
+      Window, iOS GameController.framework) as discrete events:
+      `buttondown`/`buttonup` with names normalized across pads (d-pad,
+      hat *and* left stick all arrive as `up`/`down`/`left`/`right`, each
+      name down once), `stick`/`trigger` throttled to ~20 Hz with
+      transitions reported immediately, `gamepadconnected`/
+      `gamepaddisconnected`, `gameView.gamepads` / `gameView.gamepad`
+      snapshot, dead zone and stick-press hysteresis properties.
+      Everything held is released on pause/disconnect. platformer.js
+      runs on a pad. Still open: the native `bind(sprite)` from the
+      joystick item above, which should take a pad's left stick as well
+      as the on-screen one.
 
 ## 7. Sprite parenting
 

@@ -19,6 +19,7 @@ import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.TiConvert;
 import org.appcelerator.titanium.view.TiUIView;
 
+import ti.game.engine.GamepadController;
 import ti.game.engine.Scene;
 import ti.game.engine.SceneRenderer;
 import ti.game.engine.TouchController;
@@ -38,6 +39,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	private final SceneRenderer renderer;
 	private final Scene scene;
 	private final TouchController touchController;
+	private final GamepadController gamepadController;
 	private final TiBaseActivity lifecycleActivity;
 	private volatile boolean renderingShutdown;
 
@@ -105,6 +107,9 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		glView.setRenderer(renderer);
 		touchController = new TouchController(activity, scene, proxy);
 		glView.setOnTouchListener(touchController);
+		// Bluetooth/USB game controllers — captured at the activity window so
+		// they work no matter which view holds focus
+		gamepadController = new GamepadController(activity, proxy);
 		setNativeView(glView);
 
 		if (activity instanceof TiBaseActivity) {
@@ -119,6 +124,11 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	public SceneRenderer getRenderer()
 	{
 		return renderer;
+	}
+
+	public GamepadController getGamepadController()
+	{
+		return gamepadController;
 	}
 
 	public void pauseRendering()
@@ -149,6 +159,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		if (lifecycleActivity != null) {
 			lifecycleActivity.removeOnLifecycleEventListener(this);
 		}
+		gamepadController.release();
 
 		Runnable detachSurface = new Runnable() {
 			@Override
@@ -286,6 +297,9 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		if (!renderingShutdown) {
 			glView.onPause();
 			ti.game.engine.SoundEngine.notifyActivityPaused();
+			// key-up events are lost while in the background — don't leave
+			// a direction held down in JS
+			gamepadController.releaseAll();
 		}
 	}
 
