@@ -27,6 +27,10 @@ identical on both platforms.
   bursts, follow a sprite, tint/scale/fade over lifetime
 - Verlet ropes (`createRope`) — pin ends to sprites or points, swings
   natively (chains, capes, bridges, grappling hooks)
+- Tile maps (`createTileLayer`) — one native layer per map, any size:
+  only the visible cells are drawn, solid/one-way cells block movers
+  and feed `findPath` without a sprite per tile; Tiled JSON data works
+  directly
 - Fullscreen camera effects (`cameraEffect`) — tint and glitch shader
   passes over the whole rendered scene; sprite glow highlights
   (`glowColor`/`glowBlur`), per-sprite color tinting (`tintColor`),
@@ -159,8 +163,8 @@ busy app thread can't cause stutter.
   bridge cost). Continuous gestures are throttled (`drag` at ~10 Hz);
   nothing fires per frame by design.
 
-When building a level, collect its sprites, emitters and ropes and call
-`gameView.add(objects)` once. The array crosses the bridge once and is committed
+When building a level, collect its sprites, emitters, ropes and tile
+layers and call `gameView.add(objects)` once. The array crosses the bridge once and is committed
 to the native scene under one lock. `gameView.add(object)` remains available for
 individual objects.
 
@@ -198,6 +202,15 @@ with `collidesWith`/`solidWith` is tested against sprites carrying a
 matching `collisionGroup`. Keep group lists targeted (a bullet checking
 `['asteroid']` tests 5 sprites, not the whole scene) and it stays
 negligible.
+
+**Tile maps are the exception to "everything is a sprite".** A level
+built from one sprite per tile pays for every tile every frame — drawn,
+ticked, sorted and scanned as a collision candidate whether it is on
+screen or not. A `TileLayer` costs by what is visible instead: the
+renderer walks only the cells inside the camera rect (one batch run per
+layer, since a layer has one sheet), nothing is ticked, and a mover
+against the layer tests only the few cells under its own hitbox. A
+200x200 map behaves like a 20x20 one.
 
 **Rule of thumb:** if JS runs code every frame, you're fighting the
 engine; if JS only reacts to events and sets properties, you get native
@@ -511,6 +524,60 @@ tail sprite is simply leashed, but with sprites on both ends you can
 drag either one and the other is towed behind once the rope goes taut
 (carts, chained crates).
 
+### Tile maps
+
+```javascript
+var ground = Game.createTileLayer({
+    sheet: tileSheet,              // frame index = tile id
+    tileWidth: 32, tileHeight: 32, // world size per cell (default: frame size)
+    data: [                        // rows of ids, a flat array, or strings…
+        'WWWWWWWW',
+        'W..F..PW',
+        'W.WW..PW',
+        'WWWWWWWW'
+    ],
+    legend: { W: 3, '.': 0, F: 1, P: 2 }, // …decoded through a legend
+    collisionGroup: 'wall',        // what movers list in solidWith
+    solid: ['W'],                  // ids (or legend chars) that block
+    oneWay: [7],                   // ids that only catch riders from above
+    zIndex: 0                      // draws under sprites of the same zIndex
+});
+gameView.add(ground);
+
+hero.solidWith = ['wall'];         // blocked by the water tiles like by any solid
+```
+
+One layer holds a whole map as a grid of frame indices — no sprite per
+tile, no per-tile objects at all. Per frame the renderer draws only the
+cells inside the camera rect, so map size is free: `tilemap.js` scrolls a
+120x90 island from one layer, and 1000x1000 would cost the same. Stack
+layers for ground/decoration/foreground; `scrollFactor` makes a layer a
+parallax backdrop, `tintColor`/`opacity` shade it (night, fog of war).
+
+**Collision without tile sprites.** Give the layer a `collisionGroup` and
+list the blocking tile ids in `solid` (walls from every side) or `oneWay`
+(platforms that only catch a rider falling onto them). Every mover that
+names the group in `solidWith` is resolved against the cells under its
+hitbox — rect and circle hitboxes, `swept` movers, `restitution`, `onGround`
+and the `land` event (with no `other`, since a cell is not a sprite) all
+work as against a solid sprite. Faces shared by two solid cells are not
+faces at all, so sliding along a tiled floor never snags on the seams.
+`findPath` sees the same cells: route around lakes and walls with
+`groups: [layer.collisionGroup]` and no obstacle sprites. `setBlocked(col,
+row, true|false)` overrides one cell (an invisible wall, a door that opens
+without changing its art).
+
+**Live edits.** `setTile(col, row, id)` swaps a cell — the art and its
+solid flag change together, in the running scene (dig, build, open doors);
+`getTile(col, row)` reads one back. `tileAt(x, y)` maps a tap to
+`{ col, row, tile, solid, x, y }` (cell center), `cellAt(col, row)` the
+reverse.
+
+**Tiled.** Export a map as JSON and hand a layer's `data` straight over:
+`cols: map.width, rows: map.height, firstGid: tileset.firstgid` — gid 0
+becomes an empty cell and Tiled's flip bits are masked off. One
+`createTileLayer` per Tiled layer, sharing the tileset sheet.
+
 ### Draw text
 
 ```javascript
@@ -704,6 +771,7 @@ a feature set — find the one closest to your game and start there:
 | `raycast.js` | Raycast playground: a guard's line-of-sight beam blocked by a draggable crate (beam shortens to `hit.distance` and turns red), a ledge-probing walker that turns before the platform edge, and a tap-fired turret hitscan that flashes `hit.sprite` and reports group + distance |
 | `zones.js` | `collision`/`collisionend` lifecycle: a water pool that tints the hero while he's inside, a pressure plate holding a door open exactly while the ball rests on it, and a remove-ball button showing that deleting a contact partner still fires the exit |
 | `demoscene.js` | Old-school cracktro: per-character sine text scroller on rotated copies of one closed `followPath` loop, additive copper bars bobbing on circle paths (constant speed on a circle = perfect sine), glowing floating logo, tween-scrolled `tileRepeat` starfield, looping chiptune on the music backend |
+| `tilemap.js` | Tile maps: a 120x90 island (10,800 cells) generated in JS and drawn by one `createTileLayer` — only the cells in view are rendered; water tiles are `solid` behind the layer's `collisionGroup`, so the walker is blocked without a single collision sprite and `findPath` (with a `bounds` window around the walker) routes around the lakes; BUILD mode lays planks with `setTile` (art + collision update live), DEBUG outlines the solid cells; the performance HUD (`debug: { hud: 'topRight' }`) shows draw calls and frame time staying flat while the camera scrolls |
 | `maze.js` | A* playground: tap a tile and `findPath` routes the player through a wall-tile maze (`cellSize` = tile size, so the grid matches the map) — faint dots show every grid cell of the raw route (`simplify: false`), gold dots the simplified waypoints handed to `followPath`; a hound re-paths to the player on a `gameView.every` timer and sends you `flash`ing back on contact |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going; a GAME clock on `gameView.every(1000, ...)` freezes with the scene while a REAL `setInterval` clock keeps ticking |
 
@@ -764,6 +832,7 @@ app down mid-frame.
 - `createSound(options)` → Sound
 - `createEmitter(options)` → Emitter
 - `createRope(options)` → Rope
+- `createTileLayer(options)` → TileLayer
 - `createFont(options)` → Font
 - `createText(options)` → Text
 - Easing constants: `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`,
@@ -773,7 +842,7 @@ app down mid-frame.
 
 | Member | Description |
 |---|---|
-| `add(object)` / `add([objects])` / `remove(object)` | Manage sprites, emitters and ropes; an array is committed in one native scene update |
+| `add(object)` / `add([objects])` / `remove(object)` | Manage sprites, emitters, ropes and tile layers; an array is committed in one native scene update |
 | `removeAllSprites()` | Clear the scene |
 | `pause()` / `resume()` | Render loop control (activity lifecycle is automatic) |
 | `maxFps` | Frame rate cap, e.g. `60` to keep 120 Hz (ProMotion) displays from doubling the render work; `0` (default) = display refresh rate |
@@ -787,7 +856,7 @@ app down mid-frame.
 | `stopFollow()` | Stop following; the camera stays where it is |
 | `shake({ strength, duration })` | Camera shake: `strength` px (default 12), `duration` ms (default 400) — offsets only the projection, so follow/bounds/touches are unaffected |
 | `raycast(x0, y0, x1, y1, groups)` | One-shot nearest-hit query along the segment against visible sprites whose `collisionGroup` is in `groups` (omit for any tagged sprite). Returns `null` for a clear ray, else `{ x, y, distance, group, sprite, normal: { x, y } }`. Rect hitboxes use their AABB, circle hitboxes intersect exactly; a ray starting inside a hitbox reports it at distance 0. Pass `groups` as an **array**: Android also accepts loose arguments, iOS reads only the array and silently falls back to testing every tagged sprite. For discrete checks — line of sight on an AI timer, ledge/ground probes, tap hitscan — not per-frame JS polling |
-| `findPath(from, to, options)` | Grid A* from `from` to `to` (`{ x, y }` world points) around the visible sprites whose `collisionGroup` is in `options.groups` (omit for any tagged sprite). Returns an array of `{ x, y }` waypoints ready for `sprite.followPath()`, or `null` when no route exists. Options: `cellSize` (grid resolution in px, default 32), `clearance` (extra obstacle inflation in px — about half the walker's width keeps it from scraping corners), `bounds` (`{ minX, minY, maxX, maxY }` search rect, default the surface), `diagonals` (default `true`, never cuts corners), `simplify` (line-of-sight waypoint reduction, default `true`). A blocked start/goal snaps to the nearest free cell a few cells out, so tapping an obstacle walks to its edge. Like `raycast`, a discrete query — run it on taps and AI timers, not per frame |
+| `findPath(from, to, options)` | Grid A* from `from` to `to` (`{ x, y }` world points) around the visible sprites — and the solid cells of tile layers — whose `collisionGroup` is in `options.groups` (omit for any tagged sprite or layer). Returns an array of `{ x, y }` waypoints ready for `sprite.followPath()`, or `null` when no route exists. Options: `cellSize` (grid resolution in px, default 32), `clearance` (extra obstacle inflation in px — about half the walker's width keeps it from scraping corners), `bounds` (`{ minX, minY, maxX, maxY }` search rect, default the surface), `diagonals` (default `true`, never cuts corners), `simplify` (line-of-sight waypoint reduction, default `true`). A blocked start/goal snaps to the nearest free cell a few cells out, so tapping an obstacle walks to its edge. Like `raycast`, a discrete query — run it on taps and AI timers, not per frame |
 | `after(ms, callback)` | Runs the callback once after `ms` of **game time**: the delay stretches with slow motion and freezes at `timeScale: 0`, unlike `setTimeout`. Returns an id for `cancelTimer()`. Without a callback, the view fires a `timer` event with the id instead |
 | `every(ms, callback)` | Like `after()`, repeating every `ms` of game time until cancelled (at most once per frame). Returns an id for `cancelTimer()` |
 | `cancelTimer(id)` | Cancels a timer from `after()`/`every()` |
@@ -873,7 +942,7 @@ mid-drag or mid-tween. All can be passed at creation.
 
 | Property | Description |
 |---|---|
-| `solidWith` | Groups whose sprites block this one's movement (push-out along the axis of least penetration) |
+| `solidWith` | Groups whose sprites — and tile layers' solid cells — block this one's movement (push-out along the axis of least penetration) |
 | `onGround` | true while standing on a solid (read-only — gate jumps on it) |
 | `restitution` | Bounciness of a contact: 0 = stop dead, 1 = give it all back. It reads off **both** sides — the springier of the two surfaces decides, the way Box2D mixes it — so a bouncy floor can be given `restitution: 0.5` and everything that lands on it rebounds, without touching the riders. Every solid defaults to 0, so a scene that never sets it on a surface behaves exactly as it always did: the mover's own value is the whole answer. The same mix applies between two `solidMode: 'push'` bodies; because push assumes equal masses there is no `mass` to weight it with. Small bounces are damped to a stop instead of buzzing, so below a low closing speed a body settles and grounds rather than reflecting |
 | `oneWay` | As a solid: catches landings on the top edge only — pass-through from below and sideways |
@@ -1034,6 +1103,25 @@ All properties are live.
 Methods: `emit(n)` (one-shot burst on top of `rate`), `clear()` (kill all
 live particles).
 
+### TileLayer
+
+Add/remove via `gameView.add(layer)` / `remove(layer)`. Draws under
+sprites of the same `zIndex`. All properties are live; grid edits take
+effect on the next frame.
+
+| Group | Properties |
+|---|---|
+| Grid | `data` (rows of ids, a flat row-major array sized by `cols`/`rows`, or strings decoded through `legend`; `-1`/unlisted = empty), `legend` (`{ char: id }`), `cols`, `rows`, `firstGid` (Tiled gid offset; gid 0 = empty, flip bits ignored), `width`/`height` (world size, read-only) |
+| Placement | `x`, `y` (world position of cell 0,0), `tileWidth`, `tileHeight` (world size per cell; default the sheet's frame size), `zIndex`, `scrollFactor` (parallax, like a sprite's) |
+| Look | `sheet`, `visible`, `opacity`, `tintColor` |
+| Collision | `collisionGroup` (movers list it in `solidWith`; `findPath` sees it in `groups`), `solid` (ids or legend chars that block from every side), `oneWay` (ids that only catch riders falling onto their top face), `restitution` (bounce of the cells, mixed like a solid sprite's), `debug` (outline solid cells; `gameView.debug` shows every layer) |
+
+Methods: `getTile(col, row)` (id or -1), `setTile(col, row, id)` (the
+solid flag follows the id lists), `isBlocked(col, row)`, `setBlocked(col,
+row, blocked)` (per-cell override until the next `data`/`solid` change),
+`tileAt(x, y)` → `{ col, row, tile, solid, x, y }` or `null` (world point →
+cell, `x`/`y` = cell center), `cellAt(col, row)` → the same for a cell.
+
 ## Architecture & source layout
 
 ```
@@ -1046,12 +1134,14 @@ android/src/ti/game/
 ├── SoundProxy.java          createSound() — SoundPool effect or MediaPlayer music
 ├── EmitterProxy.java        createEmitter() — JS-facing particle emitter
 ├── RopeProxy.java           createRope() — JS-facing Verlet rope
+├── TileLayerProxy.java      createTileLayer() — JS-facing tile map layer
 ├── FontProxy.java           createFont() — BMFont, grid or built-in
 ├── TextProxy.java           createText() — JS-facing text sprite
 └── engine/                  Pure native engine (no per-frame bridge use)
     ├── Scene.java           Scene graph, solids, collisions, wrapping
     ├── ParticleEmitter.java Pooled particles: spawn, integrate, fade, draw
     ├── Rope.java            Verlet chain: integrate, constrain, draw
+    ├── TileLayer.java       Tile grid + cell flags: visible-cell draw, solids
     ├── SoundEngine.java     Shared SoundPool + audio lifecycle
     ├── Sprite.java          State + physics/animation/tween/idle ticking
     ├── TextSprite.java      Sprite subclass: glyph layout + text state
@@ -1072,7 +1162,7 @@ android/src/ti/game/
 ```
 
 Contribution rules for the codebase live in `AGENTS.md`; planned features
-(tile maps, input, sprite parenting) in `TODO.md`.
+(input, sprite parenting, tile map follow-ups) in `TODO.md`.
 
 ### iOS
 

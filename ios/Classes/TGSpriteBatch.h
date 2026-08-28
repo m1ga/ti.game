@@ -55,6 +55,11 @@ NSString *TGBlendModeName(TGBlendMode mode);
 - (float)parallaxX:(TGSprite *)sprite;
 - (float)parallaxY:(TGSprite *)sprite;
 
+/** The same draw-time shift for a world-space layer (tile maps) with
+ *  the given scrollFactor; 0 for an ordinary layer. */
+- (float)parallaxOffsetX:(float)scrollFactor;
+- (float)parallaxOffsetY:(float)scrollFactor;
+
 /** Screen space = the identity projection in surface pixels: screenFixed
  *  sprites (HUDs) ignore camera position, zoom and shake. Flushes the
  *  pending batch on change, like a texture or blend switch. */

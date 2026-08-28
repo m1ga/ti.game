@@ -3,6 +3,7 @@
 //
 #import "TGPathfinder.h"
 #import "TGSprite.h"
+#import "TGTileLayer.h"
 #import <float.h>
 #import <limits.h>
 #import <math.h>
@@ -89,6 +90,63 @@ static void TGRasterize(NSArray<TGSprite *> *sprites, NSSet<NSString *> *groups,
 				int base = cy * cols;
 				for (int cx = cx0; cx <= cx1; cx++) {
 					blocked[base + cx] = true;
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Marks every grid cell a solid tile (inflated by `clearance`) touches,
+ * for the layers whose collisionGroup matches. One-way platforms are
+ * left open — a walker passes through them. Only the tiles inside the
+ * search bounds are visited, so a huge map with a small query stays cheap.
+ */
+static void TGRasterizeTiles(NSArray<TGTileLayer *> *layers, NSSet<NSString *> *groups,
+							 bool *blocked, int cols, int rows,
+							 float cellSize, float clearance, float minX, float minY)
+{
+	float maxX = minX + cols * cellSize;
+	float maxY = minY + rows * cellSize;
+	for (TGTileLayer *layer in layers) {
+		if (![layer matches:groups]) {
+			continue;
+		}
+		float tw = [layer cellWidth];
+		float th = [layer cellHeight];
+		if (tw <= 0.0f || th <= 0.0f) {
+			continue;
+		}
+		float lx = layer.x;
+		float ly = layer.y;
+		int tc0 = MAX(0, (int)floorf((minX - clearance - lx) / tw));
+		int tc1 = MIN([layer cols] - 1, (int)floorf((maxX + clearance - lx) / tw));
+		int tr0 = MAX(0, (int)floorf((minY - clearance - ly) / th));
+		int tr1 = MIN([layer rows] - 1, (int)floorf((maxY + clearance - ly) / th));
+		for (int row = tr0; row <= tr1; row++) {
+			for (int col = tc0; col <= tc1; col++) {
+				if (![layer isSolidCol:col row:row]) {
+					continue;
+				}
+				float bx0 = lx + col * tw;
+				float by0 = ly + row * th;
+				// same half-open edge rule as sprite boxes
+				int cx0 = (int)floorf((bx0 - clearance - minX) / cellSize + kEdgeEps);
+				int cy0 = (int)floorf((by0 - clearance - minY) / cellSize + kEdgeEps);
+				int cx1 = (int)ceilf((bx0 + tw + clearance - minX) / cellSize - kEdgeEps) - 1;
+				int cy1 = (int)ceilf((by0 + th + clearance - minY) / cellSize - kEdgeEps) - 1;
+				if (cx1 < 0 || cy1 < 0 || cx0 >= cols || cy0 >= rows) {
+					continue;
+				}
+				cx0 = MAX(cx0, 0);
+				cy0 = MAX(cy0, 0);
+				cx1 = MIN(cx1, cols - 1);
+				cy1 = MIN(cy1, rows - 1);
+				for (int cy = cy0; cy <= cy1; cy++) {
+					int base = cy * cols;
+					for (int cx = cx0; cx <= cx1; cx++) {
+						blocked[base + cx] = true;
+					}
 				}
 			}
 		}
@@ -346,6 +404,7 @@ static BOOL TGLineOfSight(const bool *blocked, int cols, int rows,
 @implementation TGPathfinder
 
 + (NSArray<NSNumber *> *)findInSprites:(NSArray<TGSprite *> *)sprites
+								layers:(NSArray<TGTileLayer *> *)layers
 								groups:(NSSet<NSString *> *)groups
 								startX:(float)startX startY:(float)startY
 								 goalX:(float)goalX goalY:(float)goalY
@@ -364,6 +423,7 @@ static BOOL TGLineOfSight(const bool *blocked, int cols, int rows,
 	}
 	bool *blocked = calloc(cols * rows, sizeof(bool));
 	TGRasterize(sprites, groups, blocked, cols, rows, cellSize, clearance, minX, minY);
+	TGRasterizeTiles(layers, groups, blocked, cols, rows, cellSize, clearance, minX, minY);
 
 	int rawStart = TGCellFor(startY, minY, cellSize, rows) * cols
 		+ TGCellFor(startX, minX, cellSize, cols);

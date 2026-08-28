@@ -20,6 +20,7 @@ public class Scene
 	private final List<Sprite> sprites = new ArrayList<>();
 	private final List<ParticleEmitter> emitters = new ArrayList<>();
 	private final List<Rope> ropes = new ArrayList<>();
+	private final List<TileLayer> tileLayers = new ArrayList<>();
 	private volatile boolean zOrderDirty = false;
 
 	/** Renders debug overlays for every sprite (GameView.debug = { hitbox: true }). */
@@ -307,7 +308,8 @@ public class Scene
 	}
 
 	/** Adds a group in one protected scene mutation. */
-	public void addAll(List<Sprite> newSprites, List<ParticleEmitter> newEmitters, List<Rope> newRopes)
+	public void addAll(List<Sprite> newSprites, List<ParticleEmitter> newEmitters, List<Rope> newRopes,
+					   List<TileLayer> newLayers)
 	{
 		synchronized (lock) {
 			boolean spritesAdded = false;
@@ -330,6 +332,11 @@ public class Scene
 			for (Rope rope : newRopes) {
 				if (rope != null && !ropes.contains(rope)) {
 					ropes.add(rope);
+				}
+			}
+			for (TileLayer layer : newLayers) {
+				if (layer != null && !tileLayers.contains(layer)) {
+					tileLayers.add(layer);
 				}
 			}
 			if (spritesAdded) {
@@ -455,6 +462,40 @@ public class Scene
 	private static final Comparator<Rope> BY_ROPE_Z = new Comparator<Rope>() {
 		@Override
 		public int compare(Rope a, Rope b)
+		{
+			return Integer.compare(a.zIndex, b.zIndex);
+		}
+	};
+
+	public void addTileLayer(TileLayer layer)
+	{
+		synchronized (lock) {
+			if (!tileLayers.contains(layer)) {
+				tileLayers.add(layer);
+			}
+		}
+	}
+
+	public void removeTileLayer(TileLayer layer)
+	{
+		synchronized (lock) {
+			tileLayers.remove(layer);
+		}
+	}
+
+	/** Snapshot sorted by zIndex (layers are few; sorted every call). */
+	public List<TileLayer> tileLayersSnapshot()
+	{
+		synchronized (lock) {
+			List<TileLayer> copy = new ArrayList<>(tileLayers);
+			Collections.sort(copy, BY_LAYER_Z);
+			return copy;
+		}
+	}
+
+	private static final Comparator<TileLayer> BY_LAYER_Z = new Comparator<TileLayer>() {
+		@Override
+		public int compare(TileLayer a, TileLayer b)
 		{
 			return Integer.compare(a.zIndex, b.zIndex);
 		}
@@ -726,7 +767,7 @@ public class Scene
 							float minX, float minY, float maxX, float maxY,
 							boolean diagonals, boolean simplify)
 	{
-		return Pathfinder.find(snapshot(), groups, startX, startY, goalX, goalY,
+		return Pathfinder.find(snapshot(), tileLayersSnapshot(), groups, startX, startY, goalX, goalY,
 			cellSize, clearance, minX, minY, maxX, maxY, diagonals, simplify);
 	}
 
@@ -813,7 +854,7 @@ public class Scene
 		skidTrail.update(dt);
 		updateTimers(dt);
 		wrapSprites(list);
-		resolveSolids(list);
+		resolveSolids(list, tileLayersSnapshot());
 		applyAttachments(list);
 		checkCollisions(list);
 		updateCamera(dt);
@@ -1172,7 +1213,7 @@ public class Scene
 	 * Landing on top zeroes downward velocity, sets onGround and fires the
 	 * land callback on the ground-touch transition.
 	 */
-	private void resolveSolids(List<Sprite> list)
+	private void resolveSolids(List<Sprite> list, List<TileLayer> layers)
 	{
 		resolveBilateralPairs(list);
 		for (Sprite s : list) {
@@ -1182,15 +1223,17 @@ public class Scene
 			}
 			carryByGround(s);
 			if (s.swept) {
-				sweepAgainstSolids(s, list, groups);
+				sweepAgainstSolids(s, list, layers, groups);
 			}
 			if (s.circleHitbox) {
-				resolveCircleSolids(s, list, groups);
+				resolveCircleSolids(s, list, layers, groups);
 				continue;
 			}
 			boolean wasOnGround = s.onGround;
 			boolean grounded = false;
 			Sprite groundedOn = null;
+			// The level comes first, moving solids on top of it
+			boolean onTiles = resolveTileRect(s, layers, groups);
 			s.computeAABB(aabbA);
 			for (Sprite solid : list) {
 				String group = solid.collisionGroup;
@@ -1296,6 +1339,7 @@ public class Scene
 				}
 				s.computeAABB(aabbA); // position changed — refresh for the next solid
 			}
+			grounded |= onTiles;
 			s.onGround = grounded;
 			s.groundSprite = grounded ? groundedOn : null;
 			if (grounded && !wasOnGround) {
@@ -1321,7 +1365,8 @@ public class Scene
 	 * circle against a rectangular solid — stays on the inflated-AABB
 	 * Minkowski box.
 	 */
-	private void sweepAgainstSolids(Sprite s, List<Sprite> list, Set<String> groups)
+	private void sweepAgainstSolids(Sprite s, List<Sprite> list, List<TileLayer> layers,
+									Set<String> groups)
 	{
 		float dx = s.frameDeltaX;
 		float dy = s.frameDeltaY;
@@ -1344,7 +1389,10 @@ public class Scene
 			cx = (aabbA[0] + aabbA[2]) / 2f - dx; // center at frame start
 			cy = (aabbA[1] + aabbA[3]) / 2f - dy;
 		}
-		float earliest = Float.MAX_VALUE;
+		// Tile cells sweep on the inflated-AABB Minkowski box, circles too
+		// (the same approximation a circle gets against a rect solid)
+		float earliest = sweepAgainstTiles(s, layers, groups, cx, cy, dx, dy,
+			circle ? r : hw, circle ? r : hh);
 		for (Sprite solid : list) {
 			String group = solid.collisionGroup;
 			if (solid == s || group == null || !solid.visible || !groups.contains(group)
@@ -1579,12 +1627,15 @@ public class Scene
 	 * restitution; small bounces come to rest and ground the sprite when
 	 * the normal points up.
 	 */
-	private void resolveCircleSolids(Sprite s, List<Sprite> list, Set<String> groups)
+	private void resolveCircleSolids(Sprite s, List<Sprite> list, List<TileLayer> layers,
+									 Set<String> groups)
 	{
 		boolean wasOnGround = s.onGround;
 		boolean grounded = false;
 		Sprite groundedOn = null;
 		float r = s.hitRadius();
+		// The level comes first, moving solids on top of it
+		grounded = resolveTileCircle(s, layers, groups, r);
 		for (Sprite solid : list) {
 			String group = solid.collisionGroup;
 			if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
@@ -1713,6 +1764,285 @@ public class Scene
 				listener.onLand(s, groundedOn);
 			}
 		}
+	}
+
+	// --- Tile layer solids ---------------------------------------------------
+	// A mover only ever looks at the cells under its own hitbox (plus one
+	// ring for neighbor checks), so the cost is per contact, not per map.
+	// The one thing a grid has that a list of sprite solids does not is
+	// seams: two floor tiles side by side share an edge, and that edge is
+	// not a face anything can hit. A face is only real when the cell across
+	// it is not solid — the resolvers below push out through real faces
+	// only, which is what keeps a rider from snagging on every tile
+	// boundary it slides across.
+
+	/**
+	 * Rect mover vs the solid cells of every matching layer. Same push-out,
+	 * restitution and one-way rules as a sprite solid; returns whether the
+	 * mover landed on a tile. GL thread.
+	 */
+	private boolean resolveTileRect(Sprite s, List<TileLayer> layers, Set<String> groups)
+	{
+		boolean grounded = false;
+		for (TileLayer layer : layers) {
+			if (!layer.blocks(groups)) {
+				continue;
+			}
+			float tw = layer.cellWidth();
+			float th = layer.cellHeight();
+			if (tw <= 0f || th <= 0f) {
+				continue;
+			}
+			float e = Math.max(s.restitution, layer.restitution);
+			s.computeAABB(aabbA);
+			int c0 = Math.max(0, (int) Math.floor((aabbA[0] - layer.x) / tw));
+			int c1 = Math.min(layer.cols() - 1, (int) Math.floor((aabbA[2] - layer.x) / tw));
+			int r0 = Math.max(0, (int) Math.floor((aabbA[1] - layer.y) / th));
+			int r1 = Math.min(layer.rows() - 1, (int) Math.floor((aabbA[3] - layer.y) / th));
+			for (int row = r0; row <= r1; row++) {
+				for (int col = c0; col <= c1; col++) {
+					byte flag = layer.flag(col, row);
+					if (flag == 0) {
+						continue;
+					}
+					float bx0 = layer.x + col * tw;
+					float by0 = layer.y + row * th;
+					float bx1 = bx0 + tw;
+					float by1 = by0 + th;
+					float overlapX = Math.min(aabbA[2], bx1) - Math.max(aabbA[0], bx0);
+					float overlapY = Math.min(aabbA[3], by1) - Math.max(aabbA[1], by0);
+					if (overlapX <= 0f || overlapY <= 0f) {
+						continue;
+					}
+					boolean fromAbove = aabbA[1] + aabbA[3] < by0 + by1;
+					boolean fromLeft = aabbA[0] + aabbA[2] < bx0 + bx1;
+					boolean vertical;
+					if ((flag & FLAG_SOLID_MASK) == 0) {
+						// one-way: pass-through except when falling onto the
+						// top edge — the rider's bottom was above it last frame
+						if (s.velocityY < 0f || aabbA[3] - s.frameDeltaY > by0 + 2f) {
+							continue;
+						}
+						fromAbove = true;
+						vertical = true;
+					} else {
+						boolean canY = fromAbove ? !layer.isSolid(col, row - 1) : !layer.isSolid(col, row + 1);
+						boolean canX = fromLeft ? !layer.isSolid(col - 1, row) : !layer.isSolid(col + 1, row);
+						if (!canX && !canY) {
+							continue; // buried in the middle of a solid block
+						}
+						vertical = (overlapY <= overlapX && canY) || !canX;
+					}
+					if (vertical) {
+						if (fromAbove) {
+							s.y -= overlapY;
+							float bounce = (e > 0f && s.velocityY > 0f) ? s.velocityY * e : 0f;
+							if (bounce > 40f) {
+								s.velocityY = -bounce;
+							} else {
+								if (s.velocityY > 0f) {
+									s.velocityY = 0f;
+								}
+								grounded = true;
+							}
+						} else {
+							s.y += overlapY;
+							if (s.velocityY < 0f) {
+								s.velocityY = (e > 0f) ? -s.velocityY * e : 0f;
+							}
+						}
+					} else if (fromLeft) {
+						s.x -= overlapX;
+						if (e > 0f && s.velocityX > 0f) {
+							s.velocityX = -s.velocityX * e;
+						}
+					} else {
+						s.x += overlapX;
+						if (e > 0f && s.velocityX < 0f) {
+							s.velocityX = -s.velocityX * e;
+						}
+					}
+					s.computeAABB(aabbA); // position changed — refresh for the next cell
+				}
+			}
+		}
+		return grounded;
+	}
+
+	private static final int FLAG_SOLID_MASK = TileLayer.FLAG_SOLID;
+
+	/**
+	 * Circle mover vs tile cells: closest-point normal like a rect solid,
+	 * except that a normal component pointing into a solid neighbor is
+	 * dropped — the seam between two floor tiles is not a corner to bounce
+	 * off. Returns whether the ball came to rest on a tile. GL thread.
+	 */
+	private boolean resolveTileCircle(Sprite s, List<TileLayer> layers, Set<String> groups, float r)
+	{
+		boolean grounded = false;
+		for (TileLayer layer : layers) {
+			if (!layer.blocks(groups)) {
+				continue;
+			}
+			float tw = layer.cellWidth();
+			float th = layer.cellHeight();
+			if (tw <= 0f || th <= 0f) {
+				continue;
+			}
+			float e = Math.max(s.restitution, layer.restitution);
+			s.hitCenter(centerA);
+			float cx = centerA[0];
+			float cy = centerA[1];
+			int c0 = Math.max(0, (int) Math.floor((cx - r - layer.x) / tw));
+			int c1 = Math.min(layer.cols() - 1, (int) Math.floor((cx + r - layer.x) / tw));
+			int r0 = Math.max(0, (int) Math.floor((cy - r - layer.y) / th));
+			int r1 = Math.min(layer.rows() - 1, (int) Math.floor((cy + r - layer.y) / th));
+			for (int row = r0; row <= r1; row++) {
+				for (int col = c0; col <= c1; col++) {
+					byte flag = layer.flag(col, row);
+					if (flag == 0) {
+						continue;
+					}
+					float bx0 = layer.x + col * tw;
+					float by0 = layer.y + row * th;
+					float bx1 = bx0 + tw;
+					float by1 = by0 + th;
+					float closestX = Math.min(Math.max(cx, bx0), bx1);
+					float closestY = Math.min(Math.max(cy, by0), by1);
+					float dx = cx - closestX;
+					float dy = cy - closestY;
+					float d2 = dx * dx + dy * dy;
+					if (d2 >= r * r) {
+						continue;
+					}
+					float nx, ny, penetration;
+					if (d2 > 1e-6f) {
+						float d = (float) Math.sqrt(d2);
+						nx = dx / d;
+						ny = dy / d;
+						penetration = r - d;
+					} else {
+						// center inside the cell — out through the nearest face
+						float toLeft = cx - bx0;
+						float toRight = bx1 - cx;
+						float toTop = cy - by0;
+						float toBottom = by1 - cy;
+						float min = Math.min(Math.min(toLeft, toRight), Math.min(toTop, toBottom));
+						nx = (min == toLeft) ? -1f : (min == toRight) ? 1f : 0f;
+						ny = (nx != 0f) ? 0f : (min == toTop) ? -1f : 1f;
+						penetration = min + r;
+					}
+					// Drop the part of the normal that points into a solid
+					// neighbor; what remains is the real face, so measure the
+					// overlap against that face instead of the corner
+					boolean cutX = (nx < 0f && layer.isSolid(col - 1, row)) || (nx > 0f && layer.isSolid(col + 1, row));
+					boolean cutY = (ny < 0f && layer.isSolid(col, row - 1)) || (ny > 0f && layer.isSolid(col, row + 1));
+					if (cutX && cutY) {
+						continue;
+					}
+					if (cutX && ny != 0f) {
+						ny = (ny < 0f) ? -1f : 1f;
+						nx = 0f;
+						penetration = r - ((ny < 0f) ? (by0 - cy) : (cy - by1));
+					} else if (cutY && nx != 0f) {
+						nx = (nx < 0f) ? -1f : 1f;
+						ny = 0f;
+						penetration = r - ((nx < 0f) ? (bx0 - cx) : (cx - bx1));
+					} else if (cutX || cutY) {
+						continue; // the only component pointed into the block
+					}
+					if (penetration <= 0f) {
+						continue;
+					}
+					if ((flag & FLAG_SOLID_MASK) == 0 && (ny > -0.7f || s.velocityY < 0f)) {
+						continue; // one-way: balls only land on the top face
+					}
+					if (penetration > SLOP) {
+						s.x += nx * penetration;
+						s.y += ny * penetration;
+					}
+					float vn = s.velocityX * nx + s.velocityY * ny;
+					if (vn < 0f) {
+						float bounce = -vn * e;
+						if (e > 0f && bounce > 40f) {
+							s.velocityX -= (1f + e) * vn * nx;
+							s.velocityY -= (1f + e) * vn * ny;
+						} else {
+							s.velocityX -= vn * nx;
+							s.velocityY -= vn * ny;
+							if (ny < -0.7f) {
+								grounded = true;
+							}
+						}
+					}
+					s.hitCenter(centerA); // position changed — refresh for the next cell
+					cx = centerA[0];
+					cy = centerA[1];
+				}
+			}
+		}
+		return grounded;
+	}
+
+	/**
+	 * Swept blocking against tile cells: the earliest real face the
+	 * mover's Minkowski box crosses this frame, or MAX_VALUE. A face shared
+	 * with a solid neighbor is skipped like in the static resolver, so a
+	 * fast slide along a floor never trips on the seams. GL thread.
+	 */
+	private float sweepAgainstTiles(Sprite s, List<TileLayer> layers, Set<String> groups,
+									float cx, float cy, float dx, float dy, float hw, float hh)
+	{
+		float earliest = Float.MAX_VALUE;
+		float minX = Math.min(cx, cx + dx) - hw;
+		float maxX = Math.max(cx, cx + dx) + hw;
+		float minY = Math.min(cy, cy + dy) - hh;
+		float maxY = Math.max(cy, cy + dy) + hh;
+		for (TileLayer layer : layers) {
+			if (!layer.blocks(groups)) {
+				continue;
+			}
+			float tw = layer.cellWidth();
+			float th = layer.cellHeight();
+			if (tw <= 0f || th <= 0f) {
+				continue;
+			}
+			int c0 = Math.max(0, (int) Math.floor((minX - layer.x) / tw));
+			int c1 = Math.min(layer.cols() - 1, (int) Math.floor((maxX - layer.x) / tw));
+			int r0 = Math.max(0, (int) Math.floor((minY - layer.y) / th));
+			int r1 = Math.min(layer.rows() - 1, (int) Math.floor((maxY - layer.y) / th));
+			for (int row = r0; row <= r1; row++) {
+				for (int col = c0; col <= c1; col++) {
+					byte flag = layer.flag(col, row);
+					if (flag == 0) {
+						continue;
+					}
+					float bx0 = layer.x + col * tw;
+					float by0 = layer.y + row * th;
+					if (!sweptHit(cx, cy, dx, dy, bx0 - hw, by0 - hh, bx0 + tw + hw, by0 + th + hh)) {
+						continue;
+					}
+					float t = sweptResult[0];
+					if (t <= 0f || t >= earliest) {
+						continue; // already touching, or a later face than one found
+					}
+					boolean onX = sweptResult[1] == 0f;
+					if ((flag & FLAG_SOLID_MASK) == 0) {
+						if (onX || dy <= 0f || s.velocityY < 0f) {
+							continue; // one-way: only a fall onto the top face counts
+						}
+					} else if (onX) {
+						if (dx > 0f ? layer.isSolid(col - 1, row) : layer.isSolid(col + 1, row)) {
+							continue; // an internal seam, not a wall
+						}
+					} else if (dy > 0f ? layer.isSolid(col, row - 1) : layer.isSolid(col, row + 1)) {
+						continue;
+					}
+					earliest = t;
+				}
+			}
+		}
+		return earliest;
 	}
 
 	/**

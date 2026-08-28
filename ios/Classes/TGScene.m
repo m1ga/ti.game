@@ -7,6 +7,7 @@
 #import "TGSkidTrail.h"
 #import "TGSprite.h"
 #import "TGTextSprite.h"
+#import "TGTileLayer.h"
 #import "TGBitmapFont.h"
 #import "TGDefaultFont.h"
 #import <float.h>
@@ -40,6 +41,7 @@ static float bottomEdge(TGSprite *s)
 	NSMutableArray<TGSprite *> *_sprites;
 	NSMutableArray<TGParticleEmitter *> *_emitters; // guarded by @synchronized(_sprites)
 	NSMutableArray<TGRope *> *_ropes;               // guarded by @synchronized(_sprites)
+	NSMutableArray<TGTileLayer *> *_tileLayers;     // guarded by @synchronized(_sprites)
 
 	// Camera shake, requested from any thread, animated on the render thread
 	volatile float _pendingShakeStrength;
@@ -70,6 +72,7 @@ static float bottomEdge(TGSprite *s)
 		_sprites = [NSMutableArray array];
 		_emitters = [NSMutableArray array];
 		_ropes = [NSMutableArray array];
+		_tileLayers = [NSMutableArray array];
 		_skidTrail = [[TGSkidTrail alloc] init];
 		_hud = [[TGDebugHud alloc] init];
 		_stats = [[TGFrameStats alloc] init];
@@ -214,6 +217,7 @@ static float bottomEdge(TGSprite *s)
 - (void)addSprites:(NSArray<TGSprite *> *)sprites
 		  emitters:(NSArray<TGParticleEmitter *> *)emitters
 			 ropes:(NSArray<TGRope *> *)ropes
+			layers:(NSArray<TGTileLayer *> *)layers
 {
 	@synchronized (_sprites) {
 		BOOL spritesAdded = NO;
@@ -236,6 +240,11 @@ static float bottomEdge(TGSprite *s)
 		for (TGRope *rope in ropes) {
 			if (rope != nil && ![_ropes containsObject:rope]) {
 				[_ropes addObject:rope];
+			}
+		}
+		for (TGTileLayer *layer in layers) {
+			if (layer != nil && ![_tileLayers containsObject:layer]) {
+				[_tileLayers addObject:layer];
 			}
 		}
 		if (spritesAdded) {
@@ -380,6 +389,50 @@ static float bottomEdge(TGSprite *s)
 	}
 }
 
+- (void)addTileLayer:(TGTileLayer *)layer
+{
+	if (layer == nil) {
+		return;
+	}
+	@synchronized (_sprites) {
+		if (![_tileLayers containsObject:layer]) {
+			[_tileLayers addObject:layer];
+		}
+	}
+}
+
+- (void)removeTileLayer:(TGTileLayer *)layer
+{
+	if (layer == nil) {
+		return;
+	}
+	@synchronized (_sprites) {
+		[_tileLayers removeObjectIdenticalTo:layer];
+	}
+}
+
+- (NSArray<TGTileLayer *> *)tileLayersSnapshot
+{
+	@synchronized (_sprites) {
+		return [self sortedLayersLocked];
+	}
+}
+
+/** Caller holds the _sprites lock. */
+- (NSArray<TGTileLayer *> *)sortedLayersLocked
+{
+	if (_tileLayers.count == 0) {
+		return @[];
+	}
+	return [_tileLayers sortedArrayWithOptions:NSSortStable
+							   usingComparator:^NSComparisonResult(TGTileLayer *a, TGTileLayer *b) {
+		if (a.zIndex != b.zIndex) {
+			return (a.zIndex < b.zIndex) ? NSOrderedAscending : NSOrderedDescending;
+		}
+		return NSOrderedSame;
+	}];
+}
+
 - (NSArray<TGSprite *> *)snapshot
 {
 	@synchronized (_sprites) {
@@ -415,11 +468,13 @@ static float bottomEdge(TGSprite *s)
 - (NSArray<TGSprite *> *)prepareFrame:(float)dt
 							 emitters:(NSArray<TGParticleEmitter *> **)emitters
 								ropes:(NSArray<TGRope *> **)ropes
+							   layers:(NSArray<TGTileLayer *> **)layers
 {
 	dt *= MAX(0.0f, self.timeScale);
 	__block NSArray<TGSprite *> *list;
 	__block NSArray<TGParticleEmitter *> *emitterList;
 	__block NSArray<TGRope *> *ropeList;
+	__block NSArray<TGTileLayer *> *layerList;
 	__block BOOL hasYSort;
 
 	// Capture all scene collections under the same lock. The renderer reuses
@@ -458,6 +513,7 @@ static float bottomEdge(TGSprite *s)
 			}
 			return NSOrderedSame;
 		}];
+		layerList = [self sortedLayersLocked];
 		hasYSort = _hasYSort;
 	}
 
@@ -474,7 +530,7 @@ static float bottomEdge(TGSprite *s)
 	[self.skidTrail update:dt];
 	[self updateTimers:dt];
 	[self wrapSprites:list];
-	[self resolveSolids:list];
+	[self resolveSolids:list layers:layerList];
 	[self applyAttachments:list];
 	[self checkCollisions:list];
 	[self updateFollow:dt];
@@ -505,12 +561,15 @@ static float bottomEdge(TGSprite *s)
 	if (ropes != NULL) {
 		*ropes = ropeList;
 	}
+	if (layers != NULL) {
+		*layers = layerList;
+	}
 	return list;
 }
 
 - (void)update:(float)dt
 {
-	[self prepareFrame:dt emitters:NULL ropes:NULL];
+	[self prepareFrame:dt emitters:NULL ropes:NULL layers:NULL];
 }
 
 - (void)shakeWithStrength:(float)strength duration:(float)duration
@@ -894,7 +953,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 								  maxX:(float)maxX maxY:(float)maxY
 							 diagonals:(BOOL)diagonals simplify:(BOOL)simplify
 {
-	return [TGPathfinder findInSprites:[self snapshot] groups:groups
+	return [TGPathfinder findInSprites:[self snapshot] layers:[self tileLayersSnapshot] groups:groups
 								startX:startX startY:startY goalX:goalX goalY:goalY
 							  cellSize:cellSize clearance:clearance
 								  minX:minX minY:minY maxX:maxX maxY:maxY
@@ -939,6 +998,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
  */
 - (void)sweepAgainstSolids:(TGSprite *)s
 					inList:(NSArray<TGSprite *> *)list
+					layers:(NSArray<TGTileLayer *> *)layers
 					groups:(NSSet<NSString *> *)groups
 {
 	float dx = s.frameDeltaX;
@@ -962,7 +1022,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		cx = (_aabbA[0] + _aabbA[2]) / 2.0f - dx; // center at frame start
 		cy = (_aabbA[1] + _aabbA[3]) / 2.0f - dy;
 	}
-	float earliest = FLT_MAX;
+	// Tile cells sweep on the inflated-AABB Minkowski box, circles too
+	// (the same approximation a circle gets against a rect solid)
+	float earliest = [self sweepAgainstTiles:s layers:layers groups:groups
+										  cx:cx cy:cy dx:dx dy:dy
+										  hw:circle ? r : hw hh:circle ? r : hh];
 	for (TGSprite *solid in list) {
 		NSString *group = solid.collisionGroup;
 		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]
@@ -1389,7 +1453,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		&& [gb containsObject:a.collisionGroup];
 }
 
-- (void)resolveSolids:(NSArray<TGSprite *> *)list
+- (void)resolveSolids:(NSArray<TGSprite *> *)list layers:(NSArray<TGTileLayer *> *)layers
 {
 	[self resolveBilateralPairs:list];
 	for (TGSprite *s in list) {
@@ -1399,15 +1463,17 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		}
 		[self carryByGround:s];
 		if (s.swept) {
-			[self sweepAgainstSolids:s inList:list groups:groups];
+			[self sweepAgainstSolids:s inList:list layers:layers groups:groups];
 		}
 		if (s.circleHitbox) {
-			[self resolveCircleSolids:s inList:list groups:groups];
+			[self resolveCircleSolids:s inList:list layers:layers groups:groups];
 			continue;
 		}
 		BOOL wasOnGround = s.onGround;
 		BOOL grounded = NO;
 		TGSprite *groundedOn = nil;
+		// The level comes first, moving solids on top of it
+		BOOL onTiles = [self resolveTileRect:s layers:layers groups:groups];
 		[s computeAABB:_aabbA];
 		for (TGSprite *solid in list) {
 			NSString *group = solid.collisionGroup;
@@ -1513,6 +1579,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 			[s computeAABB:_aabbA]; // position changed — refresh for the next solid
 		}
+		grounded |= onTiles;
 		s.onGround = grounded;
 		s.groundSprite = grounded ? groundedOn : nil;
 		if (grounded && !wasOnGround) {
@@ -1533,12 +1600,15 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
  */
 - (void)resolveCircleSolids:(TGSprite *)s
 					 inList:(NSArray<TGSprite *> *)list
+					 layers:(NSArray<TGTileLayer *> *)layers
 					 groups:(NSSet<NSString *> *)groups
 {
 	BOOL wasOnGround = s.onGround;
 	BOOL grounded = NO;
 	TGSprite *groundedOn = nil;
 	float r = [s hitRadius];
+	// The level comes first, moving solids on top of it
+	grounded = [self resolveTileCircle:s layers:layers groups:groups radius:r];
 	for (TGSprite *solid in list) {
 		NSString *group = solid.collisionGroup;
 		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]) {
@@ -1736,6 +1806,284 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
  * and visible sprites carrying a matching `collisionGroup`. Fires the
  * collision callback once per overlap-enter (re-fires after separation).
  */
+#pragma mark Tile layer solids
+// A mover only ever looks at the cells under its own hitbox (plus one
+// ring for neighbor checks), so the cost is per contact, not per map.
+// The one thing a grid has that a list of sprite solids does not is
+// seams: two floor tiles side by side share an edge, and that edge is
+// not a face anything can hit. A face is only real when the cell across
+// it is not solid — the resolvers below push out through real faces
+// only, which is what keeps a rider from snagging on every tile
+// boundary it slides across. See the Android twin.
+
+- (BOOL)resolveTileRect:(TGSprite *)s
+				 layers:(NSArray<TGTileLayer *> *)layers
+				 groups:(NSSet<NSString *> *)groups
+{
+	BOOL grounded = NO;
+	for (TGTileLayer *layer in layers) {
+		if (![layer blocks:groups]) {
+			continue;
+		}
+		float tw = [layer cellWidth];
+		float th = [layer cellHeight];
+		if (tw <= 0.0f || th <= 0.0f) {
+			continue;
+		}
+		float lx = layer.x;
+		float ly = layer.y;
+		float e = MAX(s.restitution, layer.restitution);
+		[s computeAABB:_aabbA];
+		int c0 = MAX(0, (int)floorf((_aabbA[0] - lx) / tw));
+		int c1 = MIN([layer cols] - 1, (int)floorf((_aabbA[2] - lx) / tw));
+		int r0 = MAX(0, (int)floorf((_aabbA[1] - ly) / th));
+		int r1 = MIN([layer rows] - 1, (int)floorf((_aabbA[3] - ly) / th));
+		for (int row = r0; row <= r1; row++) {
+			for (int col = c0; col <= c1; col++) {
+				uint8_t flag = [layer flagAtCol:col row:row];
+				if (flag == 0) {
+					continue;
+				}
+				float bx0 = lx + col * tw;
+				float by0 = ly + row * th;
+				float bx1 = bx0 + tw;
+				float by1 = by0 + th;
+				float overlapX = MIN(_aabbA[2], bx1) - MAX(_aabbA[0], bx0);
+				float overlapY = MIN(_aabbA[3], by1) - MAX(_aabbA[1], by0);
+				if (overlapX <= 0.0f || overlapY <= 0.0f) {
+					continue;
+				}
+				BOOL fromAbove = _aabbA[1] + _aabbA[3] < by0 + by1;
+				BOOL fromLeft = _aabbA[0] + _aabbA[2] < bx0 + bx1;
+				BOOL vertical;
+				if ((flag & TGTileFlagSolid) == 0) {
+					// one-way: pass-through except when falling onto the
+					// top edge — the rider's bottom was above it last frame
+					if (s.velocityY < 0.0f || _aabbA[3] - s.frameDeltaY > by0 + 2.0f) {
+						continue;
+					}
+					fromAbove = YES;
+					vertical = YES;
+				} else {
+					BOOL canY = fromAbove ? ![layer isSolidCol:col row:row - 1] : ![layer isSolidCol:col row:row + 1];
+					BOOL canX = fromLeft ? ![layer isSolidCol:col - 1 row:row] : ![layer isSolidCol:col + 1 row:row];
+					if (!canX && !canY) {
+						continue; // buried in the middle of a solid block
+					}
+					vertical = (overlapY <= overlapX && canY) || !canX;
+				}
+				if (vertical) {
+					if (fromAbove) {
+						s.y -= overlapY;
+						float bounce = (e > 0.0f && s.velocityY > 0.0f) ? s.velocityY * e : 0.0f;
+						if (bounce > 40.0f) {
+							s.velocityY = -bounce;
+						} else {
+							if (s.velocityY > 0.0f) {
+								s.velocityY = 0.0f;
+							}
+							grounded = YES;
+						}
+					} else {
+						s.y += overlapY;
+						if (s.velocityY < 0.0f) {
+							s.velocityY = (e > 0.0f) ? -s.velocityY * e : 0.0f;
+						}
+					}
+				} else if (fromLeft) {
+					s.x -= overlapX;
+					if (e > 0.0f && s.velocityX > 0.0f) {
+						s.velocityX = -s.velocityX * e;
+					}
+				} else {
+					s.x += overlapX;
+					if (e > 0.0f && s.velocityX < 0.0f) {
+						s.velocityX = -s.velocityX * e;
+					}
+				}
+				[s computeAABB:_aabbA]; // position changed — refresh for the next cell
+			}
+		}
+	}
+	return grounded;
+}
+
+- (BOOL)resolveTileCircle:(TGSprite *)s
+				   layers:(NSArray<TGTileLayer *> *)layers
+				   groups:(NSSet<NSString *> *)groups
+				   radius:(float)r
+{
+	BOOL grounded = NO;
+	for (TGTileLayer *layer in layers) {
+		if (![layer blocks:groups]) {
+			continue;
+		}
+		float tw = [layer cellWidth];
+		float th = [layer cellHeight];
+		if (tw <= 0.0f || th <= 0.0f) {
+			continue;
+		}
+		float lx = layer.x;
+		float ly = layer.y;
+		float e = MAX(s.restitution, layer.restitution);
+		[s hitCenter:_centerA];
+		float cx = _centerA[0];
+		float cy = _centerA[1];
+		int c0 = MAX(0, (int)floorf((cx - r - lx) / tw));
+		int c1 = MIN([layer cols] - 1, (int)floorf((cx + r - lx) / tw));
+		int r0 = MAX(0, (int)floorf((cy - r - ly) / th));
+		int r1 = MIN([layer rows] - 1, (int)floorf((cy + r - ly) / th));
+		for (int row = r0; row <= r1; row++) {
+			for (int col = c0; col <= c1; col++) {
+				uint8_t flag = [layer flagAtCol:col row:row];
+				if (flag == 0) {
+					continue;
+				}
+				float bx0 = lx + col * tw;
+				float by0 = ly + row * th;
+				float bx1 = bx0 + tw;
+				float by1 = by0 + th;
+				float closestX = MIN(MAX(cx, bx0), bx1);
+				float closestY = MIN(MAX(cy, by0), by1);
+				float dx = cx - closestX;
+				float dy = cy - closestY;
+				float d2 = dx * dx + dy * dy;
+				if (d2 >= r * r) {
+					continue;
+				}
+				float nx, ny, penetration;
+				if (d2 > 1e-6f) {
+					float d = sqrtf(d2);
+					nx = dx / d;
+					ny = dy / d;
+					penetration = r - d;
+				} else {
+					// center inside the cell — out through the nearest face
+					float toLeft = cx - bx0;
+					float toRight = bx1 - cx;
+					float toTop = cy - by0;
+					float toBottom = by1 - cy;
+					float minFace = MIN(MIN(toLeft, toRight), MIN(toTop, toBottom));
+					nx = (minFace == toLeft) ? -1.0f : (minFace == toRight) ? 1.0f : 0.0f;
+					ny = (nx != 0.0f) ? 0.0f : (minFace == toTop) ? -1.0f : 1.0f;
+					penetration = minFace + r;
+				}
+				// Drop the part of the normal that points into a solid
+				// neighbor; what remains is the real face, so measure the
+				// overlap against that face instead of the corner
+				BOOL cutX = (nx < 0.0f && [layer isSolidCol:col - 1 row:row])
+					|| (nx > 0.0f && [layer isSolidCol:col + 1 row:row]);
+				BOOL cutY = (ny < 0.0f && [layer isSolidCol:col row:row - 1])
+					|| (ny > 0.0f && [layer isSolidCol:col row:row + 1]);
+				if (cutX && cutY) {
+					continue;
+				}
+				if (cutX && ny != 0.0f) {
+					ny = (ny < 0.0f) ? -1.0f : 1.0f;
+					nx = 0.0f;
+					penetration = r - ((ny < 0.0f) ? (by0 - cy) : (cy - by1));
+				} else if (cutY && nx != 0.0f) {
+					nx = (nx < 0.0f) ? -1.0f : 1.0f;
+					ny = 0.0f;
+					penetration = r - ((nx < 0.0f) ? (bx0 - cx) : (cx - bx1));
+				} else if (cutX || cutY) {
+					continue; // the only component pointed into the block
+				}
+				if (penetration <= 0.0f) {
+					continue;
+				}
+				if ((flag & TGTileFlagSolid) == 0 && (ny > -0.7f || s.velocityY < 0.0f)) {
+					continue; // one-way: balls only land on the top face
+				}
+				if (penetration > TGSlop) {
+					s.x += nx * penetration;
+					s.y += ny * penetration;
+				}
+				float vn = s.velocityX * nx + s.velocityY * ny;
+				if (vn < 0.0f) {
+					float bounce = -vn * e;
+					if (e > 0.0f && bounce > 40.0f) {
+						s.velocityX -= (1.0f + e) * vn * nx;
+						s.velocityY -= (1.0f + e) * vn * ny;
+					} else {
+						s.velocityX -= vn * nx;
+						s.velocityY -= vn * ny;
+						if (ny < -0.7f) {
+							grounded = YES;
+						}
+					}
+				}
+				[s hitCenter:_centerA]; // position changed — refresh for the next cell
+				cx = _centerA[0];
+				cy = _centerA[1];
+			}
+		}
+	}
+	return grounded;
+}
+
+- (float)sweepAgainstTiles:(TGSprite *)s
+					layers:(NSArray<TGTileLayer *> *)layers
+					groups:(NSSet<NSString *> *)groups
+						cx:(float)cx cy:(float)cy dx:(float)dx dy:(float)dy
+						hw:(float)hw hh:(float)hh
+{
+	float earliest = FLT_MAX;
+	float minX = MIN(cx, cx + dx) - hw;
+	float maxX = MAX(cx, cx + dx) + hw;
+	float minY = MIN(cy, cy + dy) - hh;
+	float maxY = MAX(cy, cy + dy) + hh;
+	for (TGTileLayer *layer in layers) {
+		if (![layer blocks:groups]) {
+			continue;
+		}
+		float tw = [layer cellWidth];
+		float th = [layer cellHeight];
+		if (tw <= 0.0f || th <= 0.0f) {
+			continue;
+		}
+		float lx = layer.x;
+		float ly = layer.y;
+		int c0 = MAX(0, (int)floorf((minX - lx) / tw));
+		int c1 = MIN([layer cols] - 1, (int)floorf((maxX - lx) / tw));
+		int r0 = MAX(0, (int)floorf((minY - ly) / th));
+		int r1 = MIN([layer rows] - 1, (int)floorf((maxY - ly) / th));
+		for (int row = r0; row <= r1; row++) {
+			for (int col = c0; col <= c1; col++) {
+				uint8_t flag = [layer flagAtCol:col row:row];
+				if (flag == 0) {
+					continue;
+				}
+				float bx0 = lx + col * tw;
+				float by0 = ly + row * th;
+				if (![self sweptHitFromX:cx y:cy dx:dx dy:dy
+									minX:bx0 - hw minY:by0 - hh
+									maxX:bx0 + tw + hw maxY:by0 + th + hh]) {
+					continue;
+				}
+				float t = _sweptResult[0];
+				if (t <= 0.0f || t >= earliest) {
+					continue; // already touching, or a later face than one found
+				}
+				BOOL onX = _sweptResult[1] == 0.0f;
+				if ((flag & TGTileFlagSolid) == 0) {
+					if (onX || dy <= 0.0f || s.velocityY < 0.0f) {
+						continue; // one-way: only a fall onto the top face counts
+					}
+				} else if (onX) {
+					if (dx > 0.0f ? [layer isSolidCol:col - 1 row:row] : [layer isSolidCol:col + 1 row:row]) {
+						continue; // an internal seam, not a wall
+					}
+				} else if (dy > 0.0f ? [layer isSolidCol:col row:row - 1] : [layer isSolidCol:col row:row + 1]) {
+					continue;
+				}
+				earliest = t;
+			}
+		}
+	}
+	return earliest;
+}
+
 /**
  * Fires the collision callback once per overlap-enter and the
  * collision-end callback once per separation (also when the contact

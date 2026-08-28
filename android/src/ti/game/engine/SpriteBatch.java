@@ -430,6 +430,18 @@ public class SpriteBatch
 			? s.y + (1f - s.scrollFactor) * cameraTravelY : s.y;
 	}
 
+	/** The same draw-time shift for a world-space layer (tile maps) with
+	 *  the given scrollFactor; 0 for an ordinary layer. */
+	public float parallaxOffsetX(float scrollFactor)
+	{
+		return (scrollFactor != 1f) ? (1f - scrollFactor) * cameraTravelX : 0f;
+	}
+
+	public float parallaxOffsetY(float scrollFactor)
+	{
+		return (scrollFactor != 1f) ? (1f - scrollFactor) * cameraTravelY : 0f;
+	}
+
 	private float snapToPixel(Sprite s, float value, float origin)
 	{
 		if (s.screenFixed) {

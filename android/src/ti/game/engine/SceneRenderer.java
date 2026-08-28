@@ -175,6 +175,9 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		List<Sprite> sprites = scene.snapshot();
 		List<ParticleEmitter> emitters = scene.emittersSnapshot();
 		List<Rope> ropes = scene.ropesSnapshot();
+		List<TileLayer> layers = scene.tileLayersSnapshot();
+		float right = left + visibleW;
+		float bottom = top + visibleH;
 
 		// Sheets unloaded from JS free their texture here, on the GL thread
 		textures.deleteDisposed();
@@ -192,6 +195,9 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		for (Rope rope : ropes) {
 			ensureSheetLoaded(rope.sheet);
 		}
+		for (TileLayer layer : layers) {
+			ensureSheetLoaded(layer.sheet);
+		}
 		if (measuring) {
 			stats.texturePrepareMs = (System.nanoTime() - phaseStart) / 1_000_000.0;
 			phaseStart = System.nanoTime();
@@ -205,11 +211,17 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		// and foreground sprites (the car), so they overlay the road but
 		// stay under whatever drives across them. Emitters merge into the
 		// sprite pass by zIndex; on equal zIndex, particles draw on top.
+		// Tile layers merge the same way but draw UNDER sprites of equal
+		// zIndex — a floor is the backdrop of whatever stands on it.
 		boolean trailDrawn = false;
 		int nextEmitter = 0;
 		int nextRope = 0;
+		int nextLayer = 0;
 		int visibleSprites = 0;
 		for (Sprite s : sprites) {
+			while (nextLayer < layers.size() && layers.get(nextLayer).zIndex <= s.zIndex) {
+				layers.get(nextLayer++).draw(batch, left, top, right, bottom);
+			}
 			if (!trailDrawn && s.zIndex > 0) {
 				drawSkidTrail();
 				trailDrawn = true;
@@ -231,10 +243,18 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		while (nextEmitter < emitters.size()) {
 			emitters.get(nextEmitter++).draw(batch);
 		}
+		while (nextLayer < layers.size()) {
+			layers.get(nextLayer++).draw(batch, left, top, right, bottom);
+		}
 		while (nextRope < ropes.size()) {
 			ropes.get(nextRope++).draw(batch);
 		}
 		boolean debugAll = scene.debugAll;
+		for (TileLayer layer : layers) {
+			if (debugAll || layer.debug) {
+				layer.drawDebug(batch, textures.whiteTexture(), left, top, right, bottom);
+			}
+		}
 		for (Sprite s : sprites) {
 			if (debugAll || s.debug) {
 				drawDebugOverlay(s);
