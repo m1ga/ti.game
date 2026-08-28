@@ -601,8 +601,9 @@ var gameView = Game.createGameView({
   debug: { hitbox: true, hud: 'bottomRight' } // both; corners: topLeft, topRight, bottomLeft, bottomRight
 });
 
+var hudFont = Game.createFont({ image: 'assets/mono.png', charWidth: 9, charHeight: 15 });
 var gameView = Game.createGameView({
-  debug: { hud: true, hudFont: myFont }       // print it in the game's own typeface
+  debug: { hud: true, hudFont: hudFont }      // print it in the game's own typeface
 });
 ```
 
