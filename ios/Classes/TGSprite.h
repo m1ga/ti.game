@@ -19,6 +19,7 @@
 - (void)sprite:(TGSprite *)sprite collidedWith:(TGSprite *)other;
 - (void)sprite:(TGSprite *)sprite separatedFrom:(TGSprite *)other;
 - (void)sprite:(TGSprite *)sprite landedOn:(TGSprite *)solid;
+- (void)sprite:(TGSprite *)sprite hitWall:(TGSprite *)solid side:(NSInteger)side;
 @end
 
 /**
@@ -215,6 +216,13 @@
 @property (atomic, copy) NSSet<NSString *> *solidWith;
 @property (atomic, assign) BOOL onGround;
 
+// Pressed against a solid's side this frame: -1 = wall on the left,
+// 1 = wall on the right, 0 = free. Any sideways push-out counts — a
+// rect resolved horizontally, or a circle/OBB contact whose normal is
+// mostly horizontal. JS reads it as onWallLeft/onWallRight; the
+// transition into a wall (or flipping sides) fires 'wallhit'.
+@property (atomic, assign) NSInteger wallSide;
+
 // One-way platform: as a solid, this sprite only catches riders
 // falling onto its top edge — they jump up through it and are never
 // blocked sideways or from below (pass-through floors).
@@ -261,6 +269,10 @@ typedef NS_ENUM(int, TGSolidMode) {
 
 // The solid this sprite stood on last frame (render thread only).
 @property (atomic, weak) TGSprite *groundSprite;
+
+// The solid this sprite was pressed against last frame, nil for a
+// tile-layer wall (render thread only).
+@property (atomic, weak) TGSprite *wallSprite;
 
 // Bounciness against solids: 0 = stop dead, 0..1 = reflect with damping
 @property (atomic, assign) float restitution;

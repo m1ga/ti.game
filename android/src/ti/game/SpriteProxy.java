@@ -1224,6 +1224,20 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		return sprite.onGround;
 	}
 
+	/** True while pressed against a solid on the left (read-only — wall jumps). */
+	@Kroll.getProperty
+	public boolean getOnWallLeft()
+	{
+		return sprite.wallSide < 0;
+	}
+
+	/** True while pressed against a solid on the right (read-only — wall jumps). */
+	@Kroll.getProperty
+	public boolean getOnWallRight()
+	{
+		return sprite.wallSide > 0;
+	}
+
 	/** As a solid: riders only land on the top edge — they jump up
 	 *  through it and are never blocked sideways (pass-through floors). */
 	@Kroll.getProperty
@@ -1663,6 +1677,22 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 				data.put("group", solid.collisionGroup);
 			}
 			fireEvent("land", data);
+		}
+	}
+
+	@Override
+	public void onWallHit(Sprite s, Sprite solid, int side)
+	{
+		if (hasListeners("wallhit")) {
+			KrollDict data = new KrollDict();
+			data.put("side", side < 0 ? "left" : "right");
+			data.put("x", s.x);
+			data.put("y", s.y);
+			if (solid != null) {
+				data.put("other", solid.proxy);
+				data.put("group", solid.collisionGroup);
+			}
+			fireEvent("wallhit", data);
 		}
 	}
 

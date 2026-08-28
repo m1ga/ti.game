@@ -221,6 +221,13 @@ public class Sprite
 	public volatile Set<String> solidWith;
 	public volatile boolean onGround = false;
 
+	// Pressed against a solid's side this frame: -1 = wall on the left,
+	// 1 = wall on the right, 0 = free. Any sideways push-out counts — a
+	// rect resolved horizontally, or a circle/OBB contact whose normal is
+	// mostly horizontal. JS reads it as onWallLeft/onWallRight; the
+	// transition into a wall (or flipping sides) fires 'wallhit'.
+	public volatile int wallSide = 0;
+
 	// One-way platform: as a solid, this sprite only catches riders
 	// falling onto its top edge — they jump up through it and are never
 	// blocked sideways or from below (pass-through floors).
@@ -266,6 +273,10 @@ public class Sprite
 
 	// The solid this sprite stood on last frame (GL thread only).
 	public Sprite groundSprite;
+
+	// The solid this sprite was pressed against last frame, null for a
+	// tile-layer wall (GL thread only).
+	public Sprite wallSprite;
 
 	// Bounciness against solids: 0 = stop dead (platformer feet),
 	// 0..1 = reflect velocity with damping (balls). Tiny bounces come to rest.
@@ -344,6 +355,7 @@ public class Sprite
 		void onCollision(Sprite sprite, Sprite other);
 		void onCollisionEnd(Sprite sprite, Sprite other);
 		void onLand(Sprite sprite, Sprite solid);
+		void onWallHit(Sprite sprite, Sprite solid, int side);
 	}
 
 	public float drawWidth()

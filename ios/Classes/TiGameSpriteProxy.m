@@ -775,6 +775,18 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.onGround);
 }
 
+/** True while pressed against a solid on the left (read-only — wall jumps). */
+- (NSNumber *)onWallLeft
+{
+	return @(self.sprite.wallSide < 0);
+}
+
+/** True while pressed against a solid on the right (read-only — wall jumps). */
+- (NSNumber *)onWallRight
+{
+	return @(self.sprite.wallSide > 0);
+}
+
 /** As a solid: riders only land on the top edge — they jump up
  *  through it and are never blocked sideways (pass-through floors). */
 - (void)setOneWay:(id)value
@@ -1205,6 +1217,21 @@ static NSSet<NSString *> *toGroupSet(id value)
 			data[@"group"] = solid.collisionGroup;
 		}
 		[self fireEvent:@"land" withObject:data];
+	}
+}
+
+- (void)sprite:(TGSprite *)s hitWall:(TGSprite *)solid side:(NSInteger)side
+{
+	if ([self _hasListeners:@"wallhit"]) {
+		NSMutableDictionary *data = [NSMutableDictionary dictionary];
+		data[@"side"] = (side < 0) ? @"left" : @"right";
+		data[@"x"] = @(s.x);
+		data[@"y"] = @(s.y);
+		if (solid != nil) {
+			data[@"other"] = solid.proxy;
+			data[@"group"] = solid.collisionGroup;
+		}
+		[self fireEvent:@"wallhit" withObject:data];
 	}
 }
 

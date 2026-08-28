@@ -298,7 +298,7 @@ pointers, which is how the demos do multitouch d-pads (hold ▶ + jump).
 | Model | Properties | Feels like |
 |---|---|---|
 | Plain velocity | `velocityX/Y` (px/s), `gravity` (px/s²) | Flappy, projectiles, falling |
-| Platformer | velocity + `solidWith`, `onGround`, `land` event | Mario-style run & jump |
+| Platformer | velocity + `solidWith`, `onGround`, `land` event, `onWallLeft`/`onWallRight`, `wallhit` event | Mario-style run & jump, wall jumps |
 | Bouncing body | `restitution` (0..1) on top of `solidWith` | Balls, pinball-ish |
 | Car (`carMode`) | `throttle`, `steering` (-1..1); `enginePower`, `maxSpeed`, `turnRate`, `grip`, `drag` | Top-down racer with drift |
 | Newtonian flight | `thrust` (px/s² along heading), `angularVelocity` (deg/s), `maxSpeed` | Asteroids |
@@ -309,6 +309,12 @@ Notes:
   those groups — the engine pushes the sprite out along the axis of least
   penetration. Landing sets read-only `onGround` (gate jumps on it) and
   fires `land`; sides act as walls; below stops upward motion.
+- **Walls**: being pushed out of a solid sideways sets read-only
+  `onWallLeft` / `onWallRight` for that frame and fires `wallhit` on the
+  transition (`side`, `other`, `group`). Gate a wall jump on them and kick
+  `velocityX` away from the wall — note a sprite only stays "on" a wall
+  while something moves it into it (a held direction, a moving solid), so
+  check the flags in the jump handler, not on a timer.
 - **One-way platforms**: `oneWay: true` on a solid makes it pass-through
   except for landings on its top edge — riders jump up through it and
   are never blocked sideways or from below (classic platformer floors).
@@ -944,6 +950,7 @@ mid-drag or mid-tween. All can be passed at creation.
 |---|---|
 | `solidWith` | Groups whose sprites — and tile layers' solid cells — block this one's movement (push-out along the axis of least penetration) |
 | `onGround` | true while standing on a solid (read-only — gate jumps on it) |
+| `onWallLeft` / `onWallRight` | true while pressed against a solid's side this frame — a rect pushed out horizontally, or a circle/OBB contact whose normal is mostly horizontal (read-only — gate wall jumps on them; a wall only counts while movement pushes into it) |
 | `restitution` | Bounciness of a contact: 0 = stop dead, 1 = give it all back. It reads off **both** sides — the springier of the two surfaces decides, the way Box2D mixes it — so a bouncy floor can be given `restitution: 0.5` and everything that lands on it rebounds, without touching the riders. Every solid defaults to 0, so a scene that never sets it on a surface behaves exactly as it always did: the mover's own value is the whole answer. The same mix applies between two `solidMode: 'push'` bodies; because push assumes equal masses there is no `mass` to weight it with. Small bounces are damped to a stop instead of buzzing, so below a low closing speed a body settles and grounds rather than reflecting |
 | `oneWay` | As a solid: catches landings on the top edge only — pass-through from below and sideways |
 | `carryRiders` | As a solid: riders inherit this sprite's movement (default true); false for world-scroll terrain |
@@ -1040,6 +1047,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `collision` | `group`, `other`, `x`, `y` | Overlap with a `collidesWith` group began |
 | `collisionend` | `group`, `other`, `x`, `y` | That overlap ended (separation — also when the partner is removed or hidden) |
 | `land` | `x`, `y`, `other` (the solid), `group` | Landed on top of a `solidWith` solid |
+| `wallhit` | `side` (`'left'`/`'right'`), `x`, `y`, `other` (the solid), `group` | Started pressing against the side of a `solidWith` solid, or switched to the other side (`other`/`group` are absent for tile-layer walls) |
 
 ### Sound
 

@@ -21,6 +21,48 @@
 // enough to swallow a frame of gravity, small enough to stay invisible.
 static const float TGSlop = 0.5f;
 
+// Contact bits reported by the tile resolvers (twin of Scene.CONTACT_*)
+static const NSInteger TGContactGround = 1;
+static const NSInteger TGContactWallLeft = 2;
+static const NSInteger TGContactWallRight = 4;
+
+/** -1 / 1 for a wall-left / wall-right bit, else 0. */
+static NSInteger TGWallFromContact(NSInteger contact)
+{
+	return (contact & TGContactWallLeft) ? -1 : (contact & TGContactWallRight) ? 1 : 0;
+}
+
+/** Side of a wall from a contact normal: mostly horizontal normals
+ *  pushing left mean the wall is on the right, and vice versa. */
+static NSInteger TGWallFromNormal(float nx)
+{
+	return (nx < -0.7f) ? 1 : (nx > 0.7f) ? -1 : 0;
+}
+
+/**
+ * Publishes this frame's ground/wall contacts on the sprite and fires
+ * land / wallhit on the transitions (first touch, or flipping walls).
+ * Twin of Scene.finishContacts.
+ */
+static void TGFinishContacts(TGSprite *s, BOOL wasOnGround, BOOL grounded, TGSprite *groundedOn,
+							 NSInteger wasWall, NSInteger wall, TGSprite *wallOn)
+{
+	s.onGround = grounded;
+	s.groundSprite = grounded ? groundedOn : nil;
+	s.wallSide = wall;
+	s.wallSprite = (wall != 0) ? wallOn : nil;
+	id<TGSpriteEventListener> listener = s.eventListener;
+	if (listener == nil) {
+		return;
+	}
+	if (grounded && !wasOnGround) {
+		[listener sprite:s landedOn:groundedOn];
+	}
+	if (wall != 0 && wall != wasWall) {
+		[listener sprite:s hitWall:wallOn side:wall];
+	}
+}
+
 static float bottomEdge(TGSprite *s)
 {
 	return s.y + [s drawHeight] * fabsf(s.scaleY) * (1.0f - s.anchorY);
@@ -1472,8 +1514,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		BOOL wasOnGround = s.onGround;
 		BOOL grounded = NO;
 		TGSprite *groundedOn = nil;
+		NSInteger wasWall = s.wallSide;
+		NSInteger wall = 0;
+		TGSprite *wallOn = nil;
 		// The level comes first, moving solids on top of it
-		BOOL onTiles = [self resolveTileRect:s layers:layers groups:groups];
+		NSInteger tiles = [self resolveTileRect:s layers:layers groups:groups];
 		[s computeAABB:_aabbA];
 		for (TGSprite *solid in list) {
 			NSString *group = solid.collisionGroup;
@@ -1506,6 +1551,10 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				if (penetration > TGSlop) {
 					s.x += nx * penetration;
 					s.y += ny * penetration;
+				}
+				if (TGWallFromNormal(nx) != 0) {
+					wall = TGWallFromNormal(nx);
+					wallOn = solid;
 				}
 				float vn = s.velocityX * nx + s.velocityY * ny;
 				if (vn < 0.0f) {
@@ -1567,11 +1616,15 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				// as soon as the wall ends
 				if (_aabbA[0] + _aabbA[2] < _aabbB[0] + _aabbB[2]) {
 					s.x -= overlapX;
+					wall = 1;
+					wallOn = solid;
 					if (e > 0.0f && s.velocityX > 0.0f) {
 						s.velocityX = -s.velocityX * e;
 					}
 				} else {
 					s.x += overlapX;
+					wall = -1;
+					wallOn = solid;
 					if (e > 0.0f && s.velocityX < 0.0f) {
 						s.velocityX = -s.velocityX * e;
 					}
@@ -1579,15 +1632,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 			[s computeAABB:_aabbA]; // position changed — refresh for the next solid
 		}
-		grounded |= onTiles;
-		s.onGround = grounded;
-		s.groundSprite = grounded ? groundedOn : nil;
-		if (grounded && !wasOnGround) {
-			id<TGSpriteEventListener> listener = s.eventListener;
-			if (listener != nil) {
-				[listener sprite:s landedOn:groundedOn];
-			}
+		grounded |= (tiles & TGContactGround) != 0;
+		if (wall == 0) {
+			wall = TGWallFromContact(tiles);
 		}
+		TGFinishContacts(s, wasOnGround, grounded, groundedOn, wasWall, wall, wallOn);
 	}
 }
 
@@ -1606,9 +1655,13 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	BOOL wasOnGround = s.onGround;
 	BOOL grounded = NO;
 	TGSprite *groundedOn = nil;
+	NSInteger wasWall = s.wallSide;
+	TGSprite *wallOn = nil;
 	float r = [s hitRadius];
 	// The level comes first, moving solids on top of it
-	grounded = [self resolveTileCircle:s layers:layers groups:groups radius:r];
+	NSInteger tiles = [self resolveTileCircle:s layers:layers groups:groups radius:r];
+	grounded = (tiles & TGContactGround) != 0;
+	NSInteger wall = TGWallFromContact(tiles);
 	for (TGSprite *solid in list) {
 		NSString *group = solid.collisionGroup;
 		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]) {
@@ -1714,6 +1767,10 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			s.x += nx * penetration;
 			s.y += ny * penetration;
 		}
+		if (TGWallFromNormal(nx) != 0) {
+			wall = TGWallFromNormal(nx);
+			wallOn = solid;
+		}
 		float vn = s.velocityX * nx + s.velocityY * ny;
 		if (vn < 0.0f) {
 			float bounce = -vn * e;
@@ -1730,14 +1787,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 		}
 	}
-	s.onGround = grounded;
-	s.groundSprite = grounded ? groundedOn : nil;
-	if (grounded && !wasOnGround) {
-		id<TGSpriteEventListener> listener = s.eventListener;
-		if (listener != nil) {
-			[listener sprite:s landedOn:groundedOn];
-		}
-	}
+	TGFinishContacts(s, wasOnGround, grounded, groundedOn, wasWall, wall, wallOn);
 }
 
 /**
@@ -1816,11 +1866,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 // only, which is what keeps a rider from snagging on every tile
 // boundary it slides across. See the Android twin.
 
-- (BOOL)resolveTileRect:(TGSprite *)s
+- (NSInteger)resolveTileRect:(TGSprite *)s
 				 layers:(NSArray<TGTileLayer *> *)layers
 				 groups:(NSSet<NSString *> *)groups
 {
-	BOOL grounded = NO;
+	NSInteger contact = 0;
 	for (TGTileLayer *layer in layers) {
 		if (![layer blocks:groups]) {
 			continue;
@@ -1882,7 +1932,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 							if (s.velocityY > 0.0f) {
 								s.velocityY = 0.0f;
 							}
-							grounded = YES;
+							contact |= TGContactGround;
 						}
 					} else {
 						s.y += overlapY;
@@ -1892,11 +1942,13 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					}
 				} else if (fromLeft) {
 					s.x -= overlapX;
+					contact |= TGContactWallRight;
 					if (e > 0.0f && s.velocityX > 0.0f) {
 						s.velocityX = -s.velocityX * e;
 					}
 				} else {
 					s.x += overlapX;
+					contact |= TGContactWallLeft;
 					if (e > 0.0f && s.velocityX < 0.0f) {
 						s.velocityX = -s.velocityX * e;
 					}
@@ -1905,15 +1957,15 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 		}
 	}
-	return grounded;
+	return contact;
 }
 
-- (BOOL)resolveTileCircle:(TGSprite *)s
+- (NSInteger)resolveTileCircle:(TGSprite *)s
 				   layers:(NSArray<TGTileLayer *> *)layers
 				   groups:(NSSet<NSString *> *)groups
 				   radius:(float)r
 {
-	BOOL grounded = NO;
+	NSInteger contact = 0;
 	for (TGTileLayer *layer in layers) {
 		if (![layer blocks:groups]) {
 			continue;
@@ -1999,6 +2051,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					s.x += nx * penetration;
 					s.y += ny * penetration;
 				}
+				if (nx < -0.7f) {
+					contact |= TGContactWallRight;
+				} else if (nx > 0.7f) {
+					contact |= TGContactWallLeft;
+				}
 				float vn = s.velocityX * nx + s.velocityY * ny;
 				if (vn < 0.0f) {
 					float bounce = -vn * e;
@@ -2009,7 +2066,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 						s.velocityX -= vn * nx;
 						s.velocityY -= vn * ny;
 						if (ny < -0.7f) {
-							grounded = YES;
+							contact |= TGContactGround;
 						}
 					}
 				}
@@ -2019,7 +2076,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 		}
 	}
-	return grounded;
+	return contact;
 }
 
 - (float)sweepAgainstTiles:(TGSprite *)s

@@ -1232,8 +1232,11 @@ public class Scene
 			boolean wasOnGround = s.onGround;
 			boolean grounded = false;
 			Sprite groundedOn = null;
+			int wasWall = s.wallSide;
+			int wall = 0;
+			Sprite wallOn = null;
 			// The level comes first, moving solids on top of it
-			boolean onTiles = resolveTileRect(s, layers, groups);
+			int tiles = resolveTileRect(s, layers, groups);
 			s.computeAABB(aabbA);
 			for (Sprite solid : list) {
 				String group = solid.collisionGroup;
@@ -1266,6 +1269,10 @@ public class Scene
 					if (penetration > SLOP) {
 						s.x += nx * penetration;
 						s.y += ny * penetration;
+					}
+					if (wallFromNormal(nx) != 0) {
+						wall = wallFromNormal(nx);
+						wallOn = solid;
 					}
 					float vn = s.velocityX * nx + s.velocityY * ny;
 					if (vn < 0f) {
@@ -1327,11 +1334,15 @@ public class Scene
 					// as soon as the wall ends
 					if (aabbA[0] + aabbA[2] < aabbB[0] + aabbB[2]) {
 						s.x -= overlapX;
+						wall = 1;
+						wallOn = solid;
 						if (e > 0f && s.velocityX > 0f) {
 							s.velocityX = -s.velocityX * e;
 						}
 					} else {
 						s.x += overlapX;
+						wall = -1;
+						wallOn = solid;
 						if (e > 0f && s.velocityX < 0f) {
 							s.velocityX = -s.velocityX * e;
 						}
@@ -1339,15 +1350,11 @@ public class Scene
 				}
 				s.computeAABB(aabbA); // position changed — refresh for the next solid
 			}
-			grounded |= onTiles;
-			s.onGround = grounded;
-			s.groundSprite = grounded ? groundedOn : null;
-			if (grounded && !wasOnGround) {
-				Sprite.SpriteEventListener listener = s.eventListener;
-				if (listener != null) {
-					listener.onLand(s, groundedOn);
-				}
+			grounded |= (tiles & CONTACT_GROUND) != 0;
+			if (wall == 0) {
+				wall = wallFromContact(tiles);
 			}
+			finishContacts(s, wasOnGround, grounded, groundedOn, wasWall, wall, wallOn);
 		}
 	}
 
@@ -1633,9 +1640,13 @@ public class Scene
 		boolean wasOnGround = s.onGround;
 		boolean grounded = false;
 		Sprite groundedOn = null;
+		int wasWall = s.wallSide;
+		Sprite wallOn = null;
 		float r = s.hitRadius();
 		// The level comes first, moving solids on top of it
-		grounded = resolveTileCircle(s, layers, groups, r);
+		int tiles = resolveTileCircle(s, layers, groups, r);
+		grounded = (tiles & CONTACT_GROUND) != 0;
+		int wall = wallFromContact(tiles);
 		for (Sprite solid : list) {
 			String group = solid.collisionGroup;
 			if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
@@ -1740,6 +1751,10 @@ public class Scene
 				s.x += nx * penetration;
 				s.y += ny * penetration;
 			}
+			if (wallFromNormal(nx) != 0) {
+				wall = wallFromNormal(nx);
+				wallOn = solid;
+			}
 			float vn = s.velocityX * nx + s.velocityY * ny;
 			if (vn < 0f) {
 				float bounce = -vn * e;
@@ -1756,14 +1771,7 @@ public class Scene
 				}
 			}
 		}
-		s.onGround = grounded;
-		s.groundSprite = grounded ? groundedOn : null;
-		if (grounded && !wasOnGround) {
-			Sprite.SpriteEventListener listener = s.eventListener;
-			if (listener != null) {
-				listener.onLand(s, groundedOn);
-			}
-		}
+		finishContacts(s, wasOnGround, grounded, groundedOn, wasWall, wall, wallOn);
 	}
 
 	// --- Tile layer solids ---------------------------------------------------
@@ -1778,12 +1786,12 @@ public class Scene
 
 	/**
 	 * Rect mover vs the solid cells of every matching layer. Same push-out,
-	 * restitution and one-way rules as a sprite solid; returns whether the
-	 * mover landed on a tile. GL thread.
+	 * restitution and one-way rules as a sprite solid; returns CONTACT_*
+	 * bits: landed on a tile, pushed off a wall on the left/right. GL thread.
 	 */
-	private boolean resolveTileRect(Sprite s, List<TileLayer> layers, Set<String> groups)
+	private int resolveTileRect(Sprite s, List<TileLayer> layers, Set<String> groups)
 	{
-		boolean grounded = false;
+		int contact = 0;
 		for (TileLayer layer : layers) {
 			if (!layer.blocks(groups)) {
 				continue;
@@ -1843,7 +1851,7 @@ public class Scene
 								if (s.velocityY > 0f) {
 									s.velocityY = 0f;
 								}
-								grounded = true;
+								contact |= CONTACT_GROUND;
 							}
 						} else {
 							s.y += overlapY;
@@ -1853,11 +1861,13 @@ public class Scene
 						}
 					} else if (fromLeft) {
 						s.x -= overlapX;
+						contact |= CONTACT_WALL_RIGHT;
 						if (e > 0f && s.velocityX > 0f) {
 							s.velocityX = -s.velocityX * e;
 						}
 					} else {
 						s.x += overlapX;
+						contact |= CONTACT_WALL_LEFT;
 						if (e > 0f && s.velocityX < 0f) {
 							s.velocityX = -s.velocityX * e;
 						}
@@ -1866,20 +1876,62 @@ public class Scene
 				}
 			}
 		}
-		return grounded;
+		return contact;
 	}
 
 	private static final int FLAG_SOLID_MASK = TileLayer.FLAG_SOLID;
+
+	// Contact bits reported by the tile resolvers
+	private static final int CONTACT_GROUND = 1;
+	private static final int CONTACT_WALL_LEFT = 2;
+	private static final int CONTACT_WALL_RIGHT = 4;
+
+	/** -1 / 1 for a wall-left / wall-right bit, else 0. */
+	private static int wallFromContact(int contact)
+	{
+		return (contact & CONTACT_WALL_LEFT) != 0 ? -1 : (contact & CONTACT_WALL_RIGHT) != 0 ? 1 : 0;
+	}
+
+	/** Side of a wall from a contact normal: mostly horizontal normals
+	 *  pushing left mean the wall is on the right, and vice versa. */
+	private static int wallFromNormal(float nx)
+	{
+		return (nx < -0.7f) ? 1 : (nx > 0.7f) ? -1 : 0;
+	}
+
+	/**
+	 * Publishes this frame's ground/wall contacts on the sprite and fires
+	 * land / wallhit on the transitions (first touch, or flipping walls).
+	 */
+	private static void finishContacts(Sprite s, boolean wasOnGround, boolean grounded, Sprite groundedOn,
+									   int wasWall, int wall, Sprite wallOn)
+	{
+		s.onGround = grounded;
+		s.groundSprite = grounded ? groundedOn : null;
+		s.wallSide = wall;
+		s.wallSprite = (wall != 0) ? wallOn : null;
+		Sprite.SpriteEventListener listener = s.eventListener;
+		if (listener == null) {
+			return;
+		}
+		if (grounded && !wasOnGround) {
+			listener.onLand(s, groundedOn);
+		}
+		if (wall != 0 && wall != wasWall) {
+			listener.onWallHit(s, wallOn, wall);
+		}
+	}
 
 	/**
 	 * Circle mover vs tile cells: closest-point normal like a rect solid,
 	 * except that a normal component pointing into a solid neighbor is
 	 * dropped — the seam between two floor tiles is not a corner to bounce
-	 * off. Returns whether the ball came to rest on a tile. GL thread.
+	 * off. Returns CONTACT_* bits: came to rest on a tile, pushed off a
+	 * wall on the left/right. GL thread.
 	 */
-	private boolean resolveTileCircle(Sprite s, List<TileLayer> layers, Set<String> groups, float r)
+	private int resolveTileCircle(Sprite s, List<TileLayer> layers, Set<String> groups, float r)
 	{
-		boolean grounded = false;
+		int contact = 0;
 		for (TileLayer layer : layers) {
 			if (!layer.blocks(groups)) {
 				continue;
@@ -1961,6 +2013,11 @@ public class Scene
 						s.x += nx * penetration;
 						s.y += ny * penetration;
 					}
+					if (nx < -0.7f) {
+						contact |= CONTACT_WALL_RIGHT;
+					} else if (nx > 0.7f) {
+						contact |= CONTACT_WALL_LEFT;
+					}
 					float vn = s.velocityX * nx + s.velocityY * ny;
 					if (vn < 0f) {
 						float bounce = -vn * e;
@@ -1971,7 +2028,7 @@ public class Scene
 							s.velocityX -= vn * nx;
 							s.velocityY -= vn * ny;
 							if (ny < -0.7f) {
-								grounded = true;
+								contact |= CONTACT_GROUND;
 							}
 						}
 					}
@@ -1981,7 +2038,7 @@ public class Scene
 				}
 			}
 		}
-		return grounded;
+		return contact;
 	}
 
 	/**
