@@ -149,6 +149,7 @@
 			layers:(NSArray<TGTileLayer *> *)layers;
 - (void)remove:(TGSprite *)sprite;
 - (void)clear;
+- (void)requestImpactGateCleanup:(TGSprite *)sprite;
 - (void)markZOrderDirty;
 
 - (void)addEmitter:(TGParticleEmitter *)emitter;

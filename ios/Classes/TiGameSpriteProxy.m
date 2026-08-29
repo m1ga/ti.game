@@ -32,6 +32,23 @@
 	return @"ti.game.Sprite";
 }
 
+- (void)refreshSolidImpactListener
+{
+	[self.sprite updateSolidImpactListening:[self _hasListeners:@"solidimpact"]];
+}
+
+- (void)addEventListener:(NSArray *)args
+{
+	[super addEventListener:args];
+	[self refreshSolidImpactListener];
+}
+
+- (void)removeEventListener:(NSArray *)args
+{
+	[super removeEventListener:args];
+	[self refreshSolidImpactListener];
+}
+
 static NSSet<NSString *> *toGroupSet(id value)
 {
 	if (![value isKindOfClass:[NSArray class]]) {
@@ -885,6 +902,17 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.wallSlideSpeed);
 }
 
+/** Minimum compensated normal speed (px/s) for solidimpact. */
+- (void)setImpactThreshold:(id)value
+{
+	self.sprite.impactThreshold = MAX(0.0f, [TiUtils floatValue:value def:40.0f]);
+}
+
+- (NSNumber *)impactThreshold
+{
+	return @(self.sprite.impactThreshold);
+}
+
 #pragma mark Idle animation
 
 - (void)setIdleAnimation:(id)value
@@ -1253,6 +1281,27 @@ static NSSet<NSString *> *toGroupSet(id value)
 			data[@"group"] = solid.collisionGroup;
 		}
 		[self fireEvent:@"wallhit" withObject:data];
+	}
+}
+
+- (void)sprite:(TGSprite *)s solidImpactWith:(TGSprite *)other
+		contactX:(float)contactX contactY:(float)contactY
+		normalX:(float)normalX normalY:(float)normalY
+		   speed:(float)speed restitution:(float)restitution
+{
+	if ([self _hasListeners:@"solidimpact"]) {
+		NSMutableDictionary *data = [NSMutableDictionary dictionary];
+		data[@"group"] = other.collisionGroup;
+		data[@"other"] = other.proxy;
+		data[@"x"] = @(s.x);
+		data[@"y"] = @(s.y);
+		data[@"contactX"] = @(contactX);
+		data[@"contactY"] = @(contactY);
+		data[@"normalX"] = @(normalX);
+		data[@"normalY"] = @(normalY);
+		data[@"speed"] = @(speed);
+		data[@"restitution"] = @(restitution);
+		[self fireEvent:@"solidimpact" withObject:data];
 	}
 }
 

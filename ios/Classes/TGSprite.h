@@ -20,6 +20,10 @@
 - (void)sprite:(TGSprite *)sprite separatedFrom:(TGSprite *)other;
 - (void)sprite:(TGSprite *)sprite landedOn:(TGSprite *)solid;
 - (void)sprite:(TGSprite *)sprite hitWall:(TGSprite *)solid side:(NSInteger)side;
+- (void)sprite:(TGSprite *)sprite solidImpactWith:(TGSprite *)other
+		contactX:(float)contactX contactY:(float)contactY
+		normalX:(float)normalX normalY:(float)normalY
+		   speed:(float)speed restitution:(float)restitution;
 @end
 
 /**
@@ -275,6 +279,11 @@ typedef NS_ENUM(int, TGSolidMode) {
 @property (atomic, assign) float frameDeltaX;
 @property (atomic, assign) float frameDeltaY;
 
+// Velocity contributed during update: by carMode/thrust/gravity/damping,
+// captured before position integration. Render thread only.
+@property (atomic, assign) float frameAccelX;
+@property (atomic, assign) float frameAccelY;
+
 // The solid this sprite stood on last frame (render thread only).
 @property (atomic, weak) TGSprite *groundSprite;
 
@@ -284,6 +293,24 @@ typedef NS_ENUM(int, TGSolidMode) {
 
 // Bounciness against solids: 0 = stop dead, 0..1 = reflect with damping
 @property (atomic, assign) float restitution;
+
+// Discrete physical solid-response event. The proxy maintains the listener
+// flag; per-other gates are allocated lazily and touched only by the render
+// thread.
+@property (atomic, assign) float impactThreshold;
+@property (atomic, assign) BOOL solidImpactListening;
+
+/** Proxy listener hook; a last-listener removal queues map cleanup. */
+- (void)updateSolidImpactListening:(BOOL)listening;
+/** Returns YES only when this cleanup request must be queued. */
+- (BOOL)requestImpactGateCleanup;
+/** Render thread only. */
+- (void)clearImpactGates;
+/** Updates hysteresis for one pair and returns whether to emit. */
+- (BOOL)shouldEmitSolidImpactWith:(TGSprite *)other
+						 speed:(float)speed
+				  physicsFrame:(uint64_t)physicsFrame
+				 sceneSprites:(NSArray<TGSprite *> *)sceneSprites;
 
 // Top-down car physics (carMode = YES)
 @property (atomic, assign) BOOL carMode;

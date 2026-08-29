@@ -10,7 +10,7 @@
  *
  * Events fired natively: press, tap, release, dragstart, drag, dragend,
  * pinch, rotate, animationcomplete, complete (tween finished), collision,
- * land.
+ * collisionend, land, solidimpact.
  */
 @interface TiGameSpriteProxy : TiProxy <TGSpriteEventListener>
 

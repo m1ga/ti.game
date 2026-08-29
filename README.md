@@ -17,7 +17,8 @@ identical on both platforms.
 - Gamepads: Bluetooth/USB controllers as named `buttondown`/`buttonup`
   and throttled `stick` events — d-pad and left stick unified
 - Physics: velocity + gravity, platformer solids, bouncing (restitution),
-  arcade car model with drifting + skid marks, Newtonian flight (thrust)
+  discrete `solidimpact` responses, arcade car model with drifting + skid
+  marks, Newtonian flight (thrust)
 - Collision groups with events, invisible trigger zones, hitbox tuning,
   swept AABB for fast bullets (`swept: true` — no tunneling)
 - Parallax scroll looping, screen wrapping, idle wobble animation
@@ -391,6 +392,11 @@ Notes:
   while something moves it into it (a held direction, a moving solid), so
   check the flags in the jump handler, not on a timer. `wallSlideSpeed`
   turns that contact into a wall slide (capped fall speed) natively.
+- **Physical impacts**: `solidimpact` reports a discrete, compensated hit
+  only when `solidWith` produces a `block`, `contain` or bilateral `push`
+  response between two sprites. Solid `TileLayer` cells do not emit it in
+  this version. It is independent of `collidesWith`; see
+  [Events](#events) for its payload and gating rules.
 - **One-way platforms**: `oneWay: true` on a solid makes it pass-through
   except for landings on its top edge — riders jump up through it and
   are never blocked sideways or from below (classic platformer floors).
@@ -471,6 +477,45 @@ counts as separation. There is deliberately no per-frame "stay" event;
 track the in-between state in JS (you heard enter, you'll hear the end)
 or poll on a coarse timer. This is independent of `solidWith` — use
 solids to *block*, collision events to *react*.
+
+For reactions to the physical response itself, listen for `solidimpact`.
+
+```javascript
+var railSound = Game.createSound({ url: 'assets/rail.wav', volume: 0.3 });
+
+ball.impactThreshold = 80;
+ball.addEventListener('solidimpact', function (e) {
+    if (e.group !== 'rail') {
+        return;
+    }
+    railSound.volume = Math.min(1, 0.15 + e.speed / 1200);
+    railSound.play();
+});
+```
+
+The event is limited to sprite-to-sprite contacts. It goes to both sprites in
+a responding pair, with opposite normals, while each receiver applies its own
+`impactThreshold` (default 40 px/s). Solid `TileLayer` cells still block,
+bounce and ground movers, but do not emit `solidimpact` in this version.
+The shared `contactX`/`contactY` is calculated after penetration correction;
+`speed` is the closing normal speed before restitution, compensated for the
+gravity, thrust, car model and damping applied during that frame. The per-pair
+gate disarms after a report and rearms after separation or once the speed falls
+to half that receiver's threshold. A body held against a wall therefore emits
+once, but a resting ball can report a later, separate blow. Two different
+solids hit during one frame may each report an event, and `swept: true` does not
+duplicate it because the sweep only repositions; the static resolver owns the
+response.
+
+`collision` and `collisionend` remain a separate overlap lifecycle. If neither
+sprite has a `solidimpact` listener, the resolver returns before calculating
+the compensated speed or contact point, and it allocates no gates or bridge
+events.
+
+`contactX`/`contactY` is exact for circles and face contacts. An OBB corner is
+a support-point approximation because this lightweight engine does not build a
+contact manifold. Spin, surface velocity, tweens and `followPath` do not add a
+physical normal velocity, so they do not generate `solidimpact` by themselves.
 
 - A sprite with `width`/`height` but **no sheet** renders nothing and
   works as an invisible trigger: score zones, goals, checkpoints,
@@ -856,8 +901,8 @@ a feature set — find the one closest to your game and start there:
 | `circles.js` | Three emitters stay aligned over their respective hitbox shapes, but every emitted ball can hit all three solids and collide with the other balls as a bilateral `'push'` body. Each falls vertically from a random horizontal point within its assigned shape: `'rect'` sends it off flat faces and corners, `'circle'` deflects along the center-to-center normal, and `'rotatedRect'` on a 45°-turned square catches it on its real faces instead of a grown axis-aligned box. Below, the same shot fired at both `solidMode` values keeps the `'block'`/`'push'` comparison side by side |
 | `slopes.js` | Tilted `'rotatedRect'` ramps with two riders that take different paths through the engine: a rect crate resolved by separating axes, and a circle taken into the ramp's own frame. Both settle on the face and slide down it instead of standing on an invisible ledge. The green surfaces — the floor and both side walls — carry a `restitution` of their own, so the same ball that slides down a ramp at 0.1 rebounds off them at 0.5. The bounce is a property of the surface, not only of what lands on it; leave the walls at 0 and everything ends up parked in a corner no matter how well the floor bounces |
 | `plinko.js` | A staggered wall of 86 circular solids: each peg is a `hitboxShape: 'circle'` sprite, so a ball comes off its shoulder along the center-to-center normal and which way it goes is decided by fractions of a pixel. As bounding boxes every peg would be a square with a flat top and the balls would stack instead of scatter. `swept: true` keeps a fast ball from stepping over a small peg between frames; the slots are trigger zones and the dividers plain rects |
-| `pool.js` | Bilateral circle solids: 16 balls on a felt table, all `solidMode: 'push'`, so each pair separates once and swaps its normal velocity — a break shot scatters the rack. Rails are ordinary rect solids, pockets are circular trigger zones, and `linearDamping` is the felt that brings everything to a stop. No shot gate at all: a strike adds to whatever the cue is already carrying, so you can catch it mid-roll |
-| `drum.js` | Bingo drum with inward containment: 25 balls inside one `solidMode: 'contain'` circle, with no ring of wall sprites — the boundary is analytic, so there are no seams to squeeze through. The balls are `push` too, so they pile up under gravity instead of overlapping. SHAKE kicks them once; TUMBLE uses a thin contact launcher at the bottom to feed impulses through the pile |
+| `pool.js` | Bilateral circle solids: 16 balls on a felt table, all `solidMode: 'push'`, so each pair separates once and swaps its normal velocity — a break shot scatters the rack. Rails are ordinary rect solids, pockets are circular trigger zones, and `linearDamping` is the felt that brings everything to a stop. Rails and every ball listen for `solidimpact`; an index-based pair rule prevents both sides of one ball contact from playing the same hit twice |
+| `drum.js` | Bingo drum with inward containment: 25 balls inside one `solidMode: 'contain'` circle, with no ring of wall sprites — the boundary is analytic, so there are no seams to squeeze through. The balls are `push` too, so they pile up under gravity instead of overlapping. SHAKE kicks them once; TUMBLE uses a thin contact launcher at the bottom. The container plays glass hits, while an index-based pair rule lets exactly one ball play each ball-to-ball click |
 | `wind.js` | `gravityX`: falling leaves drift sideways under a wind you change with buttons — every leaf answers at once with no per-frame JavaScript, because the value is read natively each tick the way `gravity` is. Below, the other use, which has nothing to do with wind: a top-down puck with `gravity: 0` whose only acceleration is horizontal, for a table seen from above |
 | `path.js` | Path & chain: a ship on a smoothed looping circuit (`rotate: true`), a guard patrolling a sharp rectangle while its walk loop plays, tap-to-chain (`play('hop', { then: 'walk' })`, array chains on the bird), and a dog running one-shot zig-zag paths to taps with `pathcomplete` |
 | `raycast.js` | Raycast playground: a guard's line-of-sight beam blocked by a draggable crate (beam shortens to `hit.distance` and turns red), a ledge-probing walker that turns before the platform edge, and a tap-fired turret hitscan that flashes `hit.sprite` and reports group + distance |
@@ -1049,6 +1094,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `onWallLeft` / `onWallRight` | true while pressed against a solid's side this frame — a rect pushed out horizontally, or a circle/OBB contact whose normal is mostly horizontal (read-only — gate wall jumps on them; a wall only counts while movement pushes into it) |
 | `wallSlideSpeed` | Wall slide: while `onWallLeft`/`onWallRight`, downward velocity is capped at this many px/s, so a player holding into a wall clings and drifts down instead of dropping (0 = off, the default). Native, no per-frame JS |
 | `restitution` | Bounciness of a contact: 0 = stop dead, 1 = give it all back. It reads off **both** sides — the springier of the two surfaces decides, the way Box2D mixes it — so a bouncy floor can be given `restitution: 0.5` and everything that lands on it rebounds, without touching the riders. Every solid defaults to 0, so a scene that never sets it on a surface behaves exactly as it always did: the mover's own value is the whole answer. The same mix applies between two `solidMode: 'push'` bodies; because push assumes equal masses there is no `mass` to weight it with. Small bounces are damped to a stop instead of buzzing, so below a low closing speed a body settles and grounds rather than reflecting |
+| `impactThreshold` | Minimum compensated normal speed in px/s for this receiver's `solidimpact` event (default 40, minimum 0). The pair rearms after separation or at half this value; thresholds and gates are independent on both participants |
 | `oneWay` | As a solid: catches landings on the top edge only — pass-through from below and sideways |
 | `carryRiders` | As a solid: riders inherit this sprite's movement (default true); false for world-scroll terrain |
 | `solidMode` | As a solid: `'block'` (default — an immovable wall, what every solid did before this existed), `'contain'` (inward circular boundary: matched circles are kept *inside* its circumference instead of outside — drums, bowls, lottery cages) or `'push'` (a body in its own right: a matched circle and this one share the separation and exchange momentum along the contact normal at equal mass). The last two are circle-on-circle only, and unknown values fall back to `'block'`. `'push'` is the only one that needs agreement: **both** sprites must be `'push'` with circle hitboxes and **each must list the other's `collisionGroup`** in its own `solidWith`, or the pair falls back to one body shoving an immovable one. `'contain'` is one-directional — only the ball lists the drum |
@@ -1146,6 +1192,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `collisionend` | `group`, `other`, `x`, `y` | That overlap ended (separation — also when the partner is removed or hidden) |
 | `land` | `x`, `y`, `other` (the solid), `group` | Landed on top of a `solidWith` solid |
 | `wallhit` | `side` (`'left'`/`'right'`), `x`, `y`, `other` (the solid), `group` | Started pressing against the side of a `solidWith` solid, or switched to the other side (`other`/`group` are absent for tile-layer walls) |
+| `solidimpact` | `group`, `other`, `x`, `y`, `contactX`, `contactY`, `normalX`, `normalY`, `speed`, `restitution` | A sprite-to-sprite `solidWith` response met this sprite's threshold. `x`/`y` is the receiver position; both events share the contact point and speed, carry opposite normals, identify the other sprite's group, and use the effective mixed restitution. Tile cells do not emit it |
 
 ### Sound
 
