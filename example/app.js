@@ -30,6 +30,7 @@
 //   Bingo drum: 25 balls in one circular container — solidMode: 'contain', no wall segments
 //   Wind: gravityX — falling leaves drift sideways, and a top-down puck with gravity 0
 //   Slopes: hitboxShape 'rotatedRect' on tilted ramps — a crate and a ball riding down them
+//   Circular world: seamless world, camera, TileLayer and collisions at both edges
 
 var demos = [
 	{ title: 'Asteroids', start: require('/asteroids') },
@@ -64,7 +65,8 @@ var demos = [
 	{ title: 'Top-Down Level', start: require('/topdown') },
 	{ title: 'Trigger zones', start: require('/zones') },
 	{ title: 'Volley', start: require('/volley') },
-	{ title: 'Wind (gravityX)', start: require('/wind') }
+	{ title: 'Wind (gravityX)', start: require('/wind') },
+	{ title: 'World wrap X', start: require('/worldwrap') }
 ];
 
 var win = Ti.UI.createWindow({
