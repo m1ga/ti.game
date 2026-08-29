@@ -12,6 +12,10 @@
 // The rails are ordinary rectangular solids (`solidMode: 'block'`, the
 // default), so they still behave as immovable walls. The pockets are
 // circular trigger zones read through `collidesWith`, not solids.
+// Rails listen for `solidimpact`, and so does every ball. The engine reports
+// an impact to both sides of a contact, so each ball carries an index and only
+// the lower one plays the sound: one physical hit, one click, and no pair left
+// silent.
 //
 // `linearDamping` is the felt: a fraction of the speed shed every second,
 // so a fast ball loses a lot and a slow one very little. That is what a
@@ -53,9 +57,23 @@ module.exports = function () {
 	});
 
 	var strikeSound = Game.createSound({ url: 'assets/crash.wav', volume: 0.22 });
+
+	// The cue strike above is one deliberate whack and keeps its own sound.
+	// Ball contacts are different: short, hard, and many at once on a break.
+	// Effect sounds already overlap in the native engine, so one sound object
+	// is enough even when several contacts arrive during the opening break.
+	var impactSound = Game.createSound({ url: 'assets/pool_click.wav', volume: 0.22 });
+
+	// A ball meeting a cushion is not a ball meeting a ball. Rubber under cloth
+	// swallows the high end, so the rails get their own duller sample, with its
+	// own cadence: a rail hit should never mask a ball hit.
+	var THUD_GAP = 55;
+	var railSound = Game.createSound({ url: 'assets/thud.wav', volume: 0.24 });
+	var thudAt = 0;
 	var pocketSound = Game.createSound({ url: 'assets/good.wav', volume: 0.6 });
 	var scratchSound = Game.createSound({ url: 'assets/bad.wav', volume: 0.55 });
 
+	var resetTable = function () {};
 	var initialized = false;
 	gameView.addEventListener('resize', function (e) {
 		if (!initialized) {
@@ -81,9 +99,24 @@ module.exports = function () {
 		};
 		var scene = [];
 
+		function playRail(speed) {
+			var now = Date.now();
+			if (now - thudAt < THUD_GAP) {
+				return;
+			}
+			thudAt = now;
+			railSound.volume = Math.max(0.10, Math.min(0.40, 0.10 + speed / 2600));
+			railSound.play();
+		}
+
+		function playImpact(speed) {
+			impactSound.volume = Math.max(0.08, Math.min(0.42, 0.08 + speed / 2200));
+			impactSound.play();
+		}
+
 		var COLORS = [
 			'#e9c94c', '#3f74c9', '#cc4b45', '#7953ad', '#de7d35',
-			'#3a9765', '#944b34', '#25282d', '#e9c94c', '#3f74c9',
+			'#3a9765', '#944b34', '#cc4b45', '#e9c94c', '#3f74c9',
 			'#cc4b45', '#7953ad', '#de7d35', '#3a9765', '#944b34'
 		];
 
@@ -123,7 +156,7 @@ module.exports = function () {
 			zIndex: 20
 		});
 		var hint = Game.createText({
-			text: 'DISTANCE SETS POWER\nSTRIKES ADD TO CURRENT MOTION',
+			text: 'DISTANCE SETS POWER\nRAILS + CUE CONTACTS USE SOLIDIMPACT',
 			align: 'center',
 			x: W / 2, y: H * 0.95,
 			scale: UNIT,
@@ -183,7 +216,7 @@ module.exports = function () {
 			{ x: TABLE_MARGIN + RAIL / 2, y: (TOP + BOTTOM) / 2, w: RAIL, h: BOTTOM - TOP },
 			{ x: W - TABLE_MARGIN - RAIL / 2, y: (TOP + BOTTOM) / 2, w: RAIL, h: BOTTOM - TOP }
 		].forEach(function (rail) {
-			scene.push(Game.createSprite({
+			var railSprite = Game.createSprite({
 				sheet: wallSheet,
 				x: rail.x, y: rail.y,
 				width: rail.w, height: rail.h,
@@ -191,8 +224,15 @@ module.exports = function () {
 				tintColor: '#754329',
 				touchEnabled: false,   // taps belong to the view, not the table
 				collisionGroup: 'rail',
+				impactThreshold: 55,
 				zIndex: 3
-			}));
+			});
+			railSprite.addEventListener('solidimpact', function (e) {
+				if (e.group === 'ball') {
+					playRail(e.speed);
+				}
+			});
+			scene.push(railSprite);
 		});
 
 		// Small rail sights make the play surface easier to read at a glance.
@@ -238,7 +278,7 @@ module.exports = function () {
 
 		// --- Balls ---------------------------------------------------------
 
-		function makeBall(x, y, color, isCue) {
+		function makeBall(x, y, color, isCue, target) {
 			var ball = Game.createSprite({
 				sheet: ballSheet,
 				x: x, y: y,
@@ -257,7 +297,11 @@ module.exports = function () {
 				touchEnabled: false,
 				zIndex: isCue ? 12 : 10
 			});
+			ball.inPlay = true;
 			ball.addEventListener('collision', function () {
+				if (!ball.inPlay) {
+					return;
+				}
 				if (isCue) {
 					// scratch: spot the cue back on the head string
 					ball.velocityX = 0;
@@ -269,6 +313,7 @@ module.exports = function () {
 					showFeedback('SCRATCH - CUE RESPOTTED', '#ef7c72', 1400);
 					return;
 				}
+				ball.inPlay = false;
 				gameView.remove(ball);
 				var index = balls.indexOf(ball);
 				if (index >= 0) {
@@ -279,12 +324,33 @@ module.exports = function () {
 				showFeedback('NICE POCKET', '#82d6a9', 1100);
 				updateHud();
 			});
-			scene.push(ball);
+			target.push(ball);
+			// The engine reports an impact to BOTH sides of the contact, so if
+			// every ball played a sound each hit would play twice. Each ball
+			// carries an index and only the lower one speaks. Listening on a
+			// single ball instead — the way this demo used to — is simpler and
+			// wrong: two object balls hitting each other made no sound at all.
+			ball.impactId = balls.length;
+			// Zero, on purpose. A soft kiss between two balls is audible in real
+			// life, and the engine will not invent contacts to fill the gap:
+			// vnImpact subtracts the frame's own acceleration, so balls left
+			// touching each other or resting against a rail report nothing.
+			// (The felt is not a surface here at all — it is linearDamping on
+			// the ball — so it never had anything to report.)
+			ball.impactThreshold = 0;
+			ball.addEventListener('solidimpact', function (e) {
+				if (e.group !== 'ball') {
+					return;   // rails report their own side
+				}
+				var otherId = e.other.impactId;
+				if (typeof otherId === 'number' && ball.impactId > otherId) {
+					return;   // the other ball of this pair is speaking
+				}
+				playImpact(e.speed);
+			});
 			balls.push(ball);
 			return ball;
 		}
-
-		var cue = makeBall(midX, cueSpotY, '#f7f1df', true);
 
 		// Rack: five rows at the top of the portrait table, with the apex
 		// pointing down toward the cue ball. The spacing
@@ -292,18 +358,25 @@ module.exports = function () {
 		// what the eye reads as touching; against the frame it looked loose.
 		var apexY = FELT.top + (FELT.bottom - FELT.top) * 0.36;
 		var gap = BALL * 0.9 * 1.02;
-		var next = 0;
-		for (var row = 0; row < 5; row++) {
-			for (var seat = 0; seat <= row; seat++) {
-				makeBall(
-					midX + (seat - row / 2) * gap,
-					apexY - row * gap * 0.88,
-					COLORS[next % COLORS.length],
-					false
-				);
-				next++;
+		var cue;
+
+		function buildRack(target) {
+			cue = makeBall(midX, cueSpotY, '#f7f1df', true, target);
+			var next = 0;
+			for (var row = 0; row < 5; row++) {
+				for (var seat = 0; seat <= row; seat++) {
+					makeBall(
+						midX + (seat - row / 2) * gap,
+						apexY - row * gap * 0.88,
+						COLORS[next % COLORS.length],
+						false,
+						target
+					);
+					next++;
+				}
 			}
 		}
+		buildRack(scene);
 
 		var aimMarker = Game.createSprite({
 			sheet: sparkSheet,
@@ -323,6 +396,28 @@ module.exports = function () {
 
 		// Commit the complete table in one bridge crossing.
 		gameView.add(scene);
+
+		resetTable = function () {
+			balls.slice().forEach(function (ball) {
+				ball.inPlay = false;
+				gameView.remove(ball);
+			});
+			balls.length = 0;
+			potted = 0;
+			if (feedbackTimer) {
+				gameView.cancelTimer(feedbackTimer);
+				feedbackTimer = 0;
+			}
+			status.text = DEFAULT_STATUS;
+			status.tintColor = '#f2d47a';
+			aimMarker.clearTweens();
+			aimMarker.visible = false;
+			updateHud();
+			var freshRack = [];
+			buildRack(freshRack);
+			gameView.add(freshRack);
+			showFeedback('TABLE RESET', '#82d6a9', 900);
+		};
 
 		// --- Aiming: tap to shoot ---------------------------------------------
 		//
@@ -387,9 +482,33 @@ module.exports = function () {
 	backButton.addEventListener('click', function () {
 		win.close();
 	});
+	var resetButton = Ti.UI.createLabel({
+		text: 'RESET',
+		top: Ti.Platform.osname === 'android' ? 10 : 40,
+		right: 12,
+		width: 82,
+		height: 38,
+		color: '#e5eee9',
+		backgroundColor: '#172a21',
+		borderColor: '#456555',
+		borderWidth: 1,
+		borderRadius: 19,
+		font: { fontSize: 12, fontWeight: 'bold' },
+		textAlign: 'center',
+		zIndex: 100
+	});
+	resetButton.addEventListener('touchstart', function () { resetButton.backgroundColor = '#274538'; });
+	resetButton.addEventListener('touchend', function () { resetButton.backgroundColor = '#172a21'; });
+	resetButton.addEventListener('touchcancel', function () { resetButton.backgroundColor = '#172a21'; });
+	resetButton.addEventListener('click', function () {
+		resetTable();
+	});
 	win.add(backButton);
+	win.add(resetButton);
 	win.addEventListener('close', function () {
 		strikeSound.stop();
+		impactSound.stop();
+		railSound.stop();
 		pocketSound.stop();
 		scratchSound.stop();
 		gameView.pause();

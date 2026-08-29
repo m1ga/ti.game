@@ -3,7 +3,7 @@
 //   Puzzle: drag & drop pieces into a grid, snap or tween back home
 //   Flappy: flying pig — tap to flap, gravity, gates, parallax background
 //   Platformer: run & jump onto platforms with on-screen controls or a Bluetooth gamepad
-//   Plinko: a staggered wall of circular solids — every peg is a circle hitbox
+//   Plinko: circular pegs, impact sounds, and random one/ten-chip controls
 //   Volley: Blobby Volley style — you vs. a simple computer player
 //   Racing: pixel top-down racer with pixel snapping, drifting, checkpoints and laps
 //   Cards: select three cards from your hand and play them to the middle
@@ -26,8 +26,8 @@
 //   Zones: collision/collisionend lifecycle — water tint, pressure-plate door
 //   Demoscene: sine text scroller, copper bars, starfield + chiptune loop
 //   Maze: A* playground — tap to route through a maze, a hound re-paths to you
-//   Pool: 16 balls exchanging momentum — solidMode: 'push' plus linearDamping felt
-//   Bingo drum: 25 balls in one circular container — solidMode: 'contain', no wall segments
+//   Pool: push-body billiards with impact sounds, pockets, damping and RESET
+//   Bingo drum: contain + push balls with separate glass and ball impact sounds
 //   Wind: gravityX — falling leaves drift sideways, and a top-down puck with gravity 0
 //   Slopes: hitboxShape 'rotatedRect' on tilted ramps — a crate and a ball riding down them
 //   Circular world: seamless world, camera, TileLayer and collisions at both edges
