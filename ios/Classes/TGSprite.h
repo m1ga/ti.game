@@ -166,6 +166,9 @@
 @property (atomic, assign) float thrust;          // px/s^2 along heading
 @property (atomic, assign) BOOL wrapAround;
 
+// Opts this world sprite into TGScene.worldWrapX.
+@property (atomic, assign) BOOL wrapWorldX;
+
 // Seamless scroll looping: when wrapShift > 0 and x drops below wrapX,
 // x jumps right by wrapShift (mirrored for wrapShift < 0 / x > wrapX).
 @property (atomic, assign) float wrapX;

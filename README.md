@@ -21,6 +21,8 @@ identical on both platforms.
 - Collision groups with events, invisible trigger zones, hitbox tuning,
   swept AABB for fast bullets (`swept: true` — no tunneling)
 - Parallax scroll looping, screen wrapping, idle wobble animation
+- Circular scrolling worlds (`worldWrapX`) with seam-aware camera, sprites,
+  overlap and solid collision, swept movers, touch and full-width tile layers
 - Pixel-art mode (nearest-neighbor filtering), debug overlay for hitboxes
   and an on-screen performance HUD (fps, frame time, draw calls, counts)
 - Sound: low-latency overlapping effects + looping music (`createSound`),
@@ -446,6 +448,16 @@ Notes:
   (Asteroids). For scrolling backgrounds use `wrapX`/`wrapShift`: two
   screen-wide copies with `{ wrapX: -W/2, wrapShift: 2*W }` and a negative
   `velocityX` make a seamless parallax layer with no JS in the loop.
+- **Circular worlds**: set `gameView.worldWrapX = { minX, maxX }` and opt
+  world sprites into it with `wrapWorldX: true`. Positions normalize inside
+  that interval, the camera follows the nearest periodic image, and overlap,
+  solid resolution and swept movers see other participating sprites across the
+  seam. A `TileLayer` repeats and resolves solid cells across the seam when its
+  `x` equals `minX` and its width equals `maxX - minX`. `screenFixed` sprites
+  stay outside the circular world. While this mode is active, horizontal
+  `cameraBounds` are ignored and their vertical limits still apply. Discrete
+  `raycast()` and `findPath()` queries, particles, ropes and skid trails do not
+  repeat periodically. `worldwrap.js` is the end-to-end playground.
 
 ### Detect hits and score
 
@@ -854,6 +866,7 @@ a feature set — find the one closest to your game and start there:
 | `tilemap.js` | Tile maps: a 120x90 island (10,800 cells) generated in JS and drawn by one `createTileLayer` — only the cells in view are rendered; water tiles are `solid` behind the layer's `collisionGroup`, so the walker is blocked without a single collision sprite and `findPath` (with a `bounds` window around the walker) routes around the lakes; BUILD mode lays planks with `setTile` (art + collision update live), DEBUG outlines the solid cells; the performance HUD (`debug: { hud: 'topRight' }`) shows draw calls and frame time staying flat while the camera scrolls |
 | `maze.js` | A* playground: tap a tile and `findPath` routes the player through a wall-tile maze (`cellSize` = tile size, so the grid matches the map) — faint dots show every grid cell of the raw route (`simplify: false`), gold dots the simplified waypoints handed to `followPath`; a hound re-paths to the player on a `gameView.every` timer and sends you `flash`ing back on contact |
 | `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going; a GAME clock on `gameView.every(1000, ...)` freezes with the scene while a REAL `setInterval` clock keeps ticking |
+| `worldwrap.js` | Circular-world acceptance playground: a six-screen `worldWrapX`, shortest-path camera follow, a full-width solid `TileLayer` floor, a participating player and touchable overlap target, plus an automated `swept` bolt blocked by that target through the seam; hold either overlay button to orbit repeatedly without JS position writes |
 
 Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
@@ -932,6 +945,7 @@ app down mid-frame.
 | `cameraX` / `cameraY` | World-space offset of the view (scrolling) |
 | `cameraScale` | Zoom, anchored on the view center (default 1) |
 | `cameraBounds` | `{ minX, minY, maxX, maxY }` world rect the visible area is clamped into; `null` = unbounded |
+| `worldWrapX` | `{ minX, maxX }` enables a circular horizontal world; `null` disables it. The interval must have positive finite width. Horizontal camera bounds are ignored while active; vertical bounds remain in force |
 | `follow(sprite, options)` | Native dead-zone camera follow. Vertical: `topMargin`/`bottomMargin` (fractions of the visible height, defaults 0.33/0.7), clamped to `maxY` (default 0). Horizontal: enabled by `leftMargin`/`rightMargin` (defaults 0.35/0.65). `smoothing` (0..1, default 0 = snap) eases by that fraction of the remaining distance per 1/60 s. Every call resets all of them to their defaults first, so `follow(sprite)` with no options wipes a configuration set earlier |
 | `stopFollow()` | Stop following; the camera stays where it is |
 | `shake({ strength, duration })` | Camera shake: `strength` px (default 12), `duration` ms (default 400) — offsets only the projection, so follow/bounds/touches are unaffected |
@@ -1073,6 +1087,7 @@ mid-drag or mid-tween. All can be passed at creation.
 | `thrust` | Acceleration along the current heading, px/s² (capped at `maxSpeed`) |
 | `angularVelocity` | Spin in deg/s |
 | `wrapAround` | Leaving one screen edge re-enters from the opposite one (Asteroids) |
+| `wrapWorldX` | Participate in the GameView's circular `worldWrapX` interval. Native movement normalizes `x`; rendering, touch, sprite overlap/solid resolution and swept movement choose the nearest periodic image when both sprites participate. A TileLayer repeats only when it starts at `minX` and spans the full interval. `worldWrapX` takes precedence over `wrapAround`, `wrapX` and `wrapShift` for participating sprites; `screenFixed` is excluded |
 
 #### Wrap / loop
 

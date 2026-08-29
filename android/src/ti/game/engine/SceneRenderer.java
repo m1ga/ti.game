@@ -207,6 +207,8 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		// — the share of it that parallax sprites give back at draw time
 		batch.begin(projection, screenProjection, left, top, scale,
 			scene.cameraX + scene.shakeOffsetX, scene.cameraY + scene.shakeOffsetY);
+		batch.setWorldWrapX(scene.worldWrapXEnabled, scene.worldWrapMinX,
+			scene.worldWrapMaxX, left + visibleW * 0.5f);
 		// Skid marks slot between background (zIndex <= 0, e.g. the track)
 		// and foreground sprites (the car), so they overlay the road but
 		// stay under whatever drives across them. Emitters merge into the

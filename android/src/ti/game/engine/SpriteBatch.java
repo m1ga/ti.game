@@ -113,6 +113,10 @@ public class SpriteBatch
 	// the projection (no batch flush per parallax layer).
 	private float cameraTravelX;
 	private float cameraTravelY;
+	private boolean worldWrapXEnabled;
+	private float worldWrapMinX;
+	private float worldWrapMaxX;
+	private float worldWrapReferenceX;
 
 	// Per-frame diagnostics, reset by begin(). Plain int increments: a
 	// branch to skip them would cost more than the increment does.
@@ -185,6 +189,37 @@ public class SpriteBatch
 		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
 		GLES20.glEnable(GLES20.GL_BLEND);
 		GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+	}
+
+	/** Circular draw configuration for this frame. */
+	public void setWorldWrapX(boolean enabled, float minX, float maxX, float referenceX)
+	{
+		worldWrapXEnabled = enabled && maxX > minX;
+		worldWrapMinX = minX;
+		worldWrapMaxX = maxX;
+		worldWrapReferenceX = referenceX;
+	}
+
+	public boolean worldWrapXEnabled()
+	{
+		return worldWrapXEnabled;
+	}
+
+	public float worldWrapMinX()
+	{
+		return worldWrapMinX;
+	}
+
+	public float worldWrapWidth()
+	{
+		return worldWrapXEnabled ? worldWrapMaxX - worldWrapMinX : 0f;
+	}
+
+	private float nearestWorldX(float x)
+	{
+		float width = worldWrapWidth();
+		return width > 0f
+			? x + (float) Math.floor((worldWrapReferenceX - x) / width + 0.5f) * width : x;
 	}
 
 	/**
@@ -420,8 +455,10 @@ public class SpriteBatch
 	 *  camera travel, i.e. only scrollFactor of it moves the sprite. */
 	public float parallaxX(Sprite s)
 	{
-		return (!s.screenFixed && s.scrollFactor != 1f)
+		float x = (!s.screenFixed && s.scrollFactor != 1f)
 			? s.x + (1f - s.scrollFactor) * cameraTravelX : s.x;
+		return (worldWrapXEnabled && s.wrapWorldX && !s.screenFixed)
+			? nearestWorldX(x) : x;
 	}
 
 	public float parallaxY(Sprite s)

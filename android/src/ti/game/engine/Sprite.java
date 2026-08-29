@@ -158,6 +158,10 @@ public class Sprite
 	public volatile float thrust = 0f;
 	public volatile boolean wrapAround = false;
 
+	// Opts this world sprite into GameView.worldWrapX. Scene owns the
+	// normalization, rendering and seam-aware collision behavior.
+	public volatile boolean wrapWorldX = false;
+
 	// Seamless scroll looping: when wrapShift > 0 and x drops below wrapX,
 	// x jumps right by wrapShift (and mirrored for wrapShift < 0 / x > wrapX).
 	// Handled natively so parallax layers never stutter on JS latency.
@@ -494,10 +498,11 @@ public class Sprite
 		if (velocityY != 0f) {
 			y += velocityY * dt;
 		}
-		if (wrapShift > 0f && x < wrapX) {
+		boolean sceneWrapX = wrapWorldX && scene != null && scene.worldWrapXEnabled;
+		if (!sceneWrapX && wrapShift > 0f && x < wrapX) {
 			x += wrapShift;
 			startX += wrapShift; // teleport, not movement — keep it out of frameDelta
-		} else if (wrapShift < 0f && x > wrapX) {
+		} else if (!sceneWrapX && wrapShift < 0f && x > wrapX) {
 			x += wrapShift;
 			startX += wrapShift;
 		}

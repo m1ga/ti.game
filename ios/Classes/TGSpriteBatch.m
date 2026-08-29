@@ -152,6 +152,40 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	// the projection (no batch flush per parallax layer).
 	float _cameraTravelX;
 	float _cameraTravelY;
+	BOOL _worldWrapXEnabled;
+	float _worldWrapMinX;
+	float _worldWrapMaxX;
+	float _worldWrapReferenceX;
+}
+
+- (void)setWorldWrapX:(BOOL)enabled minX:(float)minX maxX:(float)maxX referenceX:(float)referenceX
+{
+	_worldWrapXEnabled = enabled && maxX > minX;
+	_worldWrapMinX = minX;
+	_worldWrapMaxX = maxX;
+	_worldWrapReferenceX = referenceX;
+}
+
+- (BOOL)worldWrapXEnabled
+{
+	return _worldWrapXEnabled;
+}
+
+- (float)worldWrapMinX
+{
+	return _worldWrapMinX;
+}
+
+- (float)worldWrapWidth
+{
+	return _worldWrapXEnabled ? _worldWrapMaxX - _worldWrapMinX : 0.0f;
+}
+
+- (float)nearestWorldX:(float)x
+{
+	float width = [self worldWrapWidth];
+	return width > 0.0f
+		? x + floorf((_worldWrapReferenceX - x) / width + 0.5f) * width : x;
 }
 
 - (instancetype)init
@@ -268,8 +302,10 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 
 - (float)parallaxX:(TGSprite *)s
 {
-	return (!s.screenFixed && s.scrollFactor != 1.0f)
+	float x = (!s.screenFixed && s.scrollFactor != 1.0f)
 		? s.x + (1.0f - s.scrollFactor) * _cameraTravelX : s.x;
+	return (_worldWrapXEnabled && s.wrapWorldX && !s.screenFixed)
+		? [self nearestWorldX:x] : x;
 }
 
 - (float)parallaxY:(TGSprite *)s

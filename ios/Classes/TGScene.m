@@ -578,6 +578,7 @@ static float bottomEdge(TGSprite *s)
 	[self wrapSprites:list];
 	[self resolveSolids:list layers:layerList];
 	[self applyAttachments:list];
+	[self normalizeWrappedSprites:list];
 	[self checkCollisions:list];
 	[self updateFollow:dt];
 	[self applyCameraBounds];
@@ -646,6 +647,33 @@ static float bottomEdge(TGSprite *s)
 	return [self viewOriginY] + sy / MAX(0.0001f, self.cameraScale);
 }
 
+- (float)worldWrapWidth
+{
+	return self.worldWrapXEnabled ? self.worldWrapMaxX - self.worldWrapMinX : 0.0f;
+}
+
+- (float)normalizeWorldX:(float)x
+{
+	float width = [self worldWrapWidth];
+	if (width <= 0.0f) {
+		return x;
+	}
+	float normalized = fmodf(x - self.worldWrapMinX, width);
+	if (normalized < 0.0f) {
+		normalized += width;
+	}
+	return self.worldWrapMinX + normalized;
+}
+
+- (float)nearestWorldX:(float)x reference:(float)reference
+{
+	float width = [self worldWrapWidth];
+	if (width <= 0.0f) {
+		return x;
+	}
+	return x + floorf((reference - x) / width + 0.5f) * width;
+}
+
 - (float)worldToScreenX:(float)wx
 {
 	return (wx - [self viewOriginX]) * MAX(0.0001f, self.cameraScale);
@@ -684,7 +712,10 @@ static float bottomEdge(TGSprite *s)
 		float visibleW = self.worldWidth / scale;
 		float left = visibleW * self.followLeftFraction;
 		float right = visibleW * self.followRightFraction;
-		float screenX = target.x - [self viewOriginX];
+		float targetX = (self.worldWrapXEnabled && target.wrapWorldX && !target.screenFixed)
+			? [self nearestWorldX:target.x reference:[self viewOriginX] + visibleW * 0.5f]
+			: target.x;
+		float screenX = targetX - [self viewOriginX];
 		if (screenX < left) {
 			desiredX += screenX - left;
 		} else if (screenX > right) {
@@ -722,7 +753,9 @@ static float bottomEdge(TGSprite *s)
 	float clampedY = (maxOriginY < self.boundsMinY)
 		? (self.boundsMinY + maxOriginY) / 2.0f
 		: MIN(MAX(originY, self.boundsMinY), maxOriginY);
-	self.cameraX += clampedX - originX;
+	if (!self.worldWrapXEnabled) {
+		self.cameraX += clampedX - originX;
+	}
 	self.cameraY += clampedY - originY;
 }
 
@@ -758,10 +791,22 @@ static float bottomEdge(TGSprite *s)
 {
 	float w = self.worldWidth;
 	float h = self.worldHeight;
-	if (w <= 0.0f || h <= 0.0f) {
+	if ((w <= 0.0f || h <= 0.0f) && !self.worldWrapXEnabled) {
 		return;
 	}
 	for (TGSprite *s in list) {
+		if (self.worldWrapXEnabled && s.wrapWorldX && !s.screenFixed) {
+			s.x = [self normalizeWorldX:s.x];
+			if (s.wrapAround && h > 0.0f) {
+				float marginY = [s drawHeight] * fabsf(s.scaleY) / 2.0f;
+				if (s.y < -marginY) {
+					s.y = h + marginY;
+				} else if (s.y > h + marginY) {
+					s.y = -marginY;
+				}
+			}
+			continue;
+		}
 		if (!s.wrapAround) {
 			continue;
 		}
@@ -778,6 +823,49 @@ static float bottomEdge(TGSprite *s)
 			s.y = -marginY;
 		}
 	}
+}
+
+- (void)normalizeWrappedSprites:(NSArray<TGSprite *> *)list
+{
+	if (!self.worldWrapXEnabled) {
+		return;
+	}
+	for (TGSprite *s in list) {
+		if (s.wrapWorldX && !s.screenFixed) {
+			s.x = [self normalizeWorldX:s.x];
+		}
+	}
+}
+
+- (BOOL)wraps:(TGSprite *)a with:(TGSprite *)b
+{
+	return self.worldWrapXEnabled && a.wrapWorldX && b.wrapWorldX
+		&& !a.screenFixed && !b.screenFixed;
+}
+
+- (float)periodicOffsetFrom:(TGSprite *)reference to:(TGSprite *)other
+{
+	return [self wraps:reference with:other]
+		? [self nearestWorldX:other.x reference:reference.x] - other.x : 0.0f;
+}
+
+- (void)shiftedHitCenter:(TGSprite *)sprite offsetX:(float)offsetX out:(float *)out
+{
+	[sprite hitCenter:out];
+	out[0] += offsetX;
+}
+
+- (void)shiftedHitBox:(TGSprite *)sprite offsetX:(float)offsetX out:(float *)out
+{
+	[sprite hitBox:out];
+	out[0] += offsetX;
+}
+
+- (void)shiftedAABB:(TGSprite *)sprite offsetX:(float)offsetX out:(float *)out
+{
+	[sprite computeAABB:out];
+	out[0] += offsetX;
+	out[2] += offsetX;
 }
 
 /**
@@ -1011,7 +1099,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
  * cross the target's box at any point this frame? Relative motion, so a
  * fast target can't slip past a slow bullet either.
  */
-- (BOOL)sweptShapesOverlap:(TGSprite *)s with:(TGSprite *)other
+- (BOOL)sweptShapesOverlap:(TGSprite *)s with:(TGSprite *)other offsetX:(float)otherOffsetX
 {
 	float dx = s.frameDeltaX - other.frameDeltaX;
 	float dy = s.frameDeltaY - other.frameDeltaY;
@@ -1019,7 +1107,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		return NO;
 	}
 	[s computeAABB:_aabbA];
-	[other computeAABB:_aabbB];
+	[self shiftedAABB:other offsetX:otherOffsetX out:_aabbB];
 	float hw = (_aabbA[2] - _aabbA[0]) / 2.0f;
 	float hh = (_aabbA[3] - _aabbA[1]) / 2.0f;
 	float cx = (_aabbA[0] + _aabbA[2]) / 2.0f - dx; // center at frame start
@@ -1082,11 +1170,12 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			// wall, so neither belongs in a blocking sweep
 			continue;
 		}
+		float solidOffsetX = [self periodicOffsetFrom:s to:solid];
 		if (solid.obbHitbox) {
 			// Take the whole sweep into the box's frame, where the box is
 			// axis-aligned again and the existing Minkowski segment test
 			// applies unchanged.
-			[solid hitBox:_boxB];
+			[self shiftedHitBox:solid offsetX:solidOffsetX out:_boxB];
 			float bc = cosf(_boxB[4]);
 			float bs = sinf(_boxB[4]);
 			float rx = cx - _boxB[0];
@@ -1148,7 +1237,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			continue;
 		}
 		if (circle && solid.circleHitbox) {
-			[solid hitCenter:_centerB];
+			[self shiftedHitCenter:solid offsetX:solidOffsetX out:_centerB];
 			float sum = r + [solid hitRadius];
 			float fx = cx - _centerB[0];
 			float fy = cy - _centerB[1];
@@ -1183,7 +1272,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 			continue;
 		}
-		[solid computeAABB:_aabbB];
+		[self shiftedAABB:solid offsetX:solidOffsetX out:_aabbB];
 		if (![self sweptHitFromX:cx y:cy dx:dx dy:dy
 							minX:_aabbB[0] - hw minY:_aabbB[1] - hh
 							maxX:_aabbB[2] + hw maxY:_aabbB[3] + hh]) {
@@ -1218,26 +1307,26 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 
 /** Shape-aware overlap test (rect/rect, circle/circle, circle/rect, and
  *  either of those against a rect that turns with its sprite). */
-- (BOOL)shapesOverlap:(TGSprite *)a with:(TGSprite *)b
+- (BOOL)shapesOverlap:(TGSprite *)a with:(TGSprite *)b offsetX:(float)bOffsetX
 {
 	if (a.obbHitbox || b.obbHitbox) {
 		if (a.circleHitbox || b.circleHitbox) {
 			TGSprite *circle = a.circleHitbox ? a : b;
 			TGSprite *box = a.circleHitbox ? b : a;
-			[circle hitCenter:_centerA];
-			[box hitBox:_boxB];
+			[self shiftedHitCenter:circle offsetX:(circle == b ? bOffsetX : 0.0f) out:_centerA];
+			[self shiftedHitBox:box offsetX:(box == b ? bOffsetX : 0.0f) out:_boxB];
 			// overlap only needs the yes/no, so the contact normal is moot here
 			return [self circleAtX:_centerA[0] y:_centerA[1]
 							radius:[circle hitRadius] vsObb:_boxB
 								vx:0.0f vy:0.0f out:_contact];
 		}
 		[a hitBox:_boxA];
-		[b hitBox:_boxB];
+		[self shiftedHitBox:b offsetX:bOffsetX out:_boxB];
 		return [self obb:_boxA vsObb:_boxB out:_contact];
 	}
 	if (a.circleHitbox && b.circleHitbox) {
 		[a hitCenter:_centerA];
-		[b hitCenter:_centerB];
+		[self shiftedHitCenter:b offsetX:bOffsetX out:_centerB];
 		float dx = _centerB[0] - _centerA[0];
 		float dy = _centerB[1] - _centerA[1];
 		float r = [a hitRadius] + [b hitRadius];
@@ -1246,8 +1335,8 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	if (a.circleHitbox || b.circleHitbox) {
 		TGSprite *circle = a.circleHitbox ? a : b;
 		TGSprite *rect = a.circleHitbox ? b : a;
-		[circle hitCenter:_centerA];
-		[rect computeAABB:_aabbB];
+		[self shiftedHitCenter:circle offsetX:(circle == b ? bOffsetX : 0.0f) out:_centerA];
+		[self shiftedAABB:rect offsetX:(rect == b ? bOffsetX : 0.0f) out:_aabbB];
 		float closestX = MIN(MAX(_centerA[0], _aabbB[0]), _aabbB[2]);
 		float closestY = MIN(MAX(_centerA[1], _aabbB[1]), _aabbB[3]);
 		float dx = _centerA[0] - closestX;
@@ -1256,7 +1345,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		return dx * dx + dy * dy < r * r;
 	}
 	[a computeAABB:_aabbA];
-	[b computeAABB:_aabbB];
+	[self shiftedAABB:b offsetX:bOffsetX out:_aabbB];
 	return _aabbA[0] < _aabbB[2] && _aabbA[2] > _aabbB[0]
 		&& _aabbA[1] < _aabbB[3] && _aabbA[3] > _aabbB[1];
 }
@@ -1435,7 +1524,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				continue;
 			}
 			[a hitCenter:_centerA];
-			[b hitCenter:_centerB];
+			[self shiftedHitCenter:b offsetX:[self periodicOffsetFrom:a to:b] out:_centerB];
 			float dx = _centerA[0] - _centerB[0];
 			float dy = _centerA[1] - _centerB[1];
 			float sum = [a hitRadius] + [b hitRadius];
@@ -1536,13 +1625,14 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			// given a bounce of its own without making the ball bouncy
 			// everywhere else it touches.
 			float e = MAX(s.restitution, solid.restitution);
+			float solidOffsetX = [self periodicOffsetFrom:s to:solid];
 			if (solid.obbHitbox || s.obbHitbox) {
 				// Separating axes instead of the two screen axes, so a
 				// tilted platform pushes along its own face — which is what
 				// lets a rider slide down a slope instead of standing on an
 				// invisible ledge.
 				[s hitBox:_boxA];
-				[solid hitBox:_boxB];
+				[self shiftedHitBox:solid offsetX:solidOffsetX out:_boxB];
 				if (![self obb:_boxA vsObb:_boxB out:_contact]) {
 					continue;
 				}
@@ -1578,7 +1668,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				[s computeAABB:_aabbA]; // position changed — refresh for the next solid
 				continue;
 			}
-			[solid computeAABB:_aabbB];
+			[self shiftedAABB:solid offsetX:solidOffsetX out:_aabbB];
 			float overlapX = MIN(_aabbA[2], _aabbB[2]) - MAX(_aabbA[0], _aabbB[0]);
 			float overlapY = MIN(_aabbA[3], _aabbB[3]) - MAX(_aabbA[1], _aabbB[1]);
 			if (overlapX <= 0.0f || overlapY <= 0.0f) {
@@ -1681,6 +1771,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		// given a bounce of its own without making the ball bouncy
 		// everywhere else it touches.
 		float e = MAX(s.restitution, solid.restitution);
+		float solidOffsetX = [self periodicOffsetFrom:s to:solid];
 		[s hitCenter:_centerA];
 		float cx = _centerA[0];
 		float cy = _centerA[1];
@@ -1690,7 +1781,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			// container's. The correcting normal points back toward the
 			// center, so the whole tail below (push-out, restitution,
 			// grounding on the lower arc, land) works unchanged.
-			[solid hitCenter:_centerB];
+			[self shiftedHitCenter:solid offsetX:solidOffsetX out:_centerB];
 			float allowed = [solid hitRadius] - r;
 			float dx = cx - _centerB[0];
 			float dy = cy - _centerB[1];
@@ -1705,7 +1796,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		} else if (solid.obbHitbox) {
 			// Rect that turns with its sprite: the normal comes out
 			// perpendicular to the real face, not to a phantom axis
-			[solid hitBox:_boxB];
+			[self shiftedHitBox:solid offsetX:solidOffsetX out:_boxB];
 			if (![self circleAtX:cx y:cy radius:r vsObb:_boxB
 								 vx:s.velocityX vy:s.velocityY out:_contact]) {
 				continue;
@@ -1716,7 +1807,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		} else if (solid.circleHitbox) {
 			// Circle vs circle: the normal is the line between the two
 			// centers and the overlap is r1 + r2 - d.
-			[solid hitCenter:_centerB];
+			[self shiftedHitCenter:solid offsetX:solidOffsetX out:_centerB];
 			float sum = r + [solid hitRadius];
 			float dx = cx - _centerB[0];
 			float dy = cy - _centerB[1];
@@ -1737,7 +1828,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				penetration = sum;
 			}
 		} else {
-			[solid computeAABB:_aabbB];
+			[self shiftedAABB:solid offsetX:solidOffsetX out:_aabbB];
 			float closestX = MIN(MAX(cx, _aabbB[0]), _aabbB[2]);
 			float closestY = MIN(MAX(cy, _aabbB[1]), _aabbB[3]);
 			float dx = cx - closestX;
@@ -1844,6 +1935,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	// so the offset stays in the sprite's own coordinates.
 	if (s.screenFixed != target.screenFixed) {
 		if (s.screenFixed) {
+			if (self.worldWrapXEnabled && target.wrapWorldX) {
+				float scale = MAX(0.0001f, self.cameraScale);
+				float viewCenterX = [self viewOriginX] + self.worldWidth / scale * 0.5f;
+				tx = [self nearestWorldX:tx reference:viewCenterX];
+			}
 			tx = [self worldToScreenX:tx];
 			ty = [self worldToScreenY:ty];
 		} else {
@@ -1888,13 +1984,18 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		float ly = layer.y;
 		float e = MAX(s.restitution, layer.restitution);
 		[s computeAABB:_aabbA];
-		int c0 = MAX(0, (int)floorf((_aabbA[0] - lx) / tw));
-		int c1 = MIN([layer cols] - 1, (int)floorf((_aabbA[2] - lx) / tw));
+		BOOL wrapsLayer = [self wrapsTileLayer:s layer:layer];
+		int c0 = (int)floorf((_aabbA[0] - lx) / tw);
+		int c1 = (int)floorf((_aabbA[2] - lx) / tw);
+		if (!wrapsLayer) {
+			c0 = MAX(0, c0);
+			c1 = MIN([layer cols] - 1, c1);
+		}
 		int r0 = MAX(0, (int)floorf((_aabbA[1] - ly) / th));
 		int r1 = MIN([layer rows] - 1, (int)floorf((_aabbA[3] - ly) / th));
 		for (int row = r0; row <= r1; row++) {
 			for (int col = c0; col <= c1; col++) {
-				uint8_t flag = [layer flagAtCol:col row:row];
+				uint8_t flag = [self tileFlag:layer col:col row:row wrapX:wrapsLayer];
 				if (flag == 0) {
 					continue;
 				}
@@ -1919,8 +2020,8 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					fromAbove = YES;
 					vertical = YES;
 				} else {
-					BOOL canY = fromAbove ? ![layer isSolidCol:col row:row - 1] : ![layer isSolidCol:col row:row + 1];
-					BOOL canX = fromLeft ? ![layer isSolidCol:col - 1 row:row] : ![layer isSolidCol:col + 1 row:row];
+					BOOL canY = fromAbove ? ![self tileSolid:layer col:col row:row - 1 wrapX:wrapsLayer] : ![self tileSolid:layer col:col row:row + 1 wrapX:wrapsLayer];
+					BOOL canX = fromLeft ? ![self tileSolid:layer col:col - 1 row:row wrapX:wrapsLayer] : ![self tileSolid:layer col:col + 1 row:row wrapX:wrapsLayer];
 					if (!canX && !canY) {
 						continue; // buried in the middle of a solid block
 					}
@@ -1964,6 +2065,26 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	return contact;
 }
 
+- (BOOL)wrapsTileLayer:(TGSprite *)s layer:(TGTileLayer *)layer
+{
+	return self.worldWrapXEnabled && s.wrapWorldX && !s.screenFixed
+		&& [layer spansWorldXFrom:self.worldWrapMinX width:[self worldWrapWidth]];
+}
+
+- (uint8_t)tileFlag:(TGTileLayer *)layer col:(int)col row:(int)row wrapX:(BOOL)wrapX
+{
+	int count = [layer cols];
+	int resolvedCol = wrapX ? ((col % count) + count) % count : col;
+	return [layer flagAtCol:resolvedCol row:row];
+}
+
+- (BOOL)tileSolid:(TGTileLayer *)layer col:(int)col row:(int)row wrapX:(BOOL)wrapX
+{
+	int count = [layer cols];
+	int resolvedCol = wrapX ? ((col % count) + count) % count : col;
+	return [layer isSolidCol:resolvedCol row:row];
+}
+
 - (NSInteger)resolveTileCircle:(TGSprite *)s
 				   layers:(NSArray<TGTileLayer *> *)layers
 				   groups:(NSSet<NSString *> *)groups
@@ -1985,13 +2106,18 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		[s hitCenter:_centerA];
 		float cx = _centerA[0];
 		float cy = _centerA[1];
-		int c0 = MAX(0, (int)floorf((cx - r - lx) / tw));
-		int c1 = MIN([layer cols] - 1, (int)floorf((cx + r - lx) / tw));
+		BOOL wrapsLayer = [self wrapsTileLayer:s layer:layer];
+		int c0 = (int)floorf((cx - r - lx) / tw);
+		int c1 = (int)floorf((cx + r - lx) / tw);
+		if (!wrapsLayer) {
+			c0 = MAX(0, c0);
+			c1 = MIN([layer cols] - 1, c1);
+		}
 		int r0 = MAX(0, (int)floorf((cy - r - ly) / th));
 		int r1 = MIN([layer rows] - 1, (int)floorf((cy + r - ly) / th));
 		for (int row = r0; row <= r1; row++) {
 			for (int col = c0; col <= c1; col++) {
-				uint8_t flag = [layer flagAtCol:col row:row];
+				uint8_t flag = [self tileFlag:layer col:col row:row wrapX:wrapsLayer];
 				if (flag == 0) {
 					continue;
 				}
@@ -2027,10 +2153,10 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				// Drop the part of the normal that points into a solid
 				// neighbor; what remains is the real face, so measure the
 				// overlap against that face instead of the corner
-				BOOL cutX = (nx < 0.0f && [layer isSolidCol:col - 1 row:row])
-					|| (nx > 0.0f && [layer isSolidCol:col + 1 row:row]);
-				BOOL cutY = (ny < 0.0f && [layer isSolidCol:col row:row - 1])
-					|| (ny > 0.0f && [layer isSolidCol:col row:row + 1]);
+				BOOL cutX = (nx < 0.0f && [self tileSolid:layer col:col - 1 row:row wrapX:wrapsLayer])
+					|| (nx > 0.0f && [self tileSolid:layer col:col + 1 row:row wrapX:wrapsLayer]);
+				BOOL cutY = (ny < 0.0f && [self tileSolid:layer col:col row:row - 1 wrapX:wrapsLayer])
+					|| (ny > 0.0f && [self tileSolid:layer col:col row:row + 1 wrapX:wrapsLayer]);
 				if (cutX && cutY) {
 					continue;
 				}
@@ -2105,13 +2231,18 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		}
 		float lx = layer.x;
 		float ly = layer.y;
-		int c0 = MAX(0, (int)floorf((minX - lx) / tw));
-		int c1 = MIN([layer cols] - 1, (int)floorf((maxX - lx) / tw));
+		BOOL wrapsLayer = [self wrapsTileLayer:s layer:layer];
+		int c0 = (int)floorf((minX - lx) / tw);
+		int c1 = (int)floorf((maxX - lx) / tw);
+		if (!wrapsLayer) {
+			c0 = MAX(0, c0);
+			c1 = MIN([layer cols] - 1, c1);
+		}
 		int r0 = MAX(0, (int)floorf((minY - ly) / th));
 		int r1 = MIN([layer rows] - 1, (int)floorf((maxY - ly) / th));
 		for (int row = r0; row <= r1; row++) {
 			for (int col = c0; col <= c1; col++) {
-				uint8_t flag = [layer flagAtCol:col row:row];
+				uint8_t flag = [self tileFlag:layer col:col row:row wrapX:wrapsLayer];
 				if (flag == 0) {
 					continue;
 				}
@@ -2132,10 +2263,10 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 						continue; // one-way: only a fall onto the top face counts
 					}
 				} else if (onX) {
-					if (dx > 0.0f ? [layer isSolidCol:col - 1 row:row] : [layer isSolidCol:col + 1 row:row]) {
+					if (dx > 0.0f ? [self tileSolid:layer col:col - 1 row:row wrapX:wrapsLayer] : [self tileSolid:layer col:col + 1 row:row wrapX:wrapsLayer]) {
 						continue; // an internal seam, not a wall
 					}
-				} else if (dy > 0.0f ? [layer isSolidCol:col row:row - 1] : [layer isSolidCol:col row:row + 1]) {
+				} else if (dy > 0.0f ? [self tileSolid:layer col:col row:row - 1 wrapX:wrapsLayer] : [self tileSolid:layer col:col row:row + 1 wrapX:wrapsLayer]) {
 					continue;
 				}
 				earliest = t;
@@ -2166,9 +2297,10 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			if (other == s || group == nil || !other.visible || ![groups containsObject:group]) {
 				continue;
 			}
-			BOOL overlap = [self shapesOverlap:s with:other];
+			float otherOffsetX = [self periodicOffsetFrom:s to:other];
+			BOOL overlap = [self shapesOverlap:s with:other offsetX:otherOffsetX];
 			if (!overlap && s.swept) {
-				overlap = [self sweptShapesOverlap:s with:other];
+				overlap = [self sweptShapesOverlap:s with:other offsetX:otherOffsetX];
 			}
 			if (overlap) {
 				if (![s.colliding containsObject:other]) {
@@ -2231,7 +2363,9 @@ static void fireCollisionEnd(TGSprite *s, TGSprite *other)
 	NSArray<TGSprite *> *list = [self snapshot];
 	for (NSInteger i = (NSInteger)list.count - 1; i >= 0; i--) {
 		TGSprite *s = list[i];
-		if ([s hitTestX:x y:y]) {
+		float hitX = (self.worldWrapXEnabled && s.wrapWorldX && !s.screenFixed)
+			? [self nearestWorldX:x reference:s.x] : x;
+		if ([s hitTestX:hitX y:y]) {
 			return s;
 		}
 	}
