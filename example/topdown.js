@@ -148,6 +148,7 @@ module.exports = function () {
 
 		var start = tileCenter(5, 12);
 		var SPEED = TILE * 3.5; // tiles per second
+		var DIAGONAL_SPEED = SPEED / Math.sqrt(2);
 		var player = Game.createSprite({
 			sheet: walkerSheet,
 			x: start.x,
@@ -308,8 +309,9 @@ module.exports = function () {
 		                     // so track the running state ourselves
 
 		function applyMovement() {
-			player.velocityX = moveX * SPEED;
-			player.velocityY = moveY * SPEED;
+			var speed = (moveX !== 0 && moveY !== 0) ? DIAGONAL_SPEED : SPEED;
+			player.velocityX = moveX * speed;
+			player.velocityY = moveY * speed;
 			if (moveX === 0 && moveY === 0) {
 				player.stop();
 				walking = false;
