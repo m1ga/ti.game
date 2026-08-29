@@ -113,6 +113,9 @@ public class GameViewProxy extends TiViewProxy
 		if (options.containsKey("gamepadStickRelease")) {
 			setGamepadStickRelease(options.get("gamepadStickRelease"));
 		}
+		if (options.containsKey("worldWrapX")) {
+			setWorldWrapX(options.getKrollDict("worldWrapX"));
+		}
 	}
 
 	// --- Game controllers -------------------------------------------------
@@ -576,6 +579,36 @@ public class GameViewProxy extends TiViewProxy
 	}
 
 	private KrollDict cameraBoundsDict;
+
+	/** Circular logical x interval; null or an invalid interval disables it. */
+	@Kroll.setProperty
+	public void setWorldWrapX(KrollDict bounds)
+	{
+		worldWrapXDict = bounds;
+		if (bounds == null) {
+			scene.worldWrapXEnabled = false;
+			return;
+		}
+		float minX = TiConvert.toFloat(bounds.get("minX"), 0f);
+		float maxX = TiConvert.toFloat(bounds.get("maxX"), minX);
+		if (!(maxX > minX) || Float.isInfinite(minX) || Float.isInfinite(maxX)
+				|| Float.isNaN(minX) || Float.isNaN(maxX)) {
+			worldWrapXDict = null;
+			scene.worldWrapXEnabled = false;
+			return;
+		}
+		scene.worldWrapMinX = minX;
+		scene.worldWrapMaxX = maxX;
+		scene.worldWrapXEnabled = true;
+	}
+
+	@Kroll.getProperty
+	public KrollDict getWorldWrapX()
+	{
+		return worldWrapXDict;
+	}
+
+	private KrollDict worldWrapXDict;
 
 	@Kroll.method
 	public void stopFollow()

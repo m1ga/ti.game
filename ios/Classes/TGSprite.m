@@ -235,10 +235,11 @@ static _Atomic int TGIdleSequence = 0;
 		self.y += velocityY * dt;
 	}
 	float wrapShift = self.wrapShift;
-	if (wrapShift > 0.0f && self.x < self.wrapX) {
+	BOOL sceneWrapX = self.wrapWorldX && self.scene != nil && self.scene.worldWrapXEnabled;
+	if (!sceneWrapX && wrapShift > 0.0f && self.x < self.wrapX) {
 		self.x += wrapShift;
 		startX += wrapShift; // teleport, not movement — keep it out of frameDelta
-	} else if (wrapShift < 0.0f && self.x > self.wrapX) {
+	} else if (!sceneWrapX && wrapShift < 0.0f && self.x > self.wrapX) {
 		self.x += wrapShift;
 		startX += wrapShift;
 	}

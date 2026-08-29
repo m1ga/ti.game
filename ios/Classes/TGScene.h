@@ -46,6 +46,15 @@
 @property (atomic, assign) float worldWidth;
 @property (atomic, assign) float worldHeight;
 
+// Optional circular logical world. Only wrapWorldX sprites participate;
+// screenFixed sprites are always excluded.
+@property (atomic, assign) BOOL worldWrapXEnabled;
+@property (atomic, assign) float worldWrapMinX;
+@property (atomic, assign) float worldWrapMaxX;
+- (float)worldWrapWidth;
+- (float)normalizeWorldX:(float)x;
+- (float)nearestWorldX:(float)x reference:(float)reference;
+
 // Camera: world-space offset of the view's top-left corner (at scale 1).
 @property (atomic, assign) float cameraX;
 @property (atomic, assign) float cameraY;

@@ -552,6 +552,16 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.wrapAround);
 }
 
+- (void)setWrapWorldX:(id)value
+{
+	self.sprite.wrapWorldX = [TiUtils boolValue:value def:NO];
+}
+
+- (NSNumber *)wrapWorldX
+{
+	return @(self.sprite.wrapWorldX);
+}
+
 #pragma mark Car physics (top-down driving)
 
 - (void)setCarMode:(id)value

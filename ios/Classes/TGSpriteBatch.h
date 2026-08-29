@@ -50,6 +50,12 @@ NSString *TGBlendModeName(TGBlendMode mode);
 	 travelY:(float)travelY; // float[16] each, column-major; travel = camera position + shake
 - (void)draw:(TGSprite *)sprite;
 
+/** Circular draw configuration for this frame. */
+- (void)setWorldWrapX:(BOOL)enabled minX:(float)minX maxX:(float)maxX referenceX:(float)referenceX;
+- (BOOL)worldWrapXEnabled;
+- (float)worldWrapMinX;
+- (float)worldWrapWidth;
+
 /** Draw-time position for parallax: only scrollFactor of the camera
  *  travel moves the sprite (identical draw position, no batch flush). */
 - (float)parallaxX:(TGSprite *)sprite;

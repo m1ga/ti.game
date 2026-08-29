@@ -271,6 +271,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("wrapAround")) {
 			sprite.wrapAround = TiConvert.toBoolean(options.get("wrapAround"), false);
 		}
+		if (options.containsKey("wrapWorldX")) {
+			sprite.wrapWorldX = TiConvert.toBoolean(options.get("wrapWorldX"), false);
+		}
 		if (options.containsKey("idleAnimation")) {
 			sprite.idleAnimation = TiConvert.toBoolean(options.get("idleAnimation"), false);
 		}
@@ -950,6 +953,18 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setWrapAround(boolean value)
 	{
 		sprite.wrapAround = value;
+	}
+
+	@Kroll.getProperty
+	public boolean getWrapWorldX()
+	{
+		return sprite.wrapWorldX;
+	}
+
+	@Kroll.setProperty
+	public void setWrapWorldX(boolean value)
+	{
+		sprite.wrapWorldX = value;
 	}
 
 	// --- Car physics (top-down driving) -----------------------------------

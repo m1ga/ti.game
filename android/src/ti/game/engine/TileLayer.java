@@ -217,6 +217,12 @@ public class TileLayer
 		return rows * cellHeight();
 	}
 
+	/** True when the layer exactly covers a circular world's horizontal interval. */
+	boolean spansWorldX(float minX, float width)
+	{
+		return Math.abs(x - minX) < 0.001f && Math.abs(width() - width) < 0.001f;
+	}
+
 	/** Column under a world x (may be outside the grid — check inGrid). */
 	public int colAt(float worldX)
 	{
@@ -247,6 +253,11 @@ public class TileLayer
 
 	// --- Drawing (GL thread) ---------------------------------------------
 
+	private boolean wrapsWorldX(SpriteBatch batch)
+	{
+		return batch.worldWrapXEnabled() && spansWorldX(batch.worldWrapMinX(), batch.worldWrapWidth());
+	}
+
 	/**
 	 * Draws the cells inside the visible world rect, one quad each, all
 	 * from the layer's sheet — one batch run per layer. The rect is the
@@ -270,8 +281,13 @@ public class TileLayer
 		}
 		float ox = x + batch.parallaxOffsetX(scrollFactor);
 		float oy = y + batch.parallaxOffsetY(scrollFactor);
-		int c0 = Math.max(0, (int) Math.floor((viewLeft - ox) / tw));
-		int c1 = Math.min(c - 1, (int) Math.floor((viewRight - ox) / tw));
+		boolean wrapsWorld = wrapsWorldX(batch);
+		int c0 = (int) Math.floor((viewLeft - ox) / tw);
+		int c1 = (int) Math.floor((viewRight - ox) / tw);
+		if (!wrapsWorld) {
+			c0 = Math.max(0, c0);
+			c1 = Math.min(c - 1, c1);
+		}
 		int r0 = Math.max(0, (int) Math.floor((viewTop - oy) / th));
 		int r1 = Math.min(r - 1, (int) Math.floor((viewBottom - oy) / th));
 		if (c1 < c0 || r1 < r0) {
@@ -290,7 +306,8 @@ public class TileLayer
 			int base = row * c;
 			float cy = oy + (row + 0.5f) * th;
 			for (int col = c0; col <= c1; col++) {
-				int i = base + col;
+				int sourceCol = wrapsWorld ? Math.floorMod(col, c) : col;
+				int i = base + sourceCol;
 				int id = (i < t.length) ? t[i] : EMPTY;
 				if (id < 0 || id >= frameCount) {
 					continue;
@@ -318,15 +335,24 @@ public class TileLayer
 		}
 		float ox = x + batch.parallaxOffsetX(scrollFactor);
 		float oy = y + batch.parallaxOffsetY(scrollFactor);
-		int c0 = Math.max(0, (int) Math.floor((viewLeft - ox) / tw));
-		int c1 = Math.min(c - 1, (int) Math.floor((viewRight - ox) / tw));
+		boolean wrapsWorld = wrapsWorldX(batch);
+		int c0 = (int) Math.floor((viewLeft - ox) / tw);
+		int c1 = (int) Math.floor((viewRight - ox) / tw);
+		if (!wrapsWorld) {
+			c0 = Math.max(0, c0);
+			c1 = Math.min(c - 1, c1);
+		}
 		int r0 = Math.max(0, (int) Math.floor((viewTop - oy) / th));
 		int r1 = Math.min(r - 1, (int) Math.floor((viewBottom - oy) / th));
+		if (c1 < c0 || r1 < r0) {
+			return;
+		}
 		batch.setScreenSpace(false);
 		float t = 1f;
 		for (int row = r0; row <= r1; row++) {
 			for (int col = c0; col <= c1; col++) {
-				int i = row * c + col;
+				int sourceCol = wrapsWorld ? Math.floorMod(col, c) : col;
+				int i = row * c + sourceCol;
 				byte flag = (i < f.length) ? f[i] : 0;
 				if (flag == 0) {
 					continue;

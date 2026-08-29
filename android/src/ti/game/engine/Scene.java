@@ -44,6 +44,13 @@ public class Scene
 	public volatile float worldWidth = 0f;
 	public volatile float worldHeight = 0f;
 
+	// Optional circular logical world. Only sprites with wrapWorldX opt in;
+	// screenFixed sprites are always excluded. The camera stays continuous
+	// so following a sprite across the seam never jumps.
+	public volatile boolean worldWrapXEnabled = false;
+	public volatile float worldWrapMinX = 0f;
+	public volatile float worldWrapMaxX = 0f;
+
 	// Camera: world-space offset of the view's top-left corner (at scale
 	// 1). The renderer shifts the projection by it and the touch
 	// controller maps screen touches back into world space.
@@ -203,6 +210,35 @@ public class Scene
 	public float screenToWorldY(float sy)
 	{
 		return viewOriginY() + sy / Math.max(0.0001f, cameraScale);
+	}
+
+	public float worldWrapWidth()
+	{
+		return worldWrapXEnabled ? worldWrapMaxX - worldWrapMinX : 0f;
+	}
+
+	/** Canonical x in [minX, maxX). */
+	public float normalizeWorldX(float x)
+	{
+		float width = worldWrapWidth();
+		if (width <= 0f) {
+			return x;
+		}
+		float normalized = (x - worldWrapMinX) % width;
+		if (normalized < 0f) {
+			normalized += width;
+		}
+		return worldWrapMinX + normalized;
+	}
+
+	/** Periodic image of x closest to reference. */
+	public float nearestWorldX(float x, float reference)
+	{
+		float width = worldWrapWidth();
+		if (width <= 0f) {
+			return x;
+		}
+		return x + (float) Math.floor((reference - x) / width + 0.5f) * width;
 	}
 
 	/** Maps a world position back to surface coordinates (screenFixed sprites). */
@@ -776,7 +812,7 @@ public class Scene
 	 * cross the target's box at any point this frame? Relative motion, so
 	 * a fast target can't slip past a slow bullet either.
 	 */
-	private boolean sweptShapesOverlap(Sprite s, Sprite other)
+	private boolean sweptShapesOverlap(Sprite s, Sprite other, float otherOffsetX)
 	{
 		float dx = s.frameDeltaX - other.frameDeltaX;
 		float dy = s.frameDeltaY - other.frameDeltaY;
@@ -784,7 +820,7 @@ public class Scene
 			return false;
 		}
 		s.computeAABB(aabbA);
-		other.computeAABB(aabbB);
+		shiftedAABB(other, otherOffsetX, aabbB);
 		float hw = (aabbA[2] - aabbA[0]) / 2f;
 		float hh = (aabbA[3] - aabbA[1]) / 2f;
 		float cx = (aabbA[0] + aabbA[2]) / 2f - dx; // center at frame start
@@ -795,24 +831,24 @@ public class Scene
 
 	/** Shape-aware overlap test (rect/rect, circle/circle, circle/rect,
 	 *  and either of those against a rect that turns with its sprite). */
-	private boolean shapesOverlap(Sprite a, Sprite b)
+	private boolean shapesOverlap(Sprite a, Sprite b, float bOffsetX)
 	{
 		if (a.obbHitbox || b.obbHitbox) {
 			if (a.circleHitbox || b.circleHitbox) {
 				Sprite circle = a.circleHitbox ? a : b;
 				Sprite box = a.circleHitbox ? b : a;
-				circle.hitCenter(centerA);
-				box.hitBox(boxB);
+				shiftedHitCenter(circle, circle == b ? bOffsetX : 0f, centerA);
+				shiftedHitBox(box, box == b ? bOffsetX : 0f, boxB);
 				// overlap only needs the yes/no, so the contact normal is moot here
 				return circleVsObb(centerA[0], centerA[1], circle.hitRadius(), boxB, 0f, 0f, contact);
 			}
 			a.hitBox(boxA);
-			b.hitBox(boxB);
+			shiftedHitBox(b, bOffsetX, boxB);
 			return obbVsObb(boxA, boxB, contact);
 		}
 		if (a.circleHitbox && b.circleHitbox) {
 			a.hitCenter(centerA);
-			b.hitCenter(centerB);
+			shiftedHitCenter(b, bOffsetX, centerB);
 			float dx = centerB[0] - centerA[0];
 			float dy = centerB[1] - centerA[1];
 			float r = a.hitRadius() + b.hitRadius();
@@ -821,8 +857,8 @@ public class Scene
 		if (a.circleHitbox || b.circleHitbox) {
 			Sprite circle = a.circleHitbox ? a : b;
 			Sprite rect = a.circleHitbox ? b : a;
-			circle.hitCenter(centerA);
-			rect.computeAABB(aabbB);
+			shiftedHitCenter(circle, circle == b ? bOffsetX : 0f, centerA);
+			shiftedAABB(rect, rect == b ? bOffsetX : 0f, aabbB);
 			float closestX = Math.min(Math.max(centerA[0], aabbB[0]), aabbB[2]);
 			float closestY = Math.min(Math.max(centerA[1], aabbB[1]), aabbB[3]);
 			float dx = centerA[0] - closestX;
@@ -831,7 +867,7 @@ public class Scene
 			return dx * dx + dy * dy < r * r;
 		}
 		a.computeAABB(aabbA);
-		b.computeAABB(aabbB);
+		shiftedAABB(b, bOffsetX, aabbB);
 		return aabbA[0] < aabbB[2] && aabbA[2] > aabbB[0]
 			&& aabbA[1] < aabbB[3] && aabbA[3] > aabbB[1];
 	}
@@ -856,6 +892,7 @@ public class Scene
 		wrapSprites(list);
 		resolveSolids(list, tileLayersSnapshot());
 		applyAttachments(list);
+		normalizeWrappedSprites(list);
 		checkCollisions(list);
 		updateCamera(dt);
 		updateShake(dt);
@@ -895,7 +932,9 @@ public class Scene
 			float visibleW = worldWidth / scale;
 			float left = visibleW * followLeftFraction;
 			float right = visibleW * followRightFraction;
-			float screenX = target.x - viewOriginX();
+			float targetX = (worldWrapXEnabled && target.wrapWorldX && !target.screenFixed)
+				? nearestWorldX(target.x, viewOriginX() + visibleW * 0.5f) : target.x;
+			float screenX = targetX - viewOriginX();
 			if (screenX < left) {
 				desiredX += screenX - left;
 			} else if (screenX > right) {
@@ -933,7 +972,9 @@ public class Scene
 		float clampedY = (maxOriginY < boundsMinY)
 			? (boundsMinY + maxOriginY) / 2f
 			: Math.min(Math.max(originY, boundsMinY), maxOriginY);
-		cameraX += clampedX - originX;
+		if (!worldWrapXEnabled) {
+			cameraX += clampedX - originX;
+		}
 		cameraY += clampedY - originY;
 	}
 
@@ -970,10 +1011,23 @@ public class Scene
 	{
 		float w = worldWidth;
 		float h = worldHeight;
-		if (w <= 0f || h <= 0f) {
+		if ((w <= 0f || h <= 0f) && !worldWrapXEnabled) {
 			return;
 		}
 		for (Sprite s : list) {
+			if (worldWrapXEnabled && s.wrapWorldX && !s.screenFixed) {
+				s.x = normalizeWorldX(s.x);
+				// worldWrapX owns X. wrapAround can still own Y.
+				if (s.wrapAround && h > 0f) {
+					float marginY = s.drawHeight() * Math.abs(s.scaleY) / 2f;
+					if (s.y < -marginY) {
+						s.y = h + marginY;
+					} else if (s.y > h + marginY) {
+						s.y = -marginY;
+					}
+				}
+				continue;
+			}
 			if (!s.wrapAround) {
 				continue;
 			}
@@ -990,6 +1044,49 @@ public class Scene
 				s.y = -marginY;
 			}
 		}
+	}
+
+	private void normalizeWrappedSprites(List<Sprite> list)
+	{
+		if (!worldWrapXEnabled) {
+			return;
+		}
+		for (Sprite s : list) {
+			if (s.wrapWorldX && !s.screenFixed) {
+				s.x = normalizeWorldX(s.x);
+			}
+		}
+	}
+
+	private boolean wrapsWith(Sprite a, Sprite b)
+	{
+		return worldWrapXEnabled && a.wrapWorldX && b.wrapWorldX
+			&& !a.screenFixed && !b.screenFixed;
+	}
+
+	/** Horizontal translation that places other on its nearest periodic image. */
+	private float periodicOffsetX(Sprite reference, Sprite other)
+	{
+		return wrapsWith(reference, other) ? nearestWorldX(other.x, reference.x) - other.x : 0f;
+	}
+
+	private static void shiftedHitCenter(Sprite sprite, float offsetX, float[] out)
+	{
+		sprite.hitCenter(out);
+		out[0] += offsetX;
+	}
+
+	private static void shiftedHitBox(Sprite sprite, float offsetX, float[] out)
+	{
+		sprite.hitBox(out);
+		out[0] += offsetX;
+	}
+
+	private static void shiftedAABB(Sprite sprite, float offsetX, float[] out)
+	{
+		sprite.computeAABB(out);
+		out[0] += offsetX;
+		out[2] += offsetX;
 	}
 
 	/**
@@ -1143,7 +1240,7 @@ public class Scene
 					continue;
 				}
 				a.hitCenter(centerA);
-				b.hitCenter(centerB);
+				shiftedHitCenter(b, periodicOffsetX(a, b), centerB);
 				float dx = centerA[0] - centerB[0];
 				float dy = centerA[1] - centerB[1];
 				float sum = a.hitRadius() + b.hitRadius();
@@ -1250,13 +1347,14 @@ public class Scene
 				// given a bounce of its own without making the ball bouncy
 				// everywhere else it touches.
 				float e = Math.max(s.restitution, solid.restitution);
+				float solidOffsetX = periodicOffsetX(s, solid);
 				if (solid.obbHitbox || s.obbHitbox) {
 					// Separating axes instead of the two screen axes, so a
 					// tilted platform pushes along its own face — which is
 					// what lets a rider slide down a slope instead of
 					// standing on an invisible ledge.
 					s.hitBox(boxA);
-					solid.hitBox(boxB);
+					shiftedHitBox(solid, solidOffsetX, boxB);
 					if (!obbVsObb(boxA, boxB, contact)) {
 						continue;
 					}
@@ -1292,7 +1390,7 @@ public class Scene
 					s.computeAABB(aabbA); // position changed — refresh for the next solid
 					continue;
 				}
-				solid.computeAABB(aabbB);
+				shiftedAABB(solid, solidOffsetX, aabbB);
 				float overlapX = Math.min(aabbA[2], aabbB[2]) - Math.max(aabbA[0], aabbB[0]);
 				float overlapY = Math.min(aabbA[3], aabbB[3]) - Math.max(aabbA[1], aabbB[1]);
 				if (overlapX <= 0f || overlapY <= 0f) {
@@ -1409,11 +1507,12 @@ public class Scene
 				// wall, so neither belongs in a blocking sweep
 				continue;
 			}
+			float solidOffsetX = periodicOffsetX(s, solid);
 			if (solid.obbHitbox) {
 				// Take the whole sweep into the box's frame, where the box is
 				// axis-aligned again and the existing Minkowski segment test
 				// applies unchanged.
-				solid.hitBox(boxB);
+				shiftedHitBox(solid, solidOffsetX, boxB);
 				float bc = (float) Math.cos(boxB[4]);
 				float bs = (float) Math.sin(boxB[4]);
 				float rx = cx - boxB[0];
@@ -1472,7 +1571,7 @@ public class Scene
 				continue;
 			}
 			if (circle && solid.circleHitbox) {
-				solid.hitCenter(centerB);
+				shiftedHitCenter(solid, solidOffsetX, centerB);
 				float sum = r + solid.hitRadius();
 				float fx = cx - centerB[0];
 				float fy = cy - centerB[1];
@@ -1507,7 +1606,7 @@ public class Scene
 				}
 				continue;
 			}
-			solid.computeAABB(aabbB);
+			shiftedAABB(solid, solidOffsetX, aabbB);
 			if (!sweptHit(cx, cy, dx, dy,
 					aabbB[0] - hw, aabbB[1] - hh, aabbB[2] + hw, aabbB[3] + hh)) {
 				continue;
@@ -1614,6 +1713,11 @@ public class Scene
 		// so the offset stays in the sprite's own coordinates.
 		if (s.screenFixed != target.screenFixed) {
 			if (s.screenFixed) {
+				if (worldWrapXEnabled && target.wrapWorldX) {
+					float scale = Math.max(0.0001f, cameraScale);
+					float viewCenterX = viewOriginX() + worldWidth / scale * 0.5f;
+					tx = nearestWorldX(tx, viewCenterX);
+				}
 				tx = worldToScreenX(tx);
 				ty = worldToScreenY(ty);
 			} else {
@@ -1662,6 +1766,7 @@ public class Scene
 			// given a bounce of its own without making the ball bouncy
 			// everywhere else it touches.
 			float e = Math.max(s.restitution, solid.restitution);
+			float solidOffsetX = periodicOffsetX(s, solid);
 			s.hitCenter(centerA);
 			float cx = centerA[0];
 			float cy = centerA[1];
@@ -1671,7 +1776,7 @@ public class Scene
 				// container's. The correcting normal points back toward the
 				// center, so the whole tail below (push-out, restitution,
 				// grounding on the lower arc, land) works unchanged.
-				solid.hitCenter(centerB);
+				shiftedHitCenter(solid, solidOffsetX, centerB);
 				float allowed = solid.hitRadius() - r;
 				float dx = cx - centerB[0];
 				float dy = cy - centerB[1];
@@ -1686,7 +1791,7 @@ public class Scene
 			} else if (solid.obbHitbox) {
 				// Rect that turns with its sprite: the normal comes out
 				// perpendicular to the real face, not to a phantom axis
-				solid.hitBox(boxB);
+				shiftedHitBox(solid, solidOffsetX, boxB);
 				if (!circleVsObb(cx, cy, r, boxB, s.velocityX, s.velocityY, contact)) {
 					continue;
 				}
@@ -1696,7 +1801,7 @@ public class Scene
 			} else if (solid.circleHitbox) {
 				// Circle vs circle: the normal is the line between the two
 				// centers and the overlap is r1 + r2 - d.
-				solid.hitCenter(centerB);
+				shiftedHitCenter(solid, solidOffsetX, centerB);
 				float sum = r + solid.hitRadius();
 				float dx = cx - centerB[0];
 				float dy = cy - centerB[1];
@@ -1717,7 +1822,7 @@ public class Scene
 					penetration = sum;
 				}
 			} else {
-				solid.computeAABB(aabbB);
+				shiftedAABB(solid, solidOffsetX, aabbB);
 				float closestX = Math.min(Math.max(cx, aabbB[0]), aabbB[2]);
 				float closestY = Math.min(Math.max(cy, aabbB[1]), aabbB[3]);
 				float dx = cx - closestX;
@@ -1803,13 +1908,18 @@ public class Scene
 			}
 			float e = Math.max(s.restitution, layer.restitution);
 			s.computeAABB(aabbA);
-			int c0 = Math.max(0, (int) Math.floor((aabbA[0] - layer.x) / tw));
-			int c1 = Math.min(layer.cols() - 1, (int) Math.floor((aabbA[2] - layer.x) / tw));
+			boolean wrapsLayer = wrapsTileLayer(s, layer);
+			int c0 = (int) Math.floor((aabbA[0] - layer.x) / tw);
+			int c1 = (int) Math.floor((aabbA[2] - layer.x) / tw);
+			if (!wrapsLayer) {
+				c0 = Math.max(0, c0);
+				c1 = Math.min(layer.cols() - 1, c1);
+			}
 			int r0 = Math.max(0, (int) Math.floor((aabbA[1] - layer.y) / th));
 			int r1 = Math.min(layer.rows() - 1, (int) Math.floor((aabbA[3] - layer.y) / th));
 			for (int row = r0; row <= r1; row++) {
 				for (int col = c0; col <= c1; col++) {
-					byte flag = layer.flag(col, row);
+					byte flag = tileFlag(layer, col, row, wrapsLayer);
 					if (flag == 0) {
 						continue;
 					}
@@ -1834,8 +1944,8 @@ public class Scene
 						fromAbove = true;
 						vertical = true;
 					} else {
-						boolean canY = fromAbove ? !layer.isSolid(col, row - 1) : !layer.isSolid(col, row + 1);
-						boolean canX = fromLeft ? !layer.isSolid(col - 1, row) : !layer.isSolid(col + 1, row);
+						boolean canY = fromAbove ? !tileSolid(layer, col, row - 1, wrapsLayer) : !tileSolid(layer, col, row + 1, wrapsLayer);
+						boolean canX = fromLeft ? !tileSolid(layer, col - 1, row, wrapsLayer) : !tileSolid(layer, col + 1, row, wrapsLayer);
 						if (!canX && !canY) {
 							continue; // buried in the middle of a solid block
 						}
@@ -1877,6 +1987,24 @@ public class Scene
 			}
 		}
 		return contact;
+	}
+
+	private boolean wrapsTileLayer(Sprite s, TileLayer layer)
+	{
+		return worldWrapXEnabled && s.wrapWorldX && !s.screenFixed
+			&& layer.spansWorldX(worldWrapMinX, worldWrapWidth());
+	}
+
+	private static byte tileFlag(TileLayer layer, int col, int row, boolean wrapX)
+	{
+		int resolvedCol = wrapX ? Math.floorMod(col, layer.cols()) : col;
+		return layer.flag(resolvedCol, row);
+	}
+
+	private static boolean tileSolid(TileLayer layer, int col, int row, boolean wrapX)
+	{
+		int resolvedCol = wrapX ? Math.floorMod(col, layer.cols()) : col;
+		return layer.isSolid(resolvedCol, row);
 	}
 
 	private static final int FLAG_SOLID_MASK = TileLayer.FLAG_SOLID;
@@ -1949,13 +2077,18 @@ public class Scene
 			s.hitCenter(centerA);
 			float cx = centerA[0];
 			float cy = centerA[1];
-			int c0 = Math.max(0, (int) Math.floor((cx - r - layer.x) / tw));
-			int c1 = Math.min(layer.cols() - 1, (int) Math.floor((cx + r - layer.x) / tw));
+			boolean wrapsLayer = wrapsTileLayer(s, layer);
+			int c0 = (int) Math.floor((cx - r - layer.x) / tw);
+			int c1 = (int) Math.floor((cx + r - layer.x) / tw);
+			if (!wrapsLayer) {
+				c0 = Math.max(0, c0);
+				c1 = Math.min(layer.cols() - 1, c1);
+			}
 			int r0 = Math.max(0, (int) Math.floor((cy - r - layer.y) / th));
 			int r1 = Math.min(layer.rows() - 1, (int) Math.floor((cy + r - layer.y) / th));
 			for (int row = r0; row <= r1; row++) {
 				for (int col = c0; col <= c1; col++) {
-					byte flag = layer.flag(col, row);
+					byte flag = tileFlag(layer, col, row, wrapsLayer);
 					if (flag == 0) {
 						continue;
 					}
@@ -1991,8 +2124,8 @@ public class Scene
 					// Drop the part of the normal that points into a solid
 					// neighbor; what remains is the real face, so measure the
 					// overlap against that face instead of the corner
-					boolean cutX = (nx < 0f && layer.isSolid(col - 1, row)) || (nx > 0f && layer.isSolid(col + 1, row));
-					boolean cutY = (ny < 0f && layer.isSolid(col, row - 1)) || (ny > 0f && layer.isSolid(col, row + 1));
+					boolean cutX = (nx < 0f && tileSolid(layer, col - 1, row, wrapsLayer)) || (nx > 0f && tileSolid(layer, col + 1, row, wrapsLayer));
+					boolean cutY = (ny < 0f && tileSolid(layer, col, row - 1, wrapsLayer)) || (ny > 0f && tileSolid(layer, col, row + 1, wrapsLayer));
 					if (cutX && cutY) {
 						continue;
 					}
@@ -2068,13 +2201,18 @@ public class Scene
 			if (tw <= 0f || th <= 0f) {
 				continue;
 			}
-			int c0 = Math.max(0, (int) Math.floor((minX - layer.x) / tw));
-			int c1 = Math.min(layer.cols() - 1, (int) Math.floor((maxX - layer.x) / tw));
+			boolean wrapsLayer = wrapsTileLayer(s, layer);
+			int c0 = (int) Math.floor((minX - layer.x) / tw);
+			int c1 = (int) Math.floor((maxX - layer.x) / tw);
+			if (!wrapsLayer) {
+				c0 = Math.max(0, c0);
+				c1 = Math.min(layer.cols() - 1, c1);
+			}
 			int r0 = Math.max(0, (int) Math.floor((minY - layer.y) / th));
 			int r1 = Math.min(layer.rows() - 1, (int) Math.floor((maxY - layer.y) / th));
 			for (int row = r0; row <= r1; row++) {
 				for (int col = c0; col <= c1; col++) {
-					byte flag = layer.flag(col, row);
+					byte flag = tileFlag(layer, col, row, wrapsLayer);
 					if (flag == 0) {
 						continue;
 					}
@@ -2093,10 +2231,10 @@ public class Scene
 							continue; // one-way: only a fall onto the top face counts
 						}
 					} else if (onX) {
-						if (dx > 0f ? layer.isSolid(col - 1, row) : layer.isSolid(col + 1, row)) {
+						if (dx > 0f ? tileSolid(layer, col - 1, row, wrapsLayer) : tileSolid(layer, col + 1, row, wrapsLayer)) {
 							continue; // an internal seam, not a wall
 						}
-					} else if (dy > 0f ? layer.isSolid(col, row - 1) : layer.isSolid(col, row + 1)) {
+					} else if (dy > 0f ? tileSolid(layer, col, row - 1, wrapsLayer) : tileSolid(layer, col, row + 1, wrapsLayer)) {
 						continue;
 					}
 					earliest = t;
@@ -2129,9 +2267,10 @@ public class Scene
 				if (other == s || group == null || !other.visible || !groups.contains(group)) {
 					continue;
 				}
-				boolean overlap = shapesOverlap(s, other);
+				float otherOffsetX = periodicOffsetX(s, other);
+				boolean overlap = shapesOverlap(s, other, otherOffsetX);
 				if (!overlap && s.swept) {
-					overlap = sweptShapesOverlap(s, other);
+					overlap = sweptShapesOverlap(s, other, otherOffsetX);
 				}
 				if (overlap) {
 					if (s.colliding.add(other)) {
@@ -2189,7 +2328,9 @@ public class Scene
 		List<Sprite> list = snapshot();
 		for (int i = list.size() - 1; i >= 0; i--) {
 			Sprite s = list.get(i);
-			if (s.hitTest(x, y)) {
+			float hitX = (worldWrapXEnabled && s.wrapWorldX && !s.screenFixed)
+				? nearestWorldX(x, s.x) : x;
+			if (s.hitTest(hitX, y)) {
 				return s;
 			}
 		}

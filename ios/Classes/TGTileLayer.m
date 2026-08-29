@@ -193,6 +193,11 @@
 	return [self rows] * [self cellHeight];
 }
 
+- (BOOL)spansWorldXFrom:(float)minX width:(float)width
+{
+	return fabsf(self.x - minX) < 0.001f && fabsf([self width] - width) < 0.001f;
+}
+
 - (int)colAt:(float)worldX
 {
 	float w = [self cellWidth];
@@ -220,6 +225,12 @@
 
 #pragma mark Drawing
 
+- (BOOL)wrapsWorldX:(TGSpriteBatch *)batch
+{
+	return [batch worldWrapXEnabled]
+		&& [self spansWorldXFrom:[batch worldWrapMinX] width:[batch worldWrapWidth]];
+}
+
 - (void)draw:(TGSpriteBatch *)batch
 	viewLeft:(float)viewLeft viewTop:(float)viewTop
    viewRight:(float)viewRight viewBottom:(float)viewBottom
@@ -239,8 +250,13 @@
 	int r = grid.rows;
 	float ox = self.x + [batch parallaxOffsetX:self.scrollFactor];
 	float oy = self.y + [batch parallaxOffsetY:self.scrollFactor];
-	int c0 = MAX(0, (int)floorf((viewLeft - ox) / tw));
-	int c1 = MIN(c - 1, (int)floorf((viewRight - ox) / tw));
+	BOOL wrapsWorld = [self wrapsWorldX:batch];
+	int c0 = (int)floorf((viewLeft - ox) / tw);
+	int c1 = (int)floorf((viewRight - ox) / tw);
+	if (!wrapsWorld) {
+		c0 = MAX(0, c0);
+		c1 = MIN(c - 1, c1);
+	}
 	int r0 = MAX(0, (int)floorf((viewTop - oy) / th));
 	int r1 = MIN(r - 1, (int)floorf((viewBottom - oy) / th));
 	if (c1 < c0 || r1 < r0) {
@@ -261,7 +277,8 @@
 		int base = row * c;
 		float cy = oy + (row + 0.5f) * th;
 		for (int col = c0; col <= c1; col++) {
-			int32_t tile = tiles[base + col];
+			int sourceCol = wrapsWorld ? ((col % c) + c) % c : col;
+			int32_t tile = tiles[base + sourceCol];
 			if (tile < 0 || tile >= frameCount || ![sh frame:tile into:&f]) {
 				continue;
 			}
@@ -287,16 +304,25 @@
 	int r = grid.rows;
 	float ox = self.x + [batch parallaxOffsetX:self.scrollFactor];
 	float oy = self.y + [batch parallaxOffsetY:self.scrollFactor];
-	int c0 = MAX(0, (int)floorf((viewLeft - ox) / tw));
-	int c1 = MIN(c - 1, (int)floorf((viewRight - ox) / tw));
+	BOOL wrapsWorld = [self wrapsWorldX:batch];
+	int c0 = (int)floorf((viewLeft - ox) / tw);
+	int c1 = (int)floorf((viewRight - ox) / tw);
+	if (!wrapsWorld) {
+		c0 = MAX(0, c0);
+		c1 = MIN(c - 1, c1);
+	}
 	int r0 = MAX(0, (int)floorf((viewTop - oy) / th));
 	int r1 = MIN(r - 1, (int)floorf((viewBottom - oy) / th));
+	if (c1 < c0 || r1 < r0) {
+		return;
+	}
 	[batch setScreenSpace:NO];
 	float t = 1.0f;
 	const uint8_t *flags = grid.flags;
 	for (int row = r0; row <= r1; row++) {
 		for (int col = c0; col <= c1; col++) {
-			uint8_t flag = flags[row * c + col];
+			int sourceCol = wrapsWorld ? ((col % c) + c) % c : col;
+			uint8_t flag = flags[row * c + sourceCol];
 			if (flag == 0) {
 				continue;
 			}

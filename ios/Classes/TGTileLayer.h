@@ -71,6 +71,8 @@ enum {
 - (float)cellHeight;
 - (float)width;
 - (float)height;
+/** True when the layer exactly covers a circular world's horizontal interval. */
+- (BOOL)spansWorldXFrom:(float)minX width:(float)width;
 - (int)colAt:(float)worldX;
 - (int)rowAt:(float)worldY;
 

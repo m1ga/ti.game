@@ -15,6 +15,7 @@
 #import "TiGameSpriteProxy.h"
 #import "TiGameTileLayerProxy.h"
 #import <float.h>
+#import <math.h>
 #import "TGValues.h"
 
 @interface TiGameGameViewProxy () <TGSceneTimerListener>
@@ -22,6 +23,7 @@
 
 @implementation TiGameGameViewProxy {
 	NSDictionary *_cameraBoundsDict;
+	NSDictionary *_worldWrapXDict;
 	NSString *_cameraTint;
 	NSMutableDictionary<NSNumber *, KrollCallback *> *_timerCallbacks; // guarded by @synchronized(_timerCallbacks)
 }
@@ -274,6 +276,33 @@ static NSString *const kDebugHudFontKey = @"hudFont";
 - (id)cameraBounds
 {
 	return _cameraBoundsDict;
+}
+
+/** Circular logical x interval; nil or an invalid interval disables it. */
+- (void)setWorldWrapX:(id)value
+{
+	if (![value isKindOfClass:[NSDictionary class]]) {
+		_worldWrapXDict = nil;
+		self.scene.worldWrapXEnabled = NO;
+		return;
+	}
+	NSDictionary *bounds = value;
+	float minX = [TiUtils floatValue:bounds[@"minX"] def:0.0f];
+	float maxX = [TiUtils floatValue:bounds[@"maxX"] def:minX];
+	if (!(maxX > minX) || !isfinite(minX) || !isfinite(maxX)) {
+		_worldWrapXDict = nil;
+		self.scene.worldWrapXEnabled = NO;
+		return;
+	}
+	_worldWrapXDict = bounds;
+	self.scene.worldWrapMinX = minX;
+	self.scene.worldWrapMaxX = maxX;
+	self.scene.worldWrapXEnabled = YES;
+}
+
+- (id)worldWrapX
+{
+	return _worldWrapXDict;
 }
 
 /** Rendered surface size in pixels — the scene coordinate space. */
