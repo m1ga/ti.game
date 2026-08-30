@@ -38,7 +38,8 @@ module.exports = function () {
 	var win = Ti.UI.createWindow({
 		backgroundColor: '#000',
 		extendSafeArea: false,   // keep content clear of the notch and home bar
-		theme: 'Theme.Titanium.DayNight.NoTitleBar'
+		title: 'Pool',
+		theme: 'Theme.Titanium.DayNight'
 	});
 	var gameView = Game.createGameView({
 		backgroundColor: '#071a12',
@@ -463,28 +464,42 @@ module.exports = function () {
 	}
 
 	win.add(gameView);
-	// Back — return to the launcher
-	var backButton = Ti.UI.createLabel({
-		text: '‹  EXAMPLES',
-		top: Ti.Platform.osname === 'android' ? 10 : 40,
-		left: 12,
-		width: 96,
-		height: 38,
-		color: '#e5eee9',
-		backgroundColor: '#172a21',
-		borderColor: '#456555',
-		borderWidth: 1,
-		borderRadius: 19,
-		font: { fontSize: 12, fontWeight: 'bold' },
-		textAlign: 'center',
-		zIndex: 100
-	});
-	backButton.addEventListener('touchstart', function () { backButton.backgroundColor = '#274538'; });
-	backButton.addEventListener('touchend', function () { backButton.backgroundColor = '#172a21'; });
-	backButton.addEventListener('touchcancel', function () { backButton.backgroundColor = '#172a21'; });
-	backButton.addEventListener('click', function () {
-		win.close();
-	});
+	// Back — return to the launcher. Android uses the action bar's Up arrow;
+	// iOS keeps an overlay button because there is no navigation bar.
+	if (Ti.Platform.osname === 'android') {
+		win.addEventListener('open', function () {
+			var actionBar = win.activity.actionBar;
+			if (actionBar) {
+				actionBar.displayHomeAsUp = true;
+				actionBar.onHomeIconItemSelected = function () {
+					win.close();
+				};
+			}
+		});
+	} else {
+		var backButton = Ti.UI.createLabel({
+			text: '‹  EXAMPLES',
+			top: 40,
+			left: 12,
+			width: 96,
+			height: 38,
+			color: '#e5eee9',
+			backgroundColor: '#172a21',
+			borderColor: '#456555',
+			borderWidth: 1,
+			borderRadius: 19,
+			font: { fontSize: 12, fontWeight: 'bold' },
+			textAlign: 'center',
+			zIndex: 100
+		});
+		backButton.addEventListener('touchstart', function () { backButton.backgroundColor = '#274538'; });
+		backButton.addEventListener('touchend', function () { backButton.backgroundColor = '#172a21'; });
+		backButton.addEventListener('touchcancel', function () { backButton.backgroundColor = '#172a21'; });
+		backButton.addEventListener('click', function () {
+			win.close();
+		});
+		win.add(backButton);
+	}
 	var resetButton = Ti.UI.createLabel({
 		text: 'RESET',
 		top: Ti.Platform.osname === 'android' ? 10 : 40,
@@ -506,7 +521,6 @@ module.exports = function () {
 	resetButton.addEventListener('click', function () {
 		resetTable();
 	});
-	win.add(backButton);
 	win.add(resetButton);
 	win.addEventListener('close', function () {
 		strikeSound.stop();

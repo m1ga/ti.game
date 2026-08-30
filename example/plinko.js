@@ -35,7 +35,8 @@ module.exports = function () {
 	var win = Ti.UI.createWindow({
 		backgroundColor: '#000',
 		extendSafeArea: false,   // keep content clear of the notch and home bar
-		theme: 'Theme.Titanium.DayNight.NoTitleBar'
+		title: 'Plinko',
+		theme: 'Theme.Titanium.DayNight'
 	});
 	var gameView = Game.createGameView({
 		backgroundColor: '#160f2d',
@@ -387,28 +388,41 @@ module.exports = function () {
 	}
 
 	win.add(gameView);
-	// Back — return to the launcher
-	var backButton = Ti.UI.createLabel({
-		text: '‹  EXAMPLES',
-		top: Ti.Platform.osname === 'android' ? 10 : 40,
-		left: 12,
-		width: 96,
-		height: 38,
-		color: '#e8dcff',
-		backgroundColor: '#24183b',
-		borderColor: '#594477',
-		borderWidth: 1,
-		borderRadius: 19,
-		font: { fontSize: 12, fontWeight: 'bold' },
-		textAlign: 'center',
-		zIndex: 100
-	});
-	backButton.addEventListener('touchstart', function () { backButton.backgroundColor = '#3a2758'; });
-	backButton.addEventListener('touchend', function () { backButton.backgroundColor = '#24183b'; });
-	backButton.addEventListener('touchcancel', function () { backButton.backgroundColor = '#24183b'; });
-	backButton.addEventListener('click', function () {
-		win.close();
-	});
-	win.add(backButton);
+	// Back — return to the launcher. Android uses the action bar's Up arrow;
+	// iOS keeps an overlay button because there is no navigation bar.
+	if (Ti.Platform.osname === 'android') {
+		win.addEventListener('open', function () {
+			var actionBar = win.activity.actionBar;
+			if (actionBar) {
+				actionBar.displayHomeAsUp = true;
+				actionBar.onHomeIconItemSelected = function () {
+					win.close();
+				};
+			}
+		});
+	} else {
+		var backButton = Ti.UI.createLabel({
+			text: '‹  EXAMPLES',
+			top: 40,
+			left: 12,
+			width: 96,
+			height: 38,
+			color: '#e8dcff',
+			backgroundColor: '#24183b',
+			borderColor: '#594477',
+			borderWidth: 1,
+			borderRadius: 19,
+			font: { fontSize: 12, fontWeight: 'bold' },
+			textAlign: 'center',
+			zIndex: 100
+		});
+		backButton.addEventListener('touchstart', function () { backButton.backgroundColor = '#3a2758'; });
+		backButton.addEventListener('touchend', function () { backButton.backgroundColor = '#24183b'; });
+		backButton.addEventListener('touchcancel', function () { backButton.backgroundColor = '#24183b'; });
+		backButton.addEventListener('click', function () {
+			win.close();
+		});
+		win.add(backButton);
+	}
 	win.open();
 };
