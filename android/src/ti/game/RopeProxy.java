@@ -53,40 +53,40 @@ public class RopeProxy extends KrollProxy
 			setTail((SpriteProxy) options.get("tail"));
 		}
 		if (options.containsKey("frame")) {
-			rope.frame = TiConvert.toInt(options.get("frame"));
+			rope.frame = TiConvert.toInt(options.get("frame"), rope.frame);
 		}
 		if (options.containsKey("segments")) {
-			rope.segments = TiConvert.toInt(options.get("segments"));
+			rope.segments = TiConvert.toInt(options.get("segments"), rope.segments);
 		}
 		if (options.containsKey("segmentLength")) {
-			rope.segmentLength = TiConvert.toFloat(options.get("segmentLength"));
+			rope.segmentLength = TiConvert.toFloat(options.get("segmentLength"), rope.segmentLength);
 		}
 		if (options.containsKey("maxLength")) {
-			rope.maxLength = TiConvert.toFloat(options.get("maxLength"));
+			rope.maxLength = TiConvert.toFloat(options.get("maxLength"), rope.maxLength);
 		}
 		if (options.containsKey("thickness")) {
-			rope.thickness = TiConvert.toFloat(options.get("thickness"));
+			rope.thickness = TiConvert.toFloat(options.get("thickness"), rope.thickness);
 		}
 		if (options.containsKey("gravity")) {
-			rope.gravity = TiConvert.toFloat(options.get("gravity"));
+			rope.gravity = TiConvert.toFloat(options.get("gravity"), rope.gravity);
 		}
 		if (options.containsKey("damping")) {
 			rope.damping = Values.ratio(options.get("damping"), rope.damping);
 		}
 		if (options.containsKey("iterations")) {
-			rope.iterations = TiConvert.toInt(options.get("iterations"));
+			rope.iterations = TiConvert.toInt(options.get("iterations"), rope.iterations);
 		}
 		if (options.containsKey("zIndex")) {
-			rope.zIndex = TiConvert.toInt(options.get("zIndex"));
+			rope.zIndex = TiConvert.toInt(options.get("zIndex"), rope.zIndex);
 		}
 		if (options.containsKey("visible")) {
 			rope.visible = TiConvert.toBoolean(options.get("visible"), true);
 		}
 		if (options.containsKey("x")) {
-			rope.x = TiConvert.toFloat(options.get("x"));
+			rope.x = TiConvert.toFloat(options.get("x"), rope.x);
 		}
 		if (options.containsKey("y")) {
-			rope.y = TiConvert.toFloat(options.get("y"));
+			rope.y = TiConvert.toFloat(options.get("y"), rope.y);
 		}
 	}
 

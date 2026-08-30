@@ -52,43 +52,43 @@ public class EmitterProxy extends KrollProxy
 			setTarget((SpriteProxy) options.get("target"));
 		}
 		if (options.containsKey("frame")) {
-			emitter.frame = TiConvert.toInt(options.get("frame"));
+			emitter.frame = TiConvert.toInt(options.get("frame"), emitter.frame);
 		}
 		if (options.containsKey("x")) {
-			emitter.x = TiConvert.toFloat(options.get("x"));
+			emitter.x = TiConvert.toFloat(options.get("x"), emitter.x);
 		}
 		if (options.containsKey("y")) {
-			emitter.y = TiConvert.toFloat(options.get("y"));
+			emitter.y = TiConvert.toFloat(options.get("y"), emitter.y);
 		}
 		if (options.containsKey("offsetX")) {
-			emitter.offsetX = TiConvert.toFloat(options.get("offsetX"));
+			emitter.offsetX = TiConvert.toFloat(options.get("offsetX"), emitter.offsetX);
 		}
 		if (options.containsKey("offsetY")) {
-			emitter.offsetY = TiConvert.toFloat(options.get("offsetY"));
+			emitter.offsetY = TiConvert.toFloat(options.get("offsetY"), emitter.offsetY);
 		}
 		if (options.containsKey("zIndex")) {
-			emitter.zIndex = TiConvert.toInt(options.get("zIndex"));
+			emitter.zIndex = TiConvert.toInt(options.get("zIndex"), emitter.zIndex);
 		}
 		if (options.containsKey("rate")) {
-			emitter.rate = TiConvert.toFloat(options.get("rate"));
+			emitter.rate = TiConvert.toFloat(options.get("rate"), emitter.rate);
 		}
 		if (options.containsKey("lifetime")) {
-			emitter.lifetime = TiConvert.toFloat(options.get("lifetime")) / 1000f;
+			emitter.lifetime = TiConvert.toFloat(options.get("lifetime"), emitter.lifetime * 1000f) / 1000f;
 		}
 		if (options.containsKey("speed")) {
-			emitter.speed = TiConvert.toFloat(options.get("speed"));
+			emitter.speed = TiConvert.toFloat(options.get("speed"), emitter.speed);
 		}
 		if (options.containsKey("angle")) {
-			emitter.angle = TiConvert.toFloat(options.get("angle"));
+			emitter.angle = TiConvert.toFloat(options.get("angle"), emitter.angle);
 		}
 		if (options.containsKey("spread")) {
-			emitter.spread = TiConvert.toFloat(options.get("spread"));
+			emitter.spread = TiConvert.toFloat(options.get("spread"), emitter.spread);
 		}
 		if (options.containsKey("gravity")) {
-			emitter.gravity = TiConvert.toFloat(options.get("gravity"));
+			emitter.gravity = TiConvert.toFloat(options.get("gravity"), emitter.gravity);
 		}
 		if (options.containsKey("size")) {
-			emitter.size = TiConvert.toFloat(options.get("size"));
+			emitter.size = TiConvert.toFloat(options.get("size"), emitter.size);
 		}
 		if (options.containsKey("startScale")) {
 			emitter.startScale = Values.ratio(options.get("startScale"), emitter.startScale);
@@ -112,7 +112,7 @@ public class EmitterProxy extends KrollProxy
 			emitter.emitting = TiConvert.toBoolean(options.get("emitting"), true);
 		}
 		if (options.containsKey("maxParticles")) {
-			emitter.setMaxParticles(TiConvert.toInt(options.get("maxParticles")));
+			emitter.setMaxParticles(TiConvert.toInt(options.get("maxParticles"), emitter.getMaxParticles()));
 		}
 	}
 

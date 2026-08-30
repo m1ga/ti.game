@@ -102,7 +102,7 @@ public class GameViewProxy extends TiViewProxy
 			setTimeScale(options.get("timeScale"));
 		}
 		if (options.containsKey("maxFps")) {
-			setMaxFps(TiConvert.toInt(options.get("maxFps")));
+			setMaxFps(TiConvert.toInt(options.get("maxFps"), maxFps));
 		}
 		if (options.containsKey("gamepadDeadzone")) {
 			setGamepadDeadzone(options.get("gamepadDeadzone"));
@@ -493,7 +493,7 @@ public class GameViewProxy extends TiViewProxy
 				scene.followSmoothing = Values.ratio(options.get("smoothing"), scene.followSmoothing);
 			}
 			if (options.containsKey("maxY")) {
-				scene.cameraMaxY = TiConvert.toFloat(options.get("maxY"));
+				scene.cameraMaxY = TiConvert.toFloat(options.get("maxY"), scene.cameraMaxY);
 			}
 		}
 		scene.followTarget = spriteProxy.getSprite();
@@ -511,10 +511,10 @@ public class GameViewProxy extends TiViewProxy
 		float duration = 400f;
 		if (options != null) {
 			if (options.containsKey("strength")) {
-				strength = TiConvert.toFloat(options.get("strength"));
+				strength = TiConvert.toFloat(options.get("strength"), strength);
 			}
 			if (options.containsKey("duration")) {
-				duration = TiConvert.toFloat(options.get("duration"));
+				duration = TiConvert.toFloat(options.get("duration"), duration);
 			}
 		}
 		scene.shake(strength, duration / 1000f);

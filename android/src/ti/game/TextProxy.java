@@ -47,10 +47,12 @@ public class TextProxy extends SpriteProxy
 			setAlign(TiConvert.toString(options.get("align")));
 		}
 		if (options.containsKey("letterSpacing")) {
-			textSprite.setLetterSpacing(TiConvert.toFloat(options.get("letterSpacing")));
+			textSprite.setLetterSpacing(
+				TiConvert.toFloat(options.get("letterSpacing"), textSprite.letterSpacing()));
 		}
 		if (options.containsKey("lineSpacing")) {
-			textSprite.setLineSpacing(TiConvert.toFloat(options.get("lineSpacing")));
+			textSprite.setLineSpacing(
+				TiConvert.toFloat(options.get("lineSpacing"), textSprite.lineSpacing()));
 		}
 		if (options.containsKey("maxWidth")) {
 			textSprite.setMaxWidth(TiConvert.toFloat(options.get("maxWidth"), 0f));
