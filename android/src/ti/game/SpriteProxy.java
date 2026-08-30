@@ -87,16 +87,16 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			}
 		}
 		if (options.containsKey("x")) {
-			sprite.x = TiConvert.toFloat(options.get("x"));
+			sprite.x = TiConvert.toFloat(options.get("x"), sprite.x);
 		}
 		if (options.containsKey("y")) {
-			sprite.y = TiConvert.toFloat(options.get("y"));
+			sprite.y = TiConvert.toFloat(options.get("y"), sprite.y);
 		}
 		if (options.containsKey("width")) {
-			sprite.width = TiConvert.toFloat(options.get("width"));
+			sprite.width = TiConvert.toFloat(options.get("width"), sprite.width);
 		}
 		if (options.containsKey("height")) {
-			sprite.height = TiConvert.toFloat(options.get("height"));
+			sprite.height = TiConvert.toFloat(options.get("height"), sprite.height);
 		}
 		if (options.containsKey("scale")) {
 			float s = Values.ratio(options.get("scale"), sprite.scaleX);
@@ -110,7 +110,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.scaleY = Values.ratio(options.get("scaleY"), sprite.scaleY);
 		}
 		if (options.containsKey("rotation")) {
-			sprite.rotation = TiConvert.toFloat(options.get("rotation"));
+			sprite.rotation = TiConvert.toFloat(options.get("rotation"), sprite.rotation);
 		}
 		if (options.containsKey("anchorX")) {
 			sprite.anchorX = Values.anchorX(options.get("anchorX"), sprite.anchorX);
@@ -141,7 +141,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			setGlowColor(TiConvert.toString(options.get("glowColor")));
 		}
 		if (options.containsKey("glowBlur")) {
-			sprite.glowBlur = TiConvert.toFloat(options.get("glowBlur"));
+			sprite.glowBlur = TiConvert.toFloat(options.get("glowBlur"), sprite.glowBlur);
 		}
 		if (options.containsKey("glowOpacity")) {
 			sprite.glowOpacity = Values.ratio(options.get("glowOpacity"), sprite.glowOpacity);
@@ -159,10 +159,10 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.scrollFactor = Values.ratio(options.get("scrollFactor"), sprite.scrollFactor);
 		}
 		if (options.containsKey("zIndex")) {
-			sprite.zIndex = TiConvert.toInt(options.get("zIndex"));
+			sprite.zIndex = TiConvert.toInt(options.get("zIndex"), sprite.zIndex);
 		}
 		if (options.containsKey("frame")) {
-			sprite.frame = TiConvert.toInt(options.get("frame"));
+			sprite.frame = TiConvert.toInt(options.get("frame"), sprite.frame);
 		}
 		if (options.containsKey("draggable")) {
 			sprite.draggable = TiConvert.toBoolean(options.get("draggable"), false);
@@ -189,22 +189,22 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			parseAnimations(options.get("animations"));
 		}
 		if (options.containsKey("velocityX")) {
-			sprite.velocityX = TiConvert.toFloat(options.get("velocityX"));
+			sprite.velocityX = TiConvert.toFloat(options.get("velocityX"), sprite.velocityX);
 		}
 		if (options.containsKey("velocityY")) {
-			sprite.velocityY = TiConvert.toFloat(options.get("velocityY"));
+			sprite.velocityY = TiConvert.toFloat(options.get("velocityY"), sprite.velocityY);
 		}
 		if (options.containsKey("gravity")) {
-			sprite.gravity = TiConvert.toFloat(options.get("gravity"));
+			sprite.gravity = TiConvert.toFloat(options.get("gravity"), sprite.gravity);
 		}
 		if (options.containsKey("gravityX")) {
-			sprite.gravityX = TiConvert.toFloat(options.get("gravityX"));
+			sprite.gravityX = TiConvert.toFloat(options.get("gravityX"), sprite.gravityX);
 		}
 		if (options.containsKey("wrapX")) {
-			sprite.wrapX = TiConvert.toFloat(options.get("wrapX"));
+			sprite.wrapX = TiConvert.toFloat(options.get("wrapX"), sprite.wrapX);
 		}
 		if (options.containsKey("wrapShift")) {
-			sprite.wrapShift = TiConvert.toFloat(options.get("wrapShift"));
+			sprite.wrapShift = TiConvert.toFloat(options.get("wrapShift"), sprite.wrapShift);
 		}
 		if (options.containsKey("hitboxScale")) {
 			sprite.hitboxScale = Values.ratio(options.get("hitboxScale"), sprite.hitboxScale);
@@ -240,7 +240,8 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.solidMode = solidModeFromString(TiConvert.toString(options.get("solidMode")));
 		}
 		if (options.containsKey("linearDamping")) {
-			sprite.linearDamping = Math.max(0f, TiConvert.toFloat(options.get("linearDamping")));
+			sprite.linearDamping = Math.max(0f,
+				TiConvert.toFloat(options.get("linearDamping"), sprite.linearDamping));
 		}
 		if (options.containsKey("carryRiders")) {
 			sprite.carryRiders = TiConvert.toBoolean(options.get("carryRiders"), true);
@@ -249,7 +250,8 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.restitution = Values.ratio(options.get("restitution"), sprite.restitution);
 		}
 		if (options.containsKey("wallSlideSpeed")) {
-			sprite.wallSlideSpeed = Math.max(0f, TiConvert.toFloat(options.get("wallSlideSpeed")));
+			sprite.wallSlideSpeed = Math.max(0f,
+				TiConvert.toFloat(options.get("wallSlideSpeed"), sprite.wallSlideSpeed));
 		}
 		if (options.containsKey("impactThreshold")) {
 			sprite.impactThreshold = Math.max(0f,
@@ -259,28 +261,29 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.carMode = TiConvert.toBoolean(options.get("carMode"), false);
 		}
 		if (options.containsKey("enginePower")) {
-			sprite.enginePower = TiConvert.toFloat(options.get("enginePower"));
+			sprite.enginePower = TiConvert.toFloat(options.get("enginePower"), sprite.enginePower);
 		}
 		if (options.containsKey("maxSpeed")) {
-			sprite.maxSpeed = TiConvert.toFloat(options.get("maxSpeed"));
+			sprite.maxSpeed = TiConvert.toFloat(options.get("maxSpeed"), sprite.maxSpeed);
 		}
 		if (options.containsKey("turnRate")) {
-			sprite.turnRate = TiConvert.toFloat(options.get("turnRate"));
+			sprite.turnRate = TiConvert.toFloat(options.get("turnRate"), sprite.turnRate);
 		}
 		if (options.containsKey("grip")) {
-			sprite.grip = TiConvert.toFloat(options.get("grip"));
+			sprite.grip = TiConvert.toFloat(options.get("grip"), sprite.grip);
 		}
 		if (options.containsKey("drag")) {
-			sprite.drag = TiConvert.toFloat(options.get("drag"));
+			sprite.drag = TiConvert.toFloat(options.get("drag"), sprite.drag);
 		}
 		if (options.containsKey("ySort")) {
 			sprite.ySort = TiConvert.toBoolean(options.get("ySort"), false);
 		}
 		if (options.containsKey("angularVelocity")) {
-			sprite.angularVelocity = TiConvert.toFloat(options.get("angularVelocity"));
+			sprite.angularVelocity =
+				TiConvert.toFloat(options.get("angularVelocity"), sprite.angularVelocity);
 		}
 		if (options.containsKey("thrust")) {
-			sprite.thrust = TiConvert.toFloat(options.get("thrust"));
+			sprite.thrust = TiConvert.toFloat(options.get("thrust"), sprite.thrust);
 		}
 		if (options.containsKey("wrapAround")) {
 			sprite.wrapAround = TiConvert.toBoolean(options.get("wrapAround"), false);
@@ -292,19 +295,19 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.idleAnimation = TiConvert.toBoolean(options.get("idleAnimation"), false);
 		}
 		if (options.containsKey("idleRotation")) {
-			sprite.idleRotation = TiConvert.toFloat(options.get("idleRotation"));
+			sprite.idleRotation = TiConvert.toFloat(options.get("idleRotation"), sprite.idleRotation);
 		}
 		if (options.containsKey("idleMovement")) {
-			sprite.idleMovement = TiConvert.toFloat(options.get("idleMovement"));
+			sprite.idleMovement = TiConvert.toFloat(options.get("idleMovement"), sprite.idleMovement);
 		}
 		if (options.containsKey("idleSpeed")) {
-			sprite.idleSpeed = TiConvert.toFloat(options.get("idleSpeed"));
+			sprite.idleSpeed = TiConvert.toFloat(options.get("idleSpeed"), sprite.idleSpeed);
 		}
 		if (options.containsKey("skidMarks")) {
 			sprite.skidMarks = TiConvert.toBoolean(options.get("skidMarks"), false);
 		}
 		if (options.containsKey("skidThreshold")) {
-			sprite.skidThreshold = TiConvert.toFloat(options.get("skidThreshold"));
+			sprite.skidThreshold = TiConvert.toFloat(options.get("skidThreshold"), sprite.skidThreshold);
 		}
 	}
 
@@ -1494,10 +1497,10 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		Tween tween = new Tween();
 		if (options.containsKey("x")) {
-			tween.toX = TiConvert.toFloat(options.get("x"));
+			tween.toX = TiConvert.toFloat(options.get("x"), sprite.x);
 		}
 		if (options.containsKey("y")) {
-			tween.toY = TiConvert.toFloat(options.get("y"));
+			tween.toY = TiConvert.toFloat(options.get("y"), sprite.y);
 		}
 		if (options.containsKey("scale")) {
 			float s = Values.ratio(options.get("scale"), sprite.scaleX);
@@ -1505,31 +1508,31 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			tween.toScaleY = s;
 		}
 		if (options.containsKey("scaleX")) {
-			tween.toScaleX = TiConvert.toFloat(options.get("scaleX"));
+			tween.toScaleX = TiConvert.toFloat(options.get("scaleX"), sprite.scaleX);
 		}
 		if (options.containsKey("scaleY")) {
-			tween.toScaleY = TiConvert.toFloat(options.get("scaleY"));
+			tween.toScaleY = TiConvert.toFloat(options.get("scaleY"), sprite.scaleY);
 		}
 		if (options.containsKey("rotation")) {
-			tween.toRotation = TiConvert.toFloat(options.get("rotation"));
+			tween.toRotation = TiConvert.toFloat(options.get("rotation"), sprite.rotation);
 		}
 		if (options.containsKey("opacity")) {
-			tween.toOpacity = TiConvert.toFloat(options.get("opacity"));
+			tween.toOpacity = TiConvert.toFloat(options.get("opacity"), sprite.opacity);
 		}
 		if (options.containsKey("glowOpacity")) {
-			tween.toGlowOpacity = TiConvert.toFloat(options.get("glowOpacity"));
+			tween.toGlowOpacity = TiConvert.toFloat(options.get("glowOpacity"), sprite.glowOpacity);
 		}
 		if (options.containsKey("duration")) {
-			tween.duration = TiConvert.toFloat(options.get("duration")) / 1000f;
+			tween.duration = TiConvert.toFloat(options.get("duration"), 300f) / 1000f;
 		}
 		if (options.containsKey("delay")) {
-			tween.delay = TiConvert.toFloat(options.get("delay")) / 1000f;
+			tween.delay = TiConvert.toFloat(options.get("delay"), 0f) / 1000f;
 		}
 		if (options.containsKey("easing")) {
 			tween.easing = TiConvert.toString(options.get("easing"));
 		}
 		if (options.containsKey("frame")) {
-			tween.endFrame = TiConvert.toInt(options.get("frame"));
+			tween.endFrame = TiConvert.toInt(options.get("frame"), sprite.frame);
 		}
 		sprite.addTween(tween);
 	}
