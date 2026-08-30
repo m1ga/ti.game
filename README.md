@@ -874,7 +874,9 @@ HUD costs nothing. `particles.js` and `camera.js` have it switched on.
 ## Learn from the examples
 
 `example/app.js` is a launcher; each demo is a self-contained file showing
-a feature set — find the one closest to your game and start there:
+a feature set — find the one closest to your game and start there. The only
+shared piece is `example/backnav.js`, the "back to the launcher" control
+(action bar Up arrow on Android, an overlay button on iOS):
 
 | Demo | Shows |
 |---|---|

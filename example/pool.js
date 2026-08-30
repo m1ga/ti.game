@@ -464,42 +464,8 @@ module.exports = function () {
 	}
 
 	win.add(gameView);
-	// Back — return to the launcher. Android uses the action bar's Up arrow;
-	// iOS keeps an overlay button because there is no navigation bar.
-	if (Ti.Platform.osname === 'android') {
-		win.addEventListener('open', function () {
-			var actionBar = win.activity.actionBar;
-			if (actionBar) {
-				actionBar.displayHomeAsUp = true;
-				actionBar.onHomeIconItemSelected = function () {
-					win.close();
-				};
-			}
-		});
-	} else {
-		var backButton = Ti.UI.createLabel({
-			text: '‹  EXAMPLES',
-			top: 40,
-			left: 12,
-			width: 96,
-			height: 38,
-			color: '#e5eee9',
-			backgroundColor: '#172a21',
-			borderColor: '#456555',
-			borderWidth: 1,
-			borderRadius: 19,
-			font: { fontSize: 12, fontWeight: 'bold' },
-			textAlign: 'center',
-			zIndex: 100
-		});
-		backButton.addEventListener('touchstart', function () { backButton.backgroundColor = '#274538'; });
-		backButton.addEventListener('touchend', function () { backButton.backgroundColor = '#172a21'; });
-		backButton.addEventListener('touchcancel', function () { backButton.backgroundColor = '#172a21'; });
-		backButton.addEventListener('click', function () {
-			win.close();
-		});
-		win.add(backButton);
-	}
+	// Back — action bar Up on Android, overlay pill on iOS (see backnav.js)
+	require('/backnav')(win, { text: '#e5eee9', background: '#172a21', border: '#456555', pressed: '#274538' });
 	var resetButton = Ti.UI.createLabel({
 		text: 'RESET',
 		top: Ti.Platform.osname === 'android' ? 10 : 40,
