@@ -10,6 +10,26 @@
 #import <stdatomic.h>
 
 static _Atomic int TGIdleSequence = 0;
+static const NSTimeInterval TGImpactRearmDelay = 0.1;
+static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
+
+@interface TGImpactGate : NSObject {
+@public
+	BOOL armed;
+	NSTimeInterval lastSeenPhysicsTime;
+}
+@end
+
+@implementation TGImpactGate
+- (instancetype)init
+{
+	if (self = [super init]) {
+		armed = YES;
+		lastSeenPhysicsTime = -DBL_MAX;
+	}
+	return self;
+}
+@end
 
 @implementation TGSprite {
 	// Idle wobble state (render thread only)
@@ -39,6 +59,11 @@ static _Atomic int TGIdleSequence = 0;
 
 	// Active tweens, guarded by @synchronized(_tweens)
 	NSMutableArray<TGTween *> *_tweens;
+
+	// Physical-impact gates (render thread only; allocated on first contact).
+	NSMapTable<TGSprite *, TGImpactGate *> *_impactGates;
+	NSUInteger _impactPruneThreshold;
+	atomic_bool _impactGatesStale;
 }
 
 - (instancetype)init
@@ -62,6 +87,8 @@ static _Atomic int TGIdleSequence = 0;
 		_glowB = 1.0f;
 		_visible = YES;
 		_touchEnabled = YES;
+		_impactThreshold = 40.0f;
+		_impactPruneThreshold = 16;
 		_carryRiders = YES;
 		_hitboxScale = 1.0f;
 		_hitboxScaleX = 1.0f;
@@ -81,8 +108,99 @@ static _Atomic int TGIdleSequence = 0;
 		_animationQueue = [NSMutableArray array];
 		_tweens = [NSMutableArray array];
 		atomic_init(&_animationActive, false);
+		atomic_init(&_impactGatesStale, false);
 	}
 	return self;
+}
+
+- (void)updateSolidImpactListening:(BOOL)listening
+{
+	self.solidImpactListening = listening;
+	if (!listening) {
+		[self markImpactGatesStale];
+	}
+}
+
+- (void)markImpactGatesStale
+{
+	atomic_store(&_impactGatesStale, true);
+}
+
+- (void)consumeImpactGatesStaleForScene:(TGScene *)scene
+{
+	if (!atomic_load(&_impactGatesStale) || self.scene != scene) {
+		return;
+	}
+	@synchronized (self) {
+		if (self.scene != scene || !atomic_exchange(&_impactGatesStale, false)) {
+			return;
+		}
+		[_impactGates removeAllObjects];
+		_impactGates = nil;
+		_impactPruneThreshold = 16;
+	}
+}
+
+- (BOOL)shouldEmitSolidImpactWith:(TGSprite *)other
+						 speed:(float)speed
+				   physicsTime:(NSTimeInterval)physicsTime
+						 scene:(TGScene *)scene
+{
+	if (self.scene != scene || !self.solidImpactListening) {
+		return NO;
+	}
+	@synchronized (self) {
+		if (self.scene != scene || !self.solidImpactListening) {
+			return NO;
+		}
+		if (atomic_exchange(&_impactGatesStale, false)) {
+			[_impactGates removeAllObjects];
+			_impactGates = nil;
+			_impactPruneThreshold = 16;
+		}
+		if (_impactGates == nil) {
+			_impactGates = [NSMapTable
+				mapTableWithKeyOptions:NSPointerFunctionsWeakMemory | NSPointerFunctionsObjectPointerPersonality
+				valueOptions:NSPointerFunctionsStrongMemory];
+		}
+		TGImpactGate *gate = [_impactGates objectForKey:other];
+		if (gate == nil) {
+			gate = [[TGImpactGate alloc] init];
+			[_impactGates setObject:gate forKey:other];
+		}
+		if (!gate->armed
+				&& physicsTime - gate->lastSeenPhysicsTime
+					> TGImpactRearmDelay + TGImpactTimeEpsilon) {
+			gate->armed = YES;
+		}
+		gate->lastSeenPhysicsTime = physicsTime;
+
+		float threshold = MAX(0.0f, self.impactThreshold);
+		BOOL emit = speed > 0.0f && speed >= threshold && gate->armed;
+		if (emit) {
+			gate->armed = NO;
+		}
+
+		if (_impactGates.count > _impactPruneThreshold) {
+			NSMutableArray<TGSprite *> *stale = nil;
+			for (TGSprite *key in _impactGates.keyEnumerator) {
+				TGImpactGate *candidate = [_impactGates objectForKey:key];
+				BOOL separated = physicsTime - candidate->lastSeenPhysicsTime
+					> TGImpactRearmDelay + TGImpactTimeEpsilon;
+				if (key.scene != scene || separated) {
+					if (stale == nil) {
+						stale = [NSMutableArray array];
+					}
+					[stale addObject:key];
+				}
+			}
+			for (TGSprite *key in stale) {
+				[_impactGates removeObjectForKey:key];
+			}
+			_impactPruneThreshold = MAX(16, _impactGates.count + 16);
+		}
+		return emit;
+	}
 }
 
 - (float)drawWidth
@@ -183,6 +301,8 @@ static _Atomic int TGIdleSequence = 0;
 {
 	float startX = self.x;
 	float startY = self.y;
+	float startVelocityX = self.velocityX;
+	float startVelocityY = self.velocityY;
 	if (self.carMode) {
 		[self updateCar:dt];
 	}
@@ -226,6 +346,8 @@ static _Atomic int TGIdleSequence = 0;
 		self.velocityX = dvx;
 		self.velocityY = dvy;
 	}
+	self.frameAccelX = self.velocityX - startVelocityX;
+	self.frameAccelY = self.velocityY - startVelocityY;
 	float velocityX = self.velocityX;
 	if (velocityX != 0.0f) {
 		self.x += velocityX * dt;

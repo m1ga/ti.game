@@ -33,8 +33,9 @@ import ti.game.engine.Tween;
  *   });
  *   hero.play('walk');
  *
- * Events fired natively: tap, dragstart, drag, dragend, pinch, rotate,
- * animationcomplete, complete (tween finished).
+ * Events fired natively: press, tap, release, dragstart, drag, dragend,
+ * pinch, rotate, animationcomplete, complete (tween finished), collision,
+ * collisionend, land, solidimpact.
  */
 @Kroll.proxy(creatableInModule = TiGameModule.class)
 public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListener
@@ -63,6 +64,15 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public Sprite getSprite()
 	{
 		return sprite;
+	}
+
+	@Override
+	public void onHasListenersChanged(String event, boolean hasListeners)
+	{
+		super.onHasListenersChanged(event, hasListeners);
+		if ("solidimpact".equals(event)) {
+			sprite.setSolidImpactListening(hasListeners);
+		}
 	}
 
 	@Override
@@ -240,6 +250,10 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("wallSlideSpeed")) {
 			sprite.wallSlideSpeed = Math.max(0f, TiConvert.toFloat(options.get("wallSlideSpeed")));
+		}
+		if (options.containsKey("impactThreshold")) {
+			sprite.impactThreshold = Math.max(0f,
+				TiConvert.toFloat(options.get("impactThreshold"), 40f));
 		}
 		if (options.containsKey("carMode")) {
 			sprite.carMode = TiConvert.toBoolean(options.get("carMode"), false);
@@ -1360,6 +1374,19 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		sprite.wallSlideSpeed = Math.max(0f, value);
 	}
 
+	/** Minimum compensated normal speed (px/s) for solidimpact. */
+	@Kroll.getProperty
+	public float getImpactThreshold()
+	{
+		return sprite.impactThreshold;
+	}
+
+	@Kroll.setProperty
+	public void setImpactThreshold(Object value)
+	{
+		sprite.impactThreshold = Math.max(0f, TiConvert.toFloat(value, 40f));
+	}
+
 	// --- Idle animation ---------------------------------------------------
 
 	@Kroll.getProperty
@@ -1724,6 +1751,26 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 				data.put("group", solid.collisionGroup);
 			}
 			fireEvent("wallhit", data);
+		}
+	}
+
+	@Override
+	public void onSolidImpact(Sprite s, Sprite other, float contactX, float contactY,
+			float normalX, float normalY, float speed, float restitution)
+	{
+		if (hasListeners("solidimpact")) {
+			KrollDict data = new KrollDict();
+			data.put("group", other.collisionGroup);
+			data.put("other", other.proxy);
+			data.put("x", s.x);
+			data.put("y", s.y);
+			data.put("contactX", contactX);
+			data.put("contactY", contactY);
+			data.put("normalX", normalX);
+			data.put("normalY", normalY);
+			data.put("speed", speed);
+			data.put("restitution", restitution);
+			fireEvent("solidimpact", data);
 		}
 	}
 

@@ -16,9 +16,15 @@
 // forming in one channel shoves back instead of letting the next chip pass
 // straight through it.
 //
+// Each chip listens for `solidimpact`. Peg, wall and divider contacts are
+// reported once from the chip side; chip-to-chip contacts use a stable pair
+// index so the two sides of the same physical hit do not play twice. A short
+// cadence keeps a crowded board crisp instead of turning it into audio noise.
+//
 // The slots are trigger zones read through `collidesWith`, not solids, and
-// the dividers between them are plain rects. Tap anywhere; the x coordinate
-// chooses the drop point. The brightest center slot carries the top payout.
+// the dividers between them are plain rects. A board tap chooses the drop
+// point; the controls can also release one or ten chips across random points.
+// The brightest center slot carries the top payout.
 //
 // Exports a start function; the demo opens its own window.
 
@@ -41,10 +47,24 @@ module.exports = function () {
 	var sparkSheet = Game.createSpriteSheet({ image: 'assets/spark.png', frameWidth: 16, frameHeight: 16 });
 	var winSound = Game.createSound({ url: 'assets/good.wav', volume: 0.65 });
 	var missSound = Game.createSound({ url: 'assets/bad.wav', volume: 0.45 });
+	var impactSound = Game.createSound({ url: 'assets/plinko_click.wav', volume: 0.18 });
+	var IMPACT_GAP = 35;
+	var impactAt = 0;
+
+	function playImpact(speed) {
+		var now = Date.now();
+		if (now - impactAt < IMPACT_GAP) {
+			return;
+		}
+		impactAt = now;
+		impactSound.volume = Math.max(0.08, Math.min(0.34, 0.08 + speed / 2200));
+		impactSound.play();
+	}
 
 	win.addEventListener('close', function () {
 		winSound.stop();
 		missSound.stop();
+		impactSound.stop();
 	});
 
 	var initialized = false;
@@ -107,6 +127,29 @@ module.exports = function () {
 		});
 		gameView.add(subtitle);
 
+		var CONTROL_Y = H * 0.145;
+		var CONTROL_HALF_W = W * 0.16;
+		var CONTROL_HALF_H = Math.max(22, H * 0.025);
+		var dropOneButton = Game.createText({
+			text: '[ DROP 1 ]',
+			align: 'center',
+			x: W * 0.32, y: CONTROL_Y,
+			scale: UNIT * 0.9,
+			tintColor: '#8ab4ff',
+			touchEnabled: false,
+			zIndex: 20
+		});
+		var dropTenButton = Game.createText({
+			text: '[ DROP 10 ]',
+			align: 'center',
+			x: W * 0.68, y: CONTROL_Y,
+			scale: UNIT * 0.9,
+			tintColor: '#69f0ae',
+			touchEnabled: false,
+			zIndex: 20
+		});
+		gameView.add([dropOneButton, dropTenButton]);
+
 		// --- Side walls ------------------------------------------------------
 
 		[BOARD_L - SLOT_W * 0.25, BOARD_R + SLOT_W * 0.25].forEach(function (wallX) {
@@ -151,7 +194,7 @@ module.exports = function () {
 		}
 		gameView.add(pegs);
 		// counted, not written down, so the caption cannot drift from the board
-		subtitle.text = pegs.length + ' ROUND SOLIDS  /  TAP ANYWHERE TO DROP';
+		subtitle.text = pegs.length + ' ROUND SOLIDS + SOLIDIMPACT\nTAP BOARD OR USE CONTROLS';
 
 		// --- Slots: dividers are solid, the pockets are trigger zones --------
 
@@ -215,6 +258,8 @@ module.exports = function () {
 
 		// --- Dropping ---------------------------------------------------------
 
+		// Keep the circle-vs-circle contacts readable instead of filling the
+		// board with bodies. Twelve fits one DROP 10 batch plus two single drops.
 		var MAX_LIVE = 12;
 		var live = [];
 		var COLORS = ['#ff8a80', '#ffd54a', '#69f0ae', '#8ab4ff', '#e86ea8', '#e07a2b'];
@@ -247,6 +292,7 @@ module.exports = function () {
 				gravity: 1100,
 				velocityX: bias * 4,
 				restitution: 0.42,
+				impactThreshold: 55,
 				swept: true,          // small pegs, fast ball: no stepping over one
 				touchEnabled: false,
 				// Chips are solid to each other as well as to the pegs, and
@@ -260,6 +306,18 @@ module.exports = function () {
 				collidesWith: ['slot0', 'slot1', 'slot2', 'slot3', 'slot4',
 					'slot5', 'slot6', 'slot7', 'slot8'],
 				zIndex: 10
+			});
+			ball.impactId = dropped;
+			ball.addEventListener('solidimpact', function (e) {
+				if (e.group === 'chip') {
+					var otherId = e.other && e.other.impactId;
+					if (typeof otherId === 'number' && ball.impactId > otherId) {
+						return;   // the other chip of this pair is speaking
+					}
+				} else if (e.group !== 'peg') {
+					return;
+				}
+				playImpact(e.speed);
 			});
 			ball.addEventListener('collision', function (e) {
 				var idx = parseInt(e.group.substring(4), 10);
@@ -290,7 +348,37 @@ module.exports = function () {
 			updateScore();
 		}
 
+		function dropRandom(count) {
+			count = Math.min(count, MAX_LIVE - live.length);
+			if (count <= 0) {
+				return;
+			}
+			var lo = BOARD_L + BALL;
+			var hi = BOARD_R - BALL;
+			var span = (hi - lo) / count;
+			for (var i = 0; i < count; i++) {
+				// Divide the board into bands so a ten-chip release still uses
+				// random points without clustering every chip in the same place.
+				dropAt(lo + span * (i + Math.random()));
+			}
+		}
+
+		function hitsControl(e, control) {
+			return Math.abs(e.x - control.x) <= CONTROL_HALF_W
+				&& Math.abs(e.y - CONTROL_Y) <= CONTROL_HALF_H;
+		}
+
 		gameView.addEventListener('tap', function (e) {
+			if (hitsControl(e, dropOneButton)) {
+				dropOneButton.flash('#fff', 150);
+				dropRandom(1);
+				return;
+			}
+			if (hitsControl(e, dropTenButton)) {
+				dropTenButton.flash('#fff', 150);
+				dropRandom(10);
+				return;
+			}
 			dropAt(e.x);
 		});
 		gameView.after(350, function () {

@@ -20,6 +20,12 @@
 // move because gravity and `solidMode: 'push'` carry the impact through the
 // pile. `collisionend` rearms that ball after it leaves the strip, so there is
 // no repeating timer and no synchronized whole-drum kick.
+// The glass and every ball listen for `solidimpact`. The shell keeps its own
+// glass hit, while ball-to-ball contacts rotate through three short clacks
+// with speed-based volume. Their cadences are independent, so a shell hit
+// cannot mask a ball hit. The engine reports each contact to both sides, so a
+// ball plays a clack only when its index is the lower of the pair: one hit,
+// one sound, and no contact left silent.
 //
 // The container keeps its own debug outline on purpose: the green circle is
 // the exact analytic boundary, not a stretched illustration pretending to
@@ -50,12 +56,71 @@ module.exports = function () {
 		url: 'assets/bingo_tumble.wav',
 		music: true,
 		loop: true,
-		volume: 0.16
+		volume: 0.22        // a bed under the clicks, loud enough to survive them
 	});
+
+	// Ball contacts use the same short clack family as the Tómbola app. The
+	// shell keeps the demo's original glass hit; separate cadences let both
+	// materials remain audible when impacts arrive close together.
+	var glassSound = Game.createSound({ url: 'assets/click.wav', volume: 0.3 });
+	var ballSounds = [1, 2, 3].map(function (index) {
+		return Game.createSound({
+			url: 'assets/tombola_ball_clack_' + index + '.wav',
+			volume: 0.06
+		});
+	});
+	var lastBallIndex = -1;
+	var glassAt = -Infinity;
+	var ballAt = -Infinity;
+
+	function nextSample(previous, sounds) {
+		if (previous < 0) {
+			return Math.floor(Math.random() * sounds.length);
+		}
+		var offset = 1 + Math.floor(Math.random() * (sounds.length - 1));
+		return (previous + offset) % sounds.length;
+	}
+
+	function reserveSound(lastPlayedAt, minimum) {
+		var now = Date.now();
+		return now - lastPlayedAt >= minimum ? now : 0;
+	}
+
+	function variedVolume(speed, minimum, maximum, fullSpeed) {
+		var strength = Math.min(1, Math.max(0, Number(speed) || 0) / fullSpeed);
+		var volume = minimum + (maximum - minimum) * strength;
+		return Math.min(maximum, volume * (0.92 + Math.random() * 0.16));
+	}
+
+	function playGlassImpact(speed) {
+		var now = reserveSound(glassAt, 55);
+		if (!now) {
+			return;
+		}
+		glassAt = now;
+		glassSound.volume = variedVolume(speed, 0.10, 0.45, 1200);
+		glassSound.play();
+	}
+
+	function playBallImpact(speed) {
+		var now = reserveSound(ballAt, 65);
+		if (!now) {
+			return;
+		}
+		ballAt = now;
+		lastBallIndex = nextSample(lastBallIndex, ballSounds);
+		var sound = ballSounds[lastBallIndex];
+		sound.volume = variedVolume(speed, 0.06, 0.24, 720);
+		sound.play();
+	}
 
 	win.addEventListener('close', function () {
 		shakeSound.stop();
 		tumbleSound.stop();
+		glassSound.stop();
+		ballSounds.forEach(function (sound) {
+			sound.stop();
+		});
 	});
 
 	var initialized = false;
@@ -111,6 +176,23 @@ module.exports = function () {
 
 		// --- The drum: one outlined boundary, with a simple visual shell ---
 
+		var drum = Game.createSprite({
+			x: CX, y: CY,
+			width: DRUM * 0.88, height: DRUM * 0.88,
+			touchEnabled: false,
+			hitboxShape: 'circle',
+			collisionGroup: 'drum',
+			solidMode: 'contain',   // keeps matched circles INSIDE it
+			// Typical settled-pile tremors measure about 90 px/s. 130 keeps
+			// clear of that floor while real tumbling hits remain well above it.
+			impactThreshold: 130,
+			debug: true,            // exact green containment circle
+			zIndex: 5
+		});
+		drum.addEventListener('solidimpact', function (e) {
+			playGlassImpact(e.speed);
+		});
+
 		var drumObjects = [
 			Game.createSprite({
 				sheet: wallSheet,
@@ -146,16 +228,7 @@ module.exports = function () {
 				tintColor: '#172238', opacity: 0.96,
 				touchEnabled: false, zIndex: 3
 			}),
-			Game.createSprite({
-				x: CX, y: CY,
-				width: DRUM * 0.88, height: DRUM * 0.88,
-				touchEnabled: false,
-				hitboxShape: 'circle',
-				collisionGroup: 'drum',
-				solidMode: 'contain',   // keeps matched circles INSIDE it
-				debug: true,            // exact green containment circle
-				zIndex: 5
-			})
+			drum
 		];
 		gameView.add(drumObjects);
 
@@ -203,6 +276,27 @@ module.exports = function () {
 			ball.velocityY = Math.max(ball.velocityY - upwardImpulse, -DRUM * 3.6);
 		}
 
+		// The engine reports every contact to BOTH sides, so if each ball played
+		// a sound each hit would play twice. Each ball carries an index and
+		// only the lower one speaks. The glass reports its own side, so
+		// ball/drum hits are skipped here. Written as a function, not inline in
+		// the loop, because `var ball` is function-scoped: a closure built in
+		// the loop would capture the last ball, not its own.
+		function bindImpact(ball, index) {
+			ball.impactId = index;
+			ball.impactThreshold = 130;
+			ball.addEventListener('solidimpact', function (e) {
+				if (e.group !== 'ball') {
+					return;
+				}
+				var otherId = e.other && e.other.impactId;
+				if (typeof otherId === 'number' && ball.impactId > otherId) {
+					return;
+				}
+				playBallImpact(e.speed);
+			});
+		}
+
 		function bindLauncher(ball) {
 			var touching = false;
 			ball.addEventListener('collision', function (e) {
@@ -247,6 +341,7 @@ module.exports = function () {
 				zIndex: 10
 			});
 			bindLauncher(ball);
+			bindImpact(ball, i);
 			balls.push(ball);
 		}
 		gameView.add(balls);
@@ -308,7 +403,7 @@ module.exports = function () {
 			tumbleButton.tintColor = '#69f0ae';
 		});
 		gameView.add(tumbleButton);
-		tumbleSound.play();
+		tumbleSound.play();   // TUMBLE starts on, so the bed starts with it
 
 		gameView.add(Game.createText({
 			text: COUNT + ' PUSH BODIES  /  GREEN RING = CONTAINER',

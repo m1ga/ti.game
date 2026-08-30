@@ -29,6 +29,14 @@ traffic in the loop.
       hitTest/toSpriteSpace, debug overlays shift with the art.
       Rendering + touch only — x/y, physics and collisions stay in
       world coordinates. camera.js demos it.
+- [x] Opt-in circular horizontal worlds: `gameView.worldWrapX = {
+      minX, maxX }` defines the interval and `sprite.wrapWorldX = true`
+      opts individual sprites in. Position normalization, camera follow,
+      rendering, touch, overlap checks, solid resolution and swept movement
+      all use the nearest periodic image. A `TileLayer` repeats across the
+      seam only when it starts at `minX` and its width matches `maxX - minX`.
+      Disabled by default. worldwrap.js covers the complete interaction
+      surface.
 
 ## 2. Sprite color & blending
 
@@ -59,6 +67,10 @@ traffic in the loop.
       and under `swept: true`; a circle against a rectangular solid still
       sweeps as a box. Volley ball and asteroids use it, circles.js
       compares a rect post against a round one.
+- [x] Per-axis hitbox correction (`hitboxScaleX` / `hitboxScaleY`) on top
+      of the shared `hitboxScale`, so padded art can match its visible body
+      without shrinking both axes equally. hitbox.js compares the raw and
+      corrected shapes.
 - [x] Bilateral circle-vs-circle response (`solidMode: 'push'`) — a pair
       that lists each other is resolved once, splitting the separation and
       exchanging the closing velocity at equal mass, so a struck ball
@@ -76,11 +88,24 @@ traffic in the loop.
       the mix Box2D uses by default. Solids default to 0, so every existing
       scene is unchanged; what it buys is a springy floor under riders that
       are not themselves bouncy. slopes.js.
+- [x] Discrete physical-impact events: `solidimpact` plus per-sprite
+      `impactThreshold` for `block`, `contain` and bilateral `push`
+      responses between sprites. The payload includes the other sprite,
+      shared contact point, receiver normal, compensated closing speed and
+      mixed restitution; receiver-specific gates suppress sustained contact
+      and rearm after more than 100 ms of confirmed separation. With no
+      listeners the resolver returns before building payloads or gates, so
+      there is no bridge traffic. TileLayer cells remain outside this
+      sprite-only event by design. pool.js, drum.js and plinko.js exercise it.
 - [x] Horizontal acceleration (`gravityX`) — the sibling of `gravity`;
       `gravity` keeps its exact meaning. Default 0. wind.js.
 - [x] One-way platforms (jump up through, land on top) — `oneWay: true`
       on the solid; works for rect and circle riders. The platformer
       staircase uses it.
+- [x] Native wall contacts: read-only `onWallLeft` / `onWallRight`, the
+      discrete `wallhit` transition event and `wallSlideSpeed` for a native
+      downward speed cap while pressed into a wall. Sprite and TileLayer
+      walls share the same state.
 - [x] Moving platforms that carry the rider — riders inherit the ground
       solid's per-frame movement (velocity, tweens, idle wobble; wrap
       teleports excluded) before resolution, so they're carried sideways
@@ -199,9 +224,15 @@ traffic in the loop.
 
 ## 7. Sprite parenting
 
-- [ ] `parent` property: children inherit transform (turret on a tank,
-      hat on a hero, multi-part bosses). Touches transform math,
-      hit-testing and ySort — the biggest structural item here.
+- [x] Lightweight native attachment: `attachTo(target, { offsetX, offsetY,
+      rotate })`, `detach()` and read-only `attachedTo`. Children follow the
+      target after physics without per-frame JS, cross world/screen-fixed
+      coordinates correctly, inherit effective opacity and are removed with
+      the target. This covers labels, health bars, shadows, hats and simple
+      turrets.
+- [ ] Full `parent` transform inheritance beyond `attachTo`: inherited scale,
+      visibility, flips and tint, plus touch and y-sort hierarchy for
+      multi-part bosses. This remains the structural part not yet covered.
 
 ## 8. Audio polish
 
@@ -247,6 +278,11 @@ traffic in the loop.
 
 ## Developer experience (sprinkle in between)
 
+- [x] Human-readable values at the JS boundary: named anchor presets
+      (`'bottom-left'`, `'center'`, ...) and percentage strings for every
+      ratio property (`'80%'` opacity, hitbox scale, restitution, camera/time
+      scale, sound volume, and so on), normalized through matching Android
+      and iOS helpers.
 - [x] Stats overlay next to the debug overlay: fps, draw calls, sprite
       and particle counts — `debug: { hud: 'topRight' }`, tap to expand,
       plus a `performance` event. Drawn with the bitmap-font engine and

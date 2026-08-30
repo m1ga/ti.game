@@ -22,6 +22,7 @@ public class Scene
 	private final List<Rope> ropes = new ArrayList<>();
 	private final List<TileLayer> tileLayers = new ArrayList<>();
 	private volatile boolean zOrderDirty = false;
+	private double physicsTime = 0d;
 
 	/** Renders debug overlays for every sprite (GameView.debug = { hitbox: true }). */
 	public volatile boolean debugAll = false;
@@ -399,6 +400,7 @@ public class Scene
 		if (!sprites.remove(sprite)) {
 			return;
 		}
+		sprite.markImpactGatesStale();
 		sprite.scene = null;
 		sprite.attachTarget = null;
 		sprite.attachOpacity = 1f;
@@ -422,6 +424,7 @@ public class Scene
 	{
 		synchronized (lock) {
 			for (Sprite s : sprites) {
+				s.markImpactGatesStale();
 				s.scene = null;
 				s.attachTarget = null;
 				s.attachOpacity = 1f;
@@ -559,6 +562,9 @@ public class Scene
 	private final float[] boxB = new float[5];
 	private final float[] satAxes = new float[8];
 	private final float[] contact = new float[3]; // nx, ny, penetration
+	private final float[] impactPoint = new float[2];
+	private final float[] impactBox = new float[5];
+	private final float[] impactAabb = new float[4];
 
 	// Allowed penetration, in pixels. A body resting on a solid is pulled
 	// into it by gravity every frame — at 1400 px/s² and 60 fps that is
@@ -876,8 +882,10 @@ public class Scene
 	public void update(float dt)
 	{
 		dt *= Math.max(0f, timeScale);
+		physicsTime += dt;
 		List<Sprite> list = snapshot();
 		for (Sprite s : list) {
+			s.consumeImpactGatesStale(this);
 			s.update(dt);
 		}
 		for (ParticleEmitter e : emittersSnapshot()) {
@@ -1212,6 +1220,131 @@ public class Scene
 		return true;
 	}
 
+	/** Prepares one unilateral solid response for both possible receivers.
+	 *  The acceleration term removes velocity produced by the native movement
+	 *  model in this frame, leaving the incoming normal speed. */
+	private void dispatchSolidImpact(Sprite mover, Sprite solid,
+			float normalX, float normalY, float restitution)
+	{
+		if (!mover.solidImpactListening && !solid.solidImpactListening) {
+			return;
+		}
+		float relativeVelocityX = mover.velocityX - solid.velocityX;
+		float relativeVelocityY = mover.velocityY - solid.velocityY;
+		float relativeAccelX = mover.frameAccelX - solid.frameAccelX;
+		float relativeAccelY = mover.frameAccelY - solid.frameAccelY;
+		float vn = relativeVelocityX * normalX + relativeVelocityY * normalY;
+		float speed = 0f;
+		if (vn < 0f) {
+			float vnImpact = vn
+				- (relativeAccelX * normalX + relativeAccelY * normalY);
+			speed = Math.max(0f, -vnImpact);
+		}
+		boolean fireMover = mover.shouldEmitSolidImpact(solid, speed, physicsTime, this);
+		boolean fireSolid = solid.shouldEmitSolidImpact(mover, speed, physicsTime, this);
+		if (!fireMover && !fireSolid) {
+			return;
+		}
+
+		if (mover.circleHitbox) {
+			mover.hitCenter(centerA);
+			impactPoint[0] = centerA[0] - normalX * mover.hitRadius();
+			impactPoint[1] = centerA[1] - normalY * mover.hitRadius();
+		} else {
+			supportPoint(mover, -normalX, -normalY, impactPoint);
+		}
+		fireSolidImpact(mover, solid, normalX, normalY, speed, restitution, fireMover);
+		fireSolidImpact(solid, mover, -normalX, -normalY, speed, restitution, fireSolid);
+	}
+
+	/** Push pairs use relative velocity and relative native acceleration. */
+	private void dispatchBilateralSolidImpact(Sprite a, Sprite b,
+			float normalX, float normalY, float restitution)
+	{
+		if (!a.solidImpactListening && !b.solidImpactListening) {
+			return;
+		}
+		float relativeVelocityX = a.velocityX - b.velocityX;
+		float relativeVelocityY = a.velocityY - b.velocityY;
+		float relativeAccelX = a.frameAccelX - b.frameAccelX;
+		float relativeAccelY = a.frameAccelY - b.frameAccelY;
+		float vn = relativeVelocityX * normalX + relativeVelocityY * normalY;
+		float speed = 0f;
+		if (vn < 0f) {
+			float vnImpact = vn
+				- (relativeAccelX * normalX + relativeAccelY * normalY);
+			speed = Math.max(0f, -vnImpact);
+		}
+		boolean fireA = a.shouldEmitSolidImpact(b, speed, physicsTime, this);
+		boolean fireB = b.shouldEmitSolidImpact(a, speed, physicsTime, this);
+		if (!fireA && !fireB) {
+			return;
+		}
+		a.hitCenter(centerA);
+		impactPoint[0] = centerA[0] - normalX * a.hitRadius();
+		impactPoint[1] = centerA[1] - normalY * a.hitRadius();
+		fireSolidImpact(a, b, normalX, normalY, speed, restitution, fireA);
+		fireSolidImpact(b, a, -normalX, -normalY, speed, restitution, fireB);
+	}
+
+	private void fireSolidImpact(Sprite receiver, Sprite other,
+			float normalX, float normalY, float speed, float restitution, boolean fire)
+	{
+		if (!fire) {
+			return;
+		}
+		Sprite.SpriteEventListener listener = receiver.eventListener;
+		if (listener != null) {
+			listener.onSolidImpact(receiver, other, impactPoint[0], impactPoint[1],
+				normalX, normalY, speed, restitution);
+		}
+	}
+
+	/** Support point on the receiver opposite its correction normal. A face
+	 *  normal lands on the face midpoint; a corner contact is an approximation
+	 *  for OBBs because the engine does not build a contact manifold. */
+	private void supportPoint(Sprite sprite, float directionX, float directionY, float[] out)
+	{
+		final float epsilon = 1e-4f;
+		if (sprite.obbHitbox) {
+			sprite.hitBox(impactBox);
+			float radians = impactBox[4];
+			float axisXX = (float) Math.cos(radians);
+			float axisXY = (float) Math.sin(radians);
+			float axisYX = -axisXY;
+			float axisYY = axisXX;
+			float alongX = directionX * axisXX + directionY * axisXY;
+			float alongY = directionX * axisYX + directionY * axisYY;
+			out[0] = impactBox[0];
+			out[1] = impactBox[1];
+			if (Math.abs(alongX) > epsilon) {
+				float sign = (alongX < 0f) ? -1f : 1f;
+				out[0] += axisXX * impactBox[2] * sign;
+				out[1] += axisXY * impactBox[2] * sign;
+			}
+			if (Math.abs(alongY) > epsilon) {
+				float sign = (alongY < 0f) ? -1f : 1f;
+				out[0] += axisYX * impactBox[3] * sign;
+				out[1] += axisYY * impactBox[3] * sign;
+			}
+			return;
+		}
+
+		sprite.computeAABB(impactAabb);
+		out[0] = (impactAabb[0] + impactAabb[2]) * 0.5f;
+		out[1] = (impactAabb[1] + impactAabb[3]) * 0.5f;
+		if (directionX < -epsilon) {
+			out[0] = impactAabb[0];
+		} else if (directionX > epsilon) {
+			out[0] = impactAabb[2];
+		}
+		if (directionY < -epsilon) {
+			out[1] = impactAabb[1];
+		} else if (directionY > epsilon) {
+			out[1] = impactAabb[3];
+		}
+	}
+
 	/**
 	 * Bilateral circle solids: a pair that lists each other's groups and
 	 * whose sprites are both in `solidMode: 'push'` is resolved once, not
@@ -1268,6 +1401,8 @@ public class Scene
 					b.x -= nx * half;
 					b.y -= ny * half;
 				}
+				float e = Math.max(a.restitution, b.restitution);
+				dispatchBilateralSolidImpact(a, b, nx, ny, e);
 				float vn = (a.velocityX - b.velocityX) * nx
 						 + (a.velocityY - b.velocityY) * ny;
 				if (vn >= 0f) {
@@ -1276,7 +1411,6 @@ public class Scene
 				// Equal masses: each body takes half of (1 + e) * vn, in
 				// opposite directions. The springier of the two wins — the
 				// same mix a body gets against a static surface.
-				float e = Math.max(a.restitution, b.restitution);
 				float impulse = -(1f + e) * vn * 0.5f;
 				a.velocityX += impulse * nx;
 				a.velocityY += impulse * ny;
@@ -1372,6 +1506,7 @@ public class Scene
 						wall = wallFromNormal(nx);
 						wallOn = solid;
 					}
+					dispatchSolidImpact(s, solid, nx, ny, e);
 					float vn = s.velocityX * nx + s.velocityY * ny;
 					if (vn < 0f) {
 						float bounce = -vn * e;
@@ -1408,7 +1543,10 @@ public class Scene
 				if (overlapY <= overlapX || solid.oneWay) {
 					// vertical resolution (compare AABB centers, *2 to avoid the division)
 					if (fromAbove) {
+						float normalX = 0f;
+						float normalY = -1f;
 						s.y -= overlapY; // hit the solid from above
+						dispatchSolidImpact(s, solid, normalX, normalY, e);
 						float bounce = (e > 0f && s.velocityY > 0f)
 							? s.velocityY * e : 0f;
 						if (bounce > 40f) {
@@ -1421,7 +1559,10 @@ public class Scene
 							groundedOn = solid;
 						}
 					} else {
+						float normalX = 0f;
+						float normalY = 1f;
 						s.y += overlapY; // bumped from below
+						dispatchSolidImpact(s, solid, normalX, normalY, e);
 						if (s.velocityY < 0f) {
 							s.velocityY = (e > 0f) ? -s.velocityY * e : 0f;
 						}
@@ -1431,16 +1572,22 @@ public class Scene
 					// others keep velocity so held-button movement resumes
 					// as soon as the wall ends
 					if (aabbA[0] + aabbA[2] < aabbB[0] + aabbB[2]) {
+						float normalX = -1f;
+						float normalY = 0f;
 						s.x -= overlapX;
 						wall = 1;
 						wallOn = solid;
+						dispatchSolidImpact(s, solid, normalX, normalY, e);
 						if (e > 0f && s.velocityX > 0f) {
 							s.velocityX = -s.velocityX * e;
 						}
 					} else {
+						float normalX = 1f;
+						float normalY = 0f;
 						s.x += overlapX;
 						wall = -1;
 						wallOn = solid;
+						dispatchSolidImpact(s, solid, normalX, normalY, e);
 						if (e > 0f && s.velocityX < 0f) {
 							s.velocityX = -s.velocityX * e;
 						}
@@ -1860,6 +2007,7 @@ public class Scene
 				wall = wallFromNormal(nx);
 				wallOn = solid;
 			}
+			dispatchSolidImpact(s, solid, nx, ny, e);
 			float vn = s.velocityX * nx + s.velocityY * ny;
 			if (vn < 0f) {
 				float bounce = -vn * e;

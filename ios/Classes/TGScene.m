@@ -88,6 +88,7 @@ static float bottomEdge(TGSprite *s)
 	NSMutableArray<TGParticleEmitter *> *_emitters; // guarded by @synchronized(_sprites)
 	NSMutableArray<TGRope *> *_ropes;               // guarded by @synchronized(_sprites)
 	NSMutableArray<TGTileLayer *> *_tileLayers;     // guarded by @synchronized(_sprites)
+	NSTimeInterval _physicsTime;
 
 	// Camera shake, requested from any thread, animated on the render thread
 	volatile float _pendingShakeStrength;
@@ -105,6 +106,9 @@ static float bottomEdge(TGSprite *s)
 	float _boxB[5];
 	float _satAxes[8];
 	float _contact[3]; // nx, ny, penetration
+	float _impactPoint[2];
+	float _impactBox[5];
+	float _impactAabb[4];
 
 	float _sweptResult[2]; // entry time in 0..1, entry axis (0 = x, 1 = y)
 
@@ -320,6 +324,7 @@ static float bottomEdge(TGSprite *s)
 		return;
 	}
 	[_sprites removeObjectIdenticalTo:sprite];
+	[sprite markImpactGatesStale];
 	sprite.scene = nil;
 	sprite.attachTarget = nil;
 	sprite.attachOpacity = 1.0f;
@@ -342,6 +347,7 @@ static float bottomEdge(TGSprite *s)
 {
 	@synchronized (_sprites) {
 		for (TGSprite *s in _sprites) {
+			[s markImpactGatesStale];
 			s.scene = nil;
 			s.attachTarget = nil;
 			s.attachOpacity = 1.0f;
@@ -517,6 +523,7 @@ static float bottomEdge(TGSprite *s)
 							   layers:(NSArray<TGTileLayer *> **)layers
 {
 	dt *= MAX(0.0f, self.timeScale);
+	_physicsTime += dt;
 	__block NSArray<TGSprite *> *list;
 	__block NSArray<TGParticleEmitter *> *emitterList;
 	__block NSArray<TGRope *> *ropeList;
@@ -564,6 +571,7 @@ static float bottomEdge(TGSprite *s)
 	}
 
 	for (TGSprite *s in list) {
+		[s consumeImpactGatesStaleForScene:self];
 		[s update:dt];
 	}
 	for (TGParticleEmitter *e in emitterList) {
@@ -1496,6 +1504,154 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	return YES;
 }
 
+/** Prepares one unilateral solid response for both possible receivers. */
+- (void)dispatchSolidImpactFor:(TGSprite *)mover
+						 solid:(TGSprite *)solid
+					normalX:(float)normalX
+					normalY:(float)normalY
+				 restitution:(float)restitution
+{
+	if (!mover.solidImpactListening && !solid.solidImpactListening) {
+		return;
+	}
+	float relativeVelocityX = mover.velocityX - solid.velocityX;
+	float relativeVelocityY = mover.velocityY - solid.velocityY;
+	float relativeAccelX = mover.frameAccelX - solid.frameAccelX;
+	float relativeAccelY = mover.frameAccelY - solid.frameAccelY;
+	float vn = relativeVelocityX * normalX + relativeVelocityY * normalY;
+	float speed = 0.0f;
+	if (vn < 0.0f) {
+		float vnImpact = vn
+			- (relativeAccelX * normalX + relativeAccelY * normalY);
+		speed = MAX(0.0f, -vnImpact);
+	}
+	BOOL fireMover = [mover shouldEmitSolidImpactWith:solid
+										 speed:speed
+									physicsTime:_physicsTime
+										 scene:self];
+	BOOL fireSolid = [solid shouldEmitSolidImpactWith:mover
+										 speed:speed
+									physicsTime:_physicsTime
+										 scene:self];
+	if (!fireMover && !fireSolid) {
+		return;
+	}
+	if (mover.circleHitbox) {
+		[mover hitCenter:_centerA];
+		_impactPoint[0] = _centerA[0] - normalX * [mover hitRadius];
+		_impactPoint[1] = _centerA[1] - normalY * [mover hitRadius];
+	} else {
+		[self supportPointFor:mover directionX:-normalX directionY:-normalY out:_impactPoint];
+	}
+	[self fireSolidImpactFor:mover other:solid normalX:normalX normalY:normalY
+						 speed:speed restitution:restitution enabled:fireMover];
+	[self fireSolidImpactFor:solid other:mover normalX:-normalX normalY:-normalY
+						 speed:speed restitution:restitution enabled:fireSolid];
+}
+
+/** Push pairs use relative velocity and relative native acceleration. */
+- (void)dispatchBilateralSolidImpactFor:(TGSprite *)a
+								 with:(TGSprite *)b
+							normalX:(float)normalX
+							normalY:(float)normalY
+						 restitution:(float)restitution
+{
+	if (!a.solidImpactListening && !b.solidImpactListening) {
+		return;
+	}
+	float relativeVelocityX = a.velocityX - b.velocityX;
+	float relativeVelocityY = a.velocityY - b.velocityY;
+	float relativeAccelX = a.frameAccelX - b.frameAccelX;
+	float relativeAccelY = a.frameAccelY - b.frameAccelY;
+	float vn = relativeVelocityX * normalX + relativeVelocityY * normalY;
+	float speed = 0.0f;
+	if (vn < 0.0f) {
+		float vnImpact = vn
+			- (relativeAccelX * normalX + relativeAccelY * normalY);
+		speed = MAX(0.0f, -vnImpact);
+	}
+	BOOL fireA = [a shouldEmitSolidImpactWith:b speed:speed
+		physicsTime:_physicsTime scene:self];
+	BOOL fireB = [b shouldEmitSolidImpactWith:a speed:speed
+		physicsTime:_physicsTime scene:self];
+	if (!fireA && !fireB) {
+		return;
+	}
+	[a hitCenter:_centerA];
+	_impactPoint[0] = _centerA[0] - normalX * [a hitRadius];
+	_impactPoint[1] = _centerA[1] - normalY * [a hitRadius];
+	[self fireSolidImpactFor:a other:b normalX:normalX normalY:normalY
+		 speed:speed restitution:restitution enabled:fireA];
+	[self fireSolidImpactFor:b other:a normalX:-normalX normalY:-normalY
+		 speed:speed restitution:restitution enabled:fireB];
+}
+
+- (void)fireSolidImpactFor:(TGSprite *)receiver
+					 other:(TGSprite *)other
+				normalX:(float)normalX
+				normalY:(float)normalY
+				   speed:(float)speed
+			 restitution:(float)restitution
+				 enabled:(BOOL)enabled
+{
+	if (!enabled) {
+		return;
+	}
+	id<TGSpriteEventListener> listener = receiver.eventListener;
+	if (listener != nil) {
+		[listener sprite:receiver solidImpactWith:other
+			contactX:_impactPoint[0] contactY:_impactPoint[1]
+			normalX:normalX normalY:normalY speed:speed restitution:restitution];
+	}
+}
+
+/** Face normals land on the face midpoint. OBB corner contacts are an
+ *  approximation because this lightweight resolver has no manifold. */
+- (void)supportPointFor:(TGSprite *)sprite
+				 directionX:(float)directionX
+				 directionY:(float)directionY
+						 out:(float *)out
+{
+	const float epsilon = 1e-4f;
+	if (sprite.obbHitbox) {
+		[sprite hitBox:_impactBox];
+		float c = cosf(_impactBox[4]);
+		float s = sinf(_impactBox[4]);
+		float axisXX = c;
+		float axisXY = s;
+		float axisYX = -s;
+		float axisYY = c;
+		float alongX = directionX * axisXX + directionY * axisXY;
+		float alongY = directionX * axisYX + directionY * axisYY;
+		out[0] = _impactBox[0];
+		out[1] = _impactBox[1];
+		if (fabsf(alongX) > epsilon) {
+			float sign = (alongX < 0.0f) ? -1.0f : 1.0f;
+			out[0] += axisXX * _impactBox[2] * sign;
+			out[1] += axisXY * _impactBox[2] * sign;
+		}
+		if (fabsf(alongY) > epsilon) {
+			float sign = (alongY < 0.0f) ? -1.0f : 1.0f;
+			out[0] += axisYX * _impactBox[3] * sign;
+			out[1] += axisYY * _impactBox[3] * sign;
+		}
+		return;
+	}
+	[sprite computeAABB:_impactAabb];
+	out[0] = (_impactAabb[0] + _impactAabb[2]) * 0.5f;
+	out[1] = (_impactAabb[1] + _impactAabb[3]) * 0.5f;
+	if (directionX < -epsilon) {
+		out[0] = _impactAabb[0];
+	} else if (directionX > epsilon) {
+		out[0] = _impactAabb[2];
+	}
+	if (directionY < -epsilon) {
+		out[1] = _impactAabb[1];
+	} else if (directionY > epsilon) {
+		out[1] = _impactAabb[3];
+	}
+}
+
 /**
  * Bilateral circle solids: a pair that lists each other's groups and whose
  * sprites are both in `solidMode: 'push'` is resolved once, not once per
@@ -1552,6 +1708,9 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				b.x -= nx * half;
 				b.y -= ny * half;
 			}
+			float e = MAX(a.restitution, b.restitution);
+			[self dispatchBilateralSolidImpactFor:a with:b normalX:nx normalY:ny
+				restitution:e];
 			float vn = (a.velocityX - b.velocityX) * nx
 					 + (a.velocityY - b.velocityY) * ny;
 			if (vn >= 0.0f) {
@@ -1560,7 +1719,6 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			// Equal masses: each body takes half of (1 + e) * vn, in opposite
 			// directions. The springier of the two wins — the same mix a body
 			// gets against a static surface.
-			float e = MAX(a.restitution, b.restitution);
 			float impulse = -(1.0f + e) * vn * 0.5f;
 			a.velocityX += impulse * nx;
 			a.velocityY += impulse * ny;
@@ -1650,6 +1808,8 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					wall = TGWallFromNormal(nx);
 					wallOn = solid;
 				}
+				[self dispatchSolidImpactFor:s solid:solid normalX:nx normalY:ny
+					restitution:e];
 				float vn = s.velocityX * nx + s.velocityY * ny;
 				if (vn < 0.0f) {
 					float bounce = -vn * e;
@@ -1686,7 +1846,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			if (overlapY <= overlapX || solid.oneWay) {
 				// vertical resolution (compare AABB centers, *2 avoids the division)
 				if (fromAbove) {
+					float normalX = 0.0f;
+					float normalY = -1.0f;
 					s.y -= overlapY; // hit the solid from above
+					[self dispatchSolidImpactFor:s solid:solid normalX:normalX normalY:normalY
+						restitution:e];
 					float bounce = (e > 0.0f && s.velocityY > 0.0f)
 						? s.velocityY * e : 0.0f;
 					if (bounce > 40.0f) {
@@ -1699,7 +1863,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 						groundedOn = solid;
 					}
 				} else {
+					float normalX = 0.0f;
+					float normalY = 1.0f;
 					s.y += overlapY; // bumped from below
+					[self dispatchSolidImpactFor:s solid:solid normalX:normalX normalY:normalY
+						restitution:e];
 					if (s.velocityY < 0.0f) {
 						s.velocityY = (e > 0.0f) ? -s.velocityY * e : 0.0f;
 					}
@@ -1709,16 +1877,24 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				// others keep velocity so held-button movement resumes
 				// as soon as the wall ends
 				if (_aabbA[0] + _aabbA[2] < _aabbB[0] + _aabbB[2]) {
+					float normalX = -1.0f;
+					float normalY = 0.0f;
 					s.x -= overlapX;
 					wall = 1;
 					wallOn = solid;
+					[self dispatchSolidImpactFor:s solid:solid normalX:normalX normalY:normalY
+						restitution:e];
 					if (e > 0.0f && s.velocityX > 0.0f) {
 						s.velocityX = -s.velocityX * e;
 					}
 				} else {
+					float normalX = 1.0f;
+					float normalY = 0.0f;
 					s.x += overlapX;
 					wall = -1;
 					wallOn = solid;
+					[self dispatchSolidImpactFor:s solid:solid normalX:normalX normalY:normalY
+						restitution:e];
 					if (e > 0.0f && s.velocityX < 0.0f) {
 						s.velocityX = -s.velocityX * e;
 					}
@@ -1866,6 +2042,8 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			wall = TGWallFromNormal(nx);
 			wallOn = solid;
 		}
+		[self dispatchSolidImpactFor:s solid:solid normalX:nx normalY:ny
+			restitution:e];
 		float vn = s.velocityX * nx + s.velocityY * ny;
 		if (vn < 0.0f) {
 			float bounce = -vn * e;
