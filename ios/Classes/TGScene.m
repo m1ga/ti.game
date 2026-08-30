@@ -88,8 +88,7 @@ static float bottomEdge(TGSprite *s)
 	NSMutableArray<TGParticleEmitter *> *_emitters; // guarded by @synchronized(_sprites)
 	NSMutableArray<TGRope *> *_ropes;               // guarded by @synchronized(_sprites)
 	NSMutableArray<TGTileLayer *> *_tileLayers;     // guarded by @synchronized(_sprites)
-	NSMutableArray<TGSprite *> *_impactCleanupQueue; // guarded by @synchronized(_sprites)
-	uint64_t _physicsFrame;
+	NSTimeInterval _physicsTime;
 
 	// Camera shake, requested from any thread, animated on the render thread
 	volatile float _pendingShakeStrength;
@@ -124,7 +123,6 @@ static float bottomEdge(TGSprite *s)
 		_emitters = [NSMutableArray array];
 		_ropes = [NSMutableArray array];
 		_tileLayers = [NSMutableArray array];
-		_impactCleanupQueue = [NSMutableArray array];
 		_skidTrail = [[TGSkidTrail alloc] init];
 		_hud = [[TGDebugHud alloc] init];
 		_stats = [[TGFrameStats alloc] init];
@@ -326,9 +324,7 @@ static float bottomEdge(TGSprite *s)
 		return;
 	}
 	[_sprites removeObjectIdenticalTo:sprite];
-	if (sprite.solidImpactListening) {
-		[self requestImpactGateCleanup:sprite];
-	}
+	[sprite markImpactGatesStale];
 	sprite.scene = nil;
 	sprite.attachTarget = nil;
 	sprite.attachOpacity = 1.0f;
@@ -351,39 +347,13 @@ static float bottomEdge(TGSprite *s)
 {
 	@synchronized (_sprites) {
 		for (TGSprite *s in _sprites) {
-			if (s.solidImpactListening) {
-				[self requestImpactGateCleanup:s];
-			}
+			[s markImpactGatesStale];
 			s.scene = nil;
 			s.attachTarget = nil;
 			s.attachOpacity = 1.0f;
 		}
 		[_sprites removeAllObjects];
 		_snapshotCache = nil;
-	}
-}
-
-- (void)requestImpactGateCleanup:(TGSprite *)sprite
-{
-	if (sprite == nil || ![sprite requestImpactGateCleanup]) {
-		return;
-	}
-	@synchronized (_sprites) {
-		[_impactCleanupQueue addObject:sprite];
-	}
-}
-
-- (void)drainImpactGateCleanup
-{
-	NSArray<TGSprite *> *pending = nil;
-	@synchronized (_sprites) {
-		if (_impactCleanupQueue.count > 0) {
-			pending = [_impactCleanupQueue copy];
-			[_impactCleanupQueue removeAllObjects];
-		}
-	}
-	for (TGSprite *sprite in pending) {
-		[sprite clearImpactGates];
 	}
 }
 
@@ -552,9 +522,8 @@ static float bottomEdge(TGSprite *s)
 								ropes:(NSArray<TGRope *> **)ropes
 							   layers:(NSArray<TGTileLayer *> **)layers
 {
-	[self drainImpactGateCleanup];
-	_physicsFrame++; // advances even while timeScale is zero
 	dt *= MAX(0.0f, self.timeScale);
+	_physicsTime += dt;
 	__block NSArray<TGSprite *> *list;
 	__block NSArray<TGParticleEmitter *> *emitterList;
 	__block NSArray<TGRope *> *ropeList;
@@ -602,6 +571,7 @@ static float bottomEdge(TGSprite *s)
 	}
 
 	for (TGSprite *s in list) {
+		[s consumeImpactGatesStaleForScene:self];
 		[s update:dt];
 	}
 	for (TGParticleEmitter *e in emitterList) {
@@ -1540,26 +1510,29 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					normalX:(float)normalX
 					normalY:(float)normalY
 				 restitution:(float)restitution
-					   list:(NSArray<TGSprite *> *)list
 {
 	if (!mover.solidImpactListening && !solid.solidImpactListening) {
 		return;
 	}
-	float vn = mover.velocityX * normalX + mover.velocityY * normalY;
+	float relativeVelocityX = mover.velocityX - solid.velocityX;
+	float relativeVelocityY = mover.velocityY - solid.velocityY;
+	float relativeAccelX = mover.frameAccelX - solid.frameAccelX;
+	float relativeAccelY = mover.frameAccelY - solid.frameAccelY;
+	float vn = relativeVelocityX * normalX + relativeVelocityY * normalY;
 	float speed = 0.0f;
 	if (vn < 0.0f) {
 		float vnImpact = vn
-			- (mover.frameAccelX * normalX + mover.frameAccelY * normalY);
+			- (relativeAccelX * normalX + relativeAccelY * normalY);
 		speed = MAX(0.0f, -vnImpact);
 	}
 	BOOL fireMover = [mover shouldEmitSolidImpactWith:solid
 										 speed:speed
-								   physicsFrame:_physicsFrame
-								  sceneSprites:list];
+									physicsTime:_physicsTime
+										 scene:self];
 	BOOL fireSolid = [solid shouldEmitSolidImpactWith:mover
 										 speed:speed
-								   physicsFrame:_physicsFrame
-								  sceneSprites:list];
+									physicsTime:_physicsTime
+										 scene:self];
 	if (!fireMover && !fireSolid) {
 		return;
 	}
@@ -1582,7 +1555,6 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 							normalX:(float)normalX
 							normalY:(float)normalY
 						 restitution:(float)restitution
-							   list:(NSArray<TGSprite *> *)list
 {
 	if (!a.solidImpactListening && !b.solidImpactListening) {
 		return;
@@ -1599,9 +1571,9 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		speed = MAX(0.0f, -vnImpact);
 	}
 	BOOL fireA = [a shouldEmitSolidImpactWith:b speed:speed
-		physicsFrame:_physicsFrame sceneSprites:list];
+		physicsTime:_physicsTime scene:self];
 	BOOL fireB = [b shouldEmitSolidImpactWith:a speed:speed
-		physicsFrame:_physicsFrame sceneSprites:list];
+		physicsTime:_physicsTime scene:self];
 	if (!fireA && !fireB) {
 		return;
 	}
@@ -1738,7 +1710,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 			float e = MAX(a.restitution, b.restitution);
 			[self dispatchBilateralSolidImpactFor:a with:b normalX:nx normalY:ny
-				restitution:e list:list];
+				restitution:e];
 			float vn = (a.velocityX - b.velocityX) * nx
 					 + (a.velocityY - b.velocityY) * ny;
 			if (vn >= 0.0f) {
@@ -1837,7 +1809,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					wallOn = solid;
 				}
 				[self dispatchSolidImpactFor:s solid:solid normalX:nx normalY:ny
-					restitution:e list:list];
+					restitution:e];
 				float vn = s.velocityX * nx + s.velocityY * ny;
 				if (vn < 0.0f) {
 					float bounce = -vn * e;
@@ -1878,7 +1850,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					float normalY = -1.0f;
 					s.y -= overlapY; // hit the solid from above
 					[self dispatchSolidImpactFor:s solid:solid normalX:normalX normalY:normalY
-						restitution:e list:list];
+						restitution:e];
 					float bounce = (e > 0.0f && s.velocityY > 0.0f)
 						? s.velocityY * e : 0.0f;
 					if (bounce > 40.0f) {
@@ -1895,7 +1867,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					float normalY = 1.0f;
 					s.y += overlapY; // bumped from below
 					[self dispatchSolidImpactFor:s solid:solid normalX:normalX normalY:normalY
-						restitution:e list:list];
+						restitution:e];
 					if (s.velocityY < 0.0f) {
 						s.velocityY = (e > 0.0f) ? -s.velocityY * e : 0.0f;
 					}
@@ -1911,7 +1883,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					wall = 1;
 					wallOn = solid;
 					[self dispatchSolidImpactFor:s solid:solid normalX:normalX normalY:normalY
-						restitution:e list:list];
+						restitution:e];
 					if (e > 0.0f && s.velocityX > 0.0f) {
 						s.velocityX = -s.velocityX * e;
 					}
@@ -1922,7 +1894,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 					wall = -1;
 					wallOn = solid;
 					[self dispatchSolidImpactFor:s solid:solid normalX:normalX normalY:normalY
-						restitution:e list:list];
+						restitution:e];
 					if (e > 0.0f && s.velocityX < 0.0f) {
 						s.velocityX = -s.velocityX * e;
 					}
@@ -2071,7 +2043,7 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			wallOn = solid;
 		}
 		[self dispatchSolidImpactFor:s solid:solid normalX:nx normalY:ny
-			restitution:e list:list];
+			restitution:e];
 		float vn = s.velocityX * nx + s.velocityY * ny;
 		if (vn < 0.0f) {
 			float bounce = -vn * e;

@@ -289,7 +289,7 @@ module.exports = function () {
 				if (e.group !== 'ball') {
 					return;
 				}
-				var otherId = e.other.impactId;
+				var otherId = e.other && e.other.impactId;
 				if (typeof otherId === 'number' && ball.impactId > otherId) {
 					return;
 				}

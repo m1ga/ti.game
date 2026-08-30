@@ -6,7 +6,6 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The native scene graph: an ordered list of sprites plus background color.
@@ -22,10 +21,8 @@ public class Scene
 	private final List<ParticleEmitter> emitters = new ArrayList<>();
 	private final List<Rope> ropes = new ArrayList<>();
 	private final List<TileLayer> tileLayers = new ArrayList<>();
-	private final ConcurrentLinkedQueue<Sprite> impactCleanupQueue =
-		new ConcurrentLinkedQueue<>();
 	private volatile boolean zOrderDirty = false;
-	private long physicsFrame = 0L;
+	private double physicsTime = 0d;
 
 	/** Renders debug overlays for every sprite (GameView.debug = { hitbox: true }). */
 	public volatile boolean debugAll = false;
@@ -403,9 +400,7 @@ public class Scene
 		if (!sprites.remove(sprite)) {
 			return;
 		}
-		if (sprite.solidImpactListening) {
-			requestImpactGateCleanup(sprite);
-		}
+		sprite.markImpactGatesStale();
 		sprite.scene = null;
 		sprite.attachTarget = null;
 		sprite.attachOpacity = 1f;
@@ -429,31 +424,12 @@ public class Scene
 	{
 		synchronized (lock) {
 			for (Sprite s : sprites) {
-				if (s.solidImpactListening) {
-					requestImpactGateCleanup(s);
-				}
+				s.markImpactGatesStale();
 				s.scene = null;
 				s.attachTarget = null;
 				s.attachOpacity = 1f;
 			}
 			sprites.clear();
-		}
-	}
-
-	/** Queues map cleanup without letting the JS/Kroll thread touch a gate. */
-	public void requestImpactGateCleanup(Sprite sprite)
-	{
-		if (sprite != null && sprite.requestImpactGateCleanup()) {
-			impactCleanupQueue.add(sprite);
-		}
-	}
-
-	/** GL thread only. */
-	private void drainImpactGateCleanup()
-	{
-		Sprite sprite;
-		while ((sprite = impactCleanupQueue.poll()) != null) {
-			sprite.clearImpactGates();
 		}
 	}
 
@@ -905,11 +881,11 @@ public class Scene
 	/** Ticks physics, animations and tweens, then checks collisions. GL thread. */
 	public void update(float dt)
 	{
-		drainImpactGateCleanup();
-		physicsFrame++; // advances even while timeScale is zero
 		dt *= Math.max(0f, timeScale);
+		physicsTime += dt;
 		List<Sprite> list = snapshot();
 		for (Sprite s : list) {
+			s.consumeImpactGatesStale(this);
 			s.update(dt);
 		}
 		for (ParticleEmitter e : emittersSnapshot()) {
@@ -1248,20 +1224,24 @@ public class Scene
 	 *  The acceleration term removes velocity produced by the native movement
 	 *  model in this frame, leaving the incoming normal speed. */
 	private void dispatchSolidImpact(Sprite mover, Sprite solid,
-			float normalX, float normalY, float restitution, List<Sprite> list)
+			float normalX, float normalY, float restitution)
 	{
 		if (!mover.solidImpactListening && !solid.solidImpactListening) {
 			return;
 		}
-		float vn = mover.velocityX * normalX + mover.velocityY * normalY;
+		float relativeVelocityX = mover.velocityX - solid.velocityX;
+		float relativeVelocityY = mover.velocityY - solid.velocityY;
+		float relativeAccelX = mover.frameAccelX - solid.frameAccelX;
+		float relativeAccelY = mover.frameAccelY - solid.frameAccelY;
+		float vn = relativeVelocityX * normalX + relativeVelocityY * normalY;
 		float speed = 0f;
 		if (vn < 0f) {
 			float vnImpact = vn
-				- (mover.frameAccelX * normalX + mover.frameAccelY * normalY);
+				- (relativeAccelX * normalX + relativeAccelY * normalY);
 			speed = Math.max(0f, -vnImpact);
 		}
-		boolean fireMover = mover.shouldEmitSolidImpact(solid, speed, physicsFrame, list);
-		boolean fireSolid = solid.shouldEmitSolidImpact(mover, speed, physicsFrame, list);
+		boolean fireMover = mover.shouldEmitSolidImpact(solid, speed, physicsTime, this);
+		boolean fireSolid = solid.shouldEmitSolidImpact(mover, speed, physicsTime, this);
 		if (!fireMover && !fireSolid) {
 			return;
 		}
@@ -1279,7 +1259,7 @@ public class Scene
 
 	/** Push pairs use relative velocity and relative native acceleration. */
 	private void dispatchBilateralSolidImpact(Sprite a, Sprite b,
-			float normalX, float normalY, float restitution, List<Sprite> list)
+			float normalX, float normalY, float restitution)
 	{
 		if (!a.solidImpactListening && !b.solidImpactListening) {
 			return;
@@ -1295,8 +1275,8 @@ public class Scene
 				- (relativeAccelX * normalX + relativeAccelY * normalY);
 			speed = Math.max(0f, -vnImpact);
 		}
-		boolean fireA = a.shouldEmitSolidImpact(b, speed, physicsFrame, list);
-		boolean fireB = b.shouldEmitSolidImpact(a, speed, physicsFrame, list);
+		boolean fireA = a.shouldEmitSolidImpact(b, speed, physicsTime, this);
+		boolean fireB = b.shouldEmitSolidImpact(a, speed, physicsTime, this);
 		if (!fireA && !fireB) {
 			return;
 		}
@@ -1422,7 +1402,7 @@ public class Scene
 					b.y -= ny * half;
 				}
 				float e = Math.max(a.restitution, b.restitution);
-				dispatchBilateralSolidImpact(a, b, nx, ny, e, list);
+				dispatchBilateralSolidImpact(a, b, nx, ny, e);
 				float vn = (a.velocityX - b.velocityX) * nx
 						 + (a.velocityY - b.velocityY) * ny;
 				if (vn >= 0f) {
@@ -1526,7 +1506,7 @@ public class Scene
 						wall = wallFromNormal(nx);
 						wallOn = solid;
 					}
-					dispatchSolidImpact(s, solid, nx, ny, e, list);
+					dispatchSolidImpact(s, solid, nx, ny, e);
 					float vn = s.velocityX * nx + s.velocityY * ny;
 					if (vn < 0f) {
 						float bounce = -vn * e;
@@ -1566,7 +1546,7 @@ public class Scene
 						float normalX = 0f;
 						float normalY = -1f;
 						s.y -= overlapY; // hit the solid from above
-						dispatchSolidImpact(s, solid, normalX, normalY, e, list);
+						dispatchSolidImpact(s, solid, normalX, normalY, e);
 						float bounce = (e > 0f && s.velocityY > 0f)
 							? s.velocityY * e : 0f;
 						if (bounce > 40f) {
@@ -1582,7 +1562,7 @@ public class Scene
 						float normalX = 0f;
 						float normalY = 1f;
 						s.y += overlapY; // bumped from below
-						dispatchSolidImpact(s, solid, normalX, normalY, e, list);
+						dispatchSolidImpact(s, solid, normalX, normalY, e);
 						if (s.velocityY < 0f) {
 							s.velocityY = (e > 0f) ? -s.velocityY * e : 0f;
 						}
@@ -1597,7 +1577,7 @@ public class Scene
 						s.x -= overlapX;
 						wall = 1;
 						wallOn = solid;
-						dispatchSolidImpact(s, solid, normalX, normalY, e, list);
+						dispatchSolidImpact(s, solid, normalX, normalY, e);
 						if (e > 0f && s.velocityX > 0f) {
 							s.velocityX = -s.velocityX * e;
 						}
@@ -1607,7 +1587,7 @@ public class Scene
 						s.x += overlapX;
 						wall = -1;
 						wallOn = solid;
-						dispatchSolidImpact(s, solid, normalX, normalY, e, list);
+						dispatchSolidImpact(s, solid, normalX, normalY, e);
 						if (e > 0f && s.velocityX < 0f) {
 							s.velocityX = -s.velocityX * e;
 						}
@@ -2027,7 +2007,7 @@ public class Scene
 				wall = wallFromNormal(nx);
 				wallOn = solid;
 			}
-			dispatchSolidImpact(s, solid, nx, ny, e, list);
+			dispatchSolidImpact(s, solid, nx, ny, e);
 			float vn = s.velocityX * nx + s.velocityY * ny;
 			if (vn < 0f) {
 				float bounce = -vn * e;

@@ -300,17 +300,17 @@ typedef NS_ENUM(int, TGSolidMode) {
 @property (atomic, assign) float impactThreshold;
 @property (atomic, assign) BOOL solidImpactListening;
 
-/** Proxy listener hook; a last-listener removal queues map cleanup. */
+/** Proxy listener hook; a last-listener removal marks the gate map stale. */
 - (void)updateSolidImpactListening:(BOOL)listening;
-/** Returns YES only when this cleanup request must be queued. */
-- (BOOL)requestImpactGateCleanup;
-/** Render thread only. */
-- (void)clearImpactGates;
-/** Updates hysteresis for one pair and returns whether to emit. */
+/** Marks the gate map stale without touching it from the calling thread. */
+- (void)markImpactGatesStale;
+/** The current owning render thread consumes a pending cleanup. */
+- (void)consumeImpactGatesStaleForScene:(TGScene *)scene;
+/** Updates the temporal separation gate for one pair. */
 - (BOOL)shouldEmitSolidImpactWith:(TGSprite *)other
 						 speed:(float)speed
-				  physicsFrame:(uint64_t)physicsFrame
-				 sceneSprites:(NSArray<TGSprite *> *)sceneSprites;
+				   physicsTime:(NSTimeInterval)physicsTime
+						 scene:(TGScene *)scene;
 
 // Top-down car physics (carMode = YES)
 @property (atomic, assign) BOOL carMode;

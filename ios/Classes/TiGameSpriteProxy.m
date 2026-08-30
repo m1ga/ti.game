@@ -1292,7 +1292,7 @@ static NSSet<NSString *> *toGroupSet(id value)
 	if ([self _hasListeners:@"solidimpact"]) {
 		NSMutableDictionary *data = [NSMutableDictionary dictionary];
 		data[@"group"] = other.collisionGroup;
-		data[@"other"] = other.proxy;
+		data[@"other"] = other.proxy ?: [NSNull null];
 		data[@"x"] = @(s.x);
 		data[@"y"] = @(s.y);
 		data[@"contactX"] = @(contactX);

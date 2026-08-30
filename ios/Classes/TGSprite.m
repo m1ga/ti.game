@@ -10,11 +10,13 @@
 #import <stdatomic.h>
 
 static _Atomic int TGIdleSequence = 0;
+static const NSTimeInterval TGImpactRearmDelay = 0.1;
+static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 
 @interface TGImpactGate : NSObject {
 @public
 	BOOL armed;
-	uint64_t lastSeenPhysicsFrame;
+	NSTimeInterval lastSeenPhysicsTime;
 }
 @end
 
@@ -23,7 +25,7 @@ static _Atomic int TGIdleSequence = 0;
 {
 	if (self = [super init]) {
 		armed = YES;
-		lastSeenPhysicsFrame = UINT64_MAX;
+		lastSeenPhysicsTime = -DBL_MAX;
 	}
 	return self;
 }
@@ -61,7 +63,7 @@ static _Atomic int TGIdleSequence = 0;
 	// Physical-impact gates (render thread only; allocated on first contact).
 	NSMapTable<TGSprite *, TGImpactGate *> *_impactGates;
 	NSUInteger _impactPruneThreshold;
-	BOOL _impactCleanupQueued;
+	atomic_bool _impactGatesStale;
 }
 
 - (instancetype)init
@@ -106,6 +108,7 @@ static _Atomic int TGIdleSequence = 0;
 		_animationQueue = [NSMutableArray array];
 		_tweens = [NSMutableArray array];
 		atomic_init(&_animationActive, false);
+		atomic_init(&_impactGatesStale, false);
 	}
 	return self;
 }
@@ -114,87 +117,90 @@ static _Atomic int TGIdleSequence = 0;
 {
 	self.solidImpactListening = listening;
 	if (!listening) {
-		TGScene *owner = self.scene;
-		if (owner != nil) {
-			[owner requestImpactGateCleanup:self];
-		}
+		[self markImpactGatesStale];
 	}
 }
 
-- (BOOL)requestImpactGateCleanup
+- (void)markImpactGatesStale
 {
-	@synchronized (self) {
-		if (_impactCleanupQueued) {
-			return NO;
-		}
-		_impactCleanupQueued = YES;
-		return YES;
-	}
+	atomic_store(&_impactGatesStale, true);
 }
 
-- (void)clearImpactGates
+- (void)consumeImpactGatesStaleForScene:(TGScene *)scene
 {
+	if (!atomic_load(&_impactGatesStale) || self.scene != scene) {
+		return;
+	}
 	@synchronized (self) {
+		if (self.scene != scene || !atomic_exchange(&_impactGatesStale, false)) {
+			return;
+		}
 		[_impactGates removeAllObjects];
 		_impactGates = nil;
 		_impactPruneThreshold = 16;
-		_impactCleanupQueued = NO;
 	}
 }
 
 - (BOOL)shouldEmitSolidImpactWith:(TGSprite *)other
 						 speed:(float)speed
-				  physicsFrame:(uint64_t)physicsFrame
-				 sceneSprites:(NSArray<TGSprite *> *)sceneSprites
+				   physicsTime:(NSTimeInterval)physicsTime
+						 scene:(TGScene *)scene
 {
-	if (!self.solidImpactListening) {
+	if (self.scene != scene || !self.solidImpactListening) {
 		return NO;
 	}
-	if (_impactGates == nil) {
-		_impactGates = [NSMapTable
-			mapTableWithKeyOptions:NSPointerFunctionsWeakMemory | NSPointerFunctionsObjectPointerPersonality
-			valueOptions:NSPointerFunctionsStrongMemory];
-	}
-	TGImpactGate *gate = [_impactGates objectForKey:other];
-	if (gate == nil) {
-		gate = [[TGImpactGate alloc] init];
-		[_impactGates setObject:gate forKey:other];
-	}
-	uint64_t previousFrame = physicsFrame - 1;
-	if (gate->lastSeenPhysicsFrame != physicsFrame
-			&& gate->lastSeenPhysicsFrame != previousFrame) {
-		gate->armed = YES;
-	}
-	gate->lastSeenPhysicsFrame = physicsFrame;
+	@synchronized (self) {
+		if (self.scene != scene || !self.solidImpactListening) {
+			return NO;
+		}
+		if (atomic_exchange(&_impactGatesStale, false)) {
+			[_impactGates removeAllObjects];
+			_impactGates = nil;
+			_impactPruneThreshold = 16;
+		}
+		if (_impactGates == nil) {
+			_impactGates = [NSMapTable
+				mapTableWithKeyOptions:NSPointerFunctionsWeakMemory | NSPointerFunctionsObjectPointerPersonality
+				valueOptions:NSPointerFunctionsStrongMemory];
+		}
+		TGImpactGate *gate = [_impactGates objectForKey:other];
+		if (gate == nil) {
+			gate = [[TGImpactGate alloc] init];
+			[_impactGates setObject:gate forKey:other];
+		}
+		if (!gate->armed
+				&& physicsTime - gate->lastSeenPhysicsTime
+					> TGImpactRearmDelay + TGImpactTimeEpsilon) {
+			gate->armed = YES;
+		}
+		gate->lastSeenPhysicsTime = physicsTime;
 
-	float threshold = MAX(0.0f, self.impactThreshold);
-	if (speed <= threshold * 0.5f) {
-		gate->armed = YES;
-	}
-	BOOL emit = speed > 0.0f && speed >= threshold && gate->armed;
-	if (emit) {
-		gate->armed = NO;
-	}
+		float threshold = MAX(0.0f, self.impactThreshold);
+		BOOL emit = speed > 0.0f && speed >= threshold && gate->armed;
+		if (emit) {
+			gate->armed = NO;
+		}
 
-	if (_impactGates.count > _impactPruneThreshold) {
-		NSMutableArray<TGSprite *> *stale = nil;
-		for (TGSprite *key in _impactGates.keyEnumerator) {
-			TGImpactGate *candidate = [_impactGates objectForKey:key];
-			BOOL notRecent = candidate->lastSeenPhysicsFrame != physicsFrame
-				&& candidate->lastSeenPhysicsFrame != previousFrame;
-			if (notRecent || [sceneSprites indexOfObjectIdenticalTo:key] == NSNotFound) {
-				if (stale == nil) {
-					stale = [NSMutableArray array];
+		if (_impactGates.count > _impactPruneThreshold) {
+			NSMutableArray<TGSprite *> *stale = nil;
+			for (TGSprite *key in _impactGates.keyEnumerator) {
+				TGImpactGate *candidate = [_impactGates objectForKey:key];
+				BOOL separated = physicsTime - candidate->lastSeenPhysicsTime
+					> TGImpactRearmDelay + TGImpactTimeEpsilon;
+				if (key.scene != scene || separated) {
+					if (stale == nil) {
+						stale = [NSMutableArray array];
+					}
+					[stale addObject:key];
 				}
-				[stale addObject:key];
 			}
+			for (TGSprite *key in stale) {
+				[_impactGates removeObjectForKey:key];
+			}
+			_impactPruneThreshold = MAX(16, _impactGates.count + 16);
 		}
-		for (TGSprite *key in stale) {
-			[_impactGates removeObjectForKey:key];
-		}
-		_impactPruneThreshold = MAX(16, _impactGates.count + 16);
+		return emit;
 	}
-	return emit;
 }
 
 - (float)drawWidth

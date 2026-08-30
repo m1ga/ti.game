@@ -114,9 +114,12 @@ module.exports = function () {
 			impactSound.play();
 		}
 
+		// The 8-ball is red instead of its usual #25282d: black disappears
+		// against this demo's dark green felt, especially on smaller screens.
+		var EIGHT_BALL_COLOR = '#cc4b45';
 		var COLORS = [
 			'#e9c94c', '#3f74c9', '#cc4b45', '#7953ad', '#de7d35',
-			'#3a9765', '#944b34', '#cc4b45', '#e9c94c', '#3f74c9',
+			'#3a9765', '#944b34', EIGHT_BALL_COLOR, '#e9c94c', '#3f74c9',
 			'#cc4b45', '#7953ad', '#de7d35', '#3a9765', '#944b34'
 		];
 
@@ -342,7 +345,7 @@ module.exports = function () {
 				if (e.group !== 'ball') {
 					return;   // rails report their own side
 				}
-				var otherId = e.other.impactId;
+				var otherId = e.other && e.other.impactId;
 				if (typeof otherId === 'number' && ball.impactId > otherId) {
 					return;   // the other ball of this pair is speaking
 				}

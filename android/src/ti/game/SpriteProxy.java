@@ -253,7 +253,7 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		}
 		if (options.containsKey("impactThreshold")) {
 			sprite.impactThreshold = Math.max(0f,
-				TiConvert.toFloat(options.get("impactThreshold")));
+				TiConvert.toFloat(options.get("impactThreshold"), 40f));
 		}
 		if (options.containsKey("carMode")) {
 			sprite.carMode = TiConvert.toBoolean(options.get("carMode"), false);
@@ -1382,9 +1382,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setImpactThreshold(float value)
+	public void setImpactThreshold(Object value)
 	{
-		sprite.impactThreshold = Math.max(0f, value);
+		sprite.impactThreshold = Math.max(0f, TiConvert.toFloat(value, 40f));
 	}
 
 	// --- Idle animation ---------------------------------------------------

@@ -258,6 +258,8 @@ module.exports = function () {
 
 		// --- Dropping ---------------------------------------------------------
 
+		// Keep the circle-vs-circle contacts readable instead of filling the
+		// board with bodies. Twelve fits one DROP 10 batch plus two single drops.
 		var MAX_LIVE = 12;
 		var live = [];
 		var COLORS = ['#ff8a80', '#ffd54a', '#69f0ae', '#8ab4ff', '#e86ea8', '#e07a2b'];
@@ -308,7 +310,7 @@ module.exports = function () {
 			ball.impactId = dropped;
 			ball.addEventListener('solidimpact', function (e) {
 				if (e.group === 'chip') {
-					var otherId = e.other.impactId;
+					var otherId = e.other && e.other.impactId;
 					if (typeof otherId === 'number' && ball.impactId > otherId) {
 						return;   // the other chip of this pair is speaking
 					}
@@ -347,6 +349,10 @@ module.exports = function () {
 		}
 
 		function dropRandom(count) {
+			count = Math.min(count, MAX_LIVE - live.length);
+			if (count <= 0) {
+				return;
+			}
 			var lo = BOARD_L + BALL;
 			var hi = BOARD_R - BALL;
 			var span = (hi - lo) / count;

@@ -93,10 +93,10 @@ traffic in the loop.
       responses between sprites. The payload includes the other sprite,
       shared contact point, receiver normal, compensated closing speed and
       mixed restitution; receiver-specific gates suppress sustained contact
-      and rearm after separation or at half-threshold. With no listeners the
-      resolver returns before building payloads or gates, so there is no
-      bridge traffic. TileLayer cells remain outside this sprite-only event
-      by design. pool.js, drum.js and plinko.js exercise it.
+      and rearm after more than 100 ms of confirmed separation. With no
+      listeners the resolver returns before building payloads or gates, so
+      there is no bridge traffic. TileLayer cells remain outside this
+      sprite-only event by design. pool.js, drum.js and plinko.js exercise it.
 - [x] Horizontal acceleration (`gravityX`) — the sibling of `gravity`;
       `gravity` keeps its exact meaning. Default 0. wind.js.
 - [x] One-way platforms (jump up through, land on top) — `oneWay: true`

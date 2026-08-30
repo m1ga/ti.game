@@ -3,10 +3,10 @@ package ti.game.engine;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appcelerator.kroll.KrollProxy;
@@ -310,12 +310,14 @@ public class Sprite
 	public volatile boolean solidImpactListening = false;
 	private WeakHashMap<Sprite, ImpactGate> impactGates;
 	private int impactPruneThreshold = 16;
-	private boolean impactCleanupQueued = false;
+	private final AtomicBoolean impactGatesStale = new AtomicBoolean(false);
+	private static final double IMPACT_REARM_DELAY = 0.1d;
+	private static final double IMPACT_TIME_EPSILON = 1e-9d;
 
 	private static final class ImpactGate
 	{
 		boolean armed = true;
-		long lastSeenPhysicsFrame = Long.MIN_VALUE;
+		double lastSeenPhysicsTime = Double.NEGATIVE_INFINITY;
 	}
 
 	// Top-down car physics (carMode = true). JS sets throttle/steering from
@@ -396,49 +398,52 @@ public class Sprite
 			float normalX, float normalY, float speed, float restitution);
 	}
 
-	/** Marks this sprite's gates for cleanup without touching the render-thread
-	 *  map from Kroll. Returns true only for the request that must be queued. */
-	public synchronized boolean requestImpactGateCleanup()
+	/** Marks the render-thread gate map for cleanup without touching it from
+	 *  Kroll or a scene-mutation thread. */
+	public void markImpactGatesStale()
 	{
-		if (impactCleanupQueued) {
-			return false;
-		}
-		impactCleanupQueued = true;
-		return true;
+		impactGatesStale.set(true);
 	}
 
 	/** Called by the proxy when the first listener is added or the last one
-	 *  is removed. Cleanup is queued onto the render thread. */
+	 *  is removed. Cleanup is deferred to the owning render thread. */
 	public void setSolidImpactListening(boolean listening)
 	{
 		solidImpactListening = listening;
 		if (!listening) {
-			Scene owner = scene;
-			if (owner != null) {
-				owner.requestImpactGateCleanup(this);
+			markImpactGatesStale();
+		}
+	}
+
+	/** Clears stale gates only for the render thread that currently owns this
+	 *  sprite. A previous scene may still hold it in an in-flight snapshot. */
+	public void consumeImpactGatesStale(Scene owner)
+	{
+		if (!impactGatesStale.get() || scene != owner) {
+			return;
+		}
+		synchronized (this) {
+			// The owner can change while an old render thread waits for this lock.
+			if (scene != owner || !impactGatesStale.getAndSet(false)) {
+				return;
 			}
+			if (impactGates != null) {
+				impactGates.clear();
+				impactGates = null;
+			}
+			impactPruneThreshold = 16;
 		}
 	}
 
-	/** Render thread only. */
-	public synchronized void clearImpactGates()
-	{
-		if (impactGates != null) {
-			impactGates.clear();
-			impactGates = null;
-		}
-		impactPruneThreshold = 16;
-		impactCleanupQueued = false;
-	}
-
-	/** Updates this receiver's per-pair hysteresis and returns whether its
+	/** Updates this receiver's per-pair separation gate and returns whether its
 	 *  listener should receive the current physical impact. Render thread. */
-	public boolean shouldEmitSolidImpact(Sprite other, float speed,
-			long physicsFrame, List<Sprite> sceneSprites)
+	public synchronized boolean shouldEmitSolidImpact(Sprite other, float speed,
+			double physicsTime, Scene owner)
 	{
-		if (!solidImpactListening) {
+		if (scene != owner || !solidImpactListening) {
 			return false;
 		}
+		consumeImpactGatesStale(owner);
 		if (impactGates == null) {
 			impactGates = new WeakHashMap<>();
 		}
@@ -447,52 +452,39 @@ public class Sprite
 			gate = new ImpactGate();
 			impactGates.put(other, gate);
 		}
-		long previousFrame = physicsFrame - 1L;
-		if (gate.lastSeenPhysicsFrame != physicsFrame
-				&& gate.lastSeenPhysicsFrame != previousFrame) {
+		if (!gate.armed
+				&& physicsTime - gate.lastSeenPhysicsTime
+					> IMPACT_REARM_DELAY + IMPACT_TIME_EPSILON) {
 			gate.armed = true;
 		}
-		gate.lastSeenPhysicsFrame = physicsFrame;
+		gate.lastSeenPhysicsTime = physicsTime;
 
 		float threshold = Math.max(0f, impactThreshold);
-		if (speed <= threshold * 0.5f) {
-			gate.armed = true;
-		}
 		boolean emit = speed > 0f && speed >= threshold && gate.armed;
 		if (emit) {
 			gate.armed = false;
 		}
 
 		if (impactGates.size() > impactPruneThreshold) {
-			pruneImpactGates(physicsFrame, sceneSprites);
+			pruneImpactGates(physicsTime, owner);
 		}
 		return emit;
 	}
 
-	private void pruneImpactGates(long physicsFrame, List<Sprite> sceneSprites)
+	private void pruneImpactGates(double physicsTime, Scene owner)
 	{
-		long previousFrame = physicsFrame - 1L;
 		for (Iterator<Map.Entry<Sprite, ImpactGate>> it = impactGates.entrySet().iterator();
 				it.hasNext();) {
 			Map.Entry<Sprite, ImpactGate> entry = it.next();
+			Sprite other = entry.getKey();
 			ImpactGate gate = entry.getValue();
-			if ((gate.lastSeenPhysicsFrame != physicsFrame
-					&& gate.lastSeenPhysicsFrame != previousFrame)
-					|| !containsIdentity(sceneSprites, entry.getKey())) {
+			if (other == null || other.scene != owner
+					|| physicsTime - gate.lastSeenPhysicsTime
+						> IMPACT_REARM_DELAY + IMPACT_TIME_EPSILON) {
 				it.remove();
 			}
 		}
 		impactPruneThreshold = Math.max(16, impactGates.size() + 16);
-	}
-
-	private static boolean containsIdentity(List<Sprite> sprites, Sprite target)
-	{
-		for (Sprite sprite : sprites) {
-			if (sprite == target) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	public float drawWidth()
