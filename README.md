@@ -918,7 +918,7 @@ These demos do not cover every public member. In particular, there is no
 dedicated demo for `wallhit`/`wallSlideSpeed`, resource `unload()`, every
 gamepad event or every creation-time option.
 
-Run them with `ti build -p android --sdk 13.3.1.GA` from `android/` (executes
+Run them with `ti build -p android` from `android/` (executes
 `example/app.js` on a device/emulator).
 
 ## Names and percentages
@@ -1429,8 +1429,8 @@ behavior, change both platforms (see `AGENTS.md`).
 
 ```bash
 cd android
-ti build -p android --build-only --sdk 13.3.1.GA   # package android/dist/ti.game-android-<version>.zip
-ti build -p android --sdk 13.3.1.GA                # run the example app on a device/emulator
+ti build -p android --build-only   # package android/dist/ti.game-android-<version>.zip
+ti build -p android                # run the example app on a device/emulator
 
 cd ios                             # macOS only
 ti build -p ios --build-only       # package the iOS module zip
