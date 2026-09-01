@@ -6,9 +6,9 @@
 
 A 2D sprite game engine module for Titanium SDK (Android and iOS),
 rendered with OpenGL ES 2.0. You describe your scene and react to events
-from JavaScript; everything that runs every frame — rendering, animation,
-physics, collision, gestures — runs natively at 60 fps. The JS API is
-identical on both platforms.
+from JavaScript; rendering, animation, physics, collision and gestures run
+natively every frame. The API reference below starts with the portable
+Android/iOS contract and calls out the few platform differences.
 
 **Features**
 
@@ -47,7 +47,7 @@ identical on both platforms.
   for camera-proof HUDs
 - Sprite attachment (`attachTo`) — pin any sprite to another with an
   offset, tracked natively every frame (name tags, health bars, turrets)
-- 26 example demos in `example/` covering every feature
+- 34 example demos in `example/`, each focused on a runnable feature set
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -84,7 +84,7 @@ step by step — sprite, animation, tap-to-move.
        draggable: true,
        animations: {
            walk: { frames: [0, 1, 2, 3], fps: 12, loop: true },
-           jump: { frames: [4, 5, 6], fps: 10, frame: 0 }
+           jump: { frames: [4, 5, 6], fps: 10 }
        }
    });
    hero.play('walk');
@@ -95,10 +95,9 @@ step by step — sprite, animation, tap-to-move.
    win.open();
    ```
 
-That's the whole model: create a **GameView** (the canvas), create
-**SpriteSheets** (textures cut into frames), create **Sprites** (things on
-screen), set properties, listen for events. You never write a game loop —
-the engine runs it natively.
+The model is small: create a **GameView** (the canvas), **SpriteSheets**
+(textures cut into frames) and **Sprites** (objects in the scene), then set
+properties and listen for events. The native engine owns the game loop.
 
 ## Core concepts
 
@@ -138,8 +137,7 @@ gameView.addEventListener('resize', function (e) {
 
 ## Performance: what runs where
 
-Three threads touch a running game — knowing what happens on each is the
-key to understanding both the performance and the API design:
+Three threads touch a running game:
 
 | Thread | Runs | Bridge involved? |
 |---|---|---|
@@ -147,8 +145,8 @@ key to understanding both the performance and the API design:
 | **Android UI thread** | Touch handling: hit-testing, drag movement, pinch/rotate gestures | No |
 | **JS/Kroll thread** | Your game code: creating sprites, setting properties, handling events | Yes — this is the only place the Titanium bridge exists |
 
-**Per frame, on-device, zero bridge traffic.** Every 16 ms tick reads and
-writes only native `Sprite` objects in the scene graph. A drag moves the
+**A normal frame does not cross the bridge.** Every tick reads and writes only
+native `Sprite` objects in the scene graph. A drag moves the
 sprite on the UI thread; a tween, a falling bird, a drifting car, a
 bouncing ball all advance on the GL thread. Nothing in the frame loop
 waits for — or even talks to — JavaScript, so JS garbage collection or a
@@ -215,11 +213,11 @@ screen or not. A `TileLayer` costs by what is visible instead: the
 renderer walks only the cells inside the camera rect (one batch run per
 layer, since a layer has one sheet), nothing is ticked, and a mover
 against the layer tests only the few cells under its own hitbox. A
-200x200 map behaves like a 20x20 one.
+200x200 map and a 20x20 map have similar draw cost at the same viewport,
+although the larger grid still uses more memory.
 
-**Rule of thumb:** if JS runs code every frame, you're fighting the
-engine; if JS only reacts to events and sets properties, you get native
-performance for free.
+Keep continuous movement and animation in the engine. JavaScript should react
+to discrete events and make occasional property writes.
 
 **LiveView.** A LiveView reload replaces Titanium's JavaScript runtime. The
 module automatically retires every `GameView` render loop owned by the old
@@ -249,10 +247,11 @@ judge performance on device, not in the simulator.
   It defaults to `false`; combine it with `smoothing: false` when a moving
   pixel-art sprite must keep a stable texel phase.
 - **Frame animations**: declare named animations on the sprite
-  (`{ frames, fps, loop, frame }`), control with `play(name)` / `stop()` / the
-  `frame` property. Non-looping animations fire `animationcomplete`; an
-  optional `frame` in the definition is the sheet frame shown once the
-  animation finishes (default: hold the last animation frame).
+  (`{ frames, fps, loop }`), control them with `play(name)`, `stop()` and the
+  `frame` property. Non-looping animations fire `animationcomplete` and hold
+  their last frame. Android also accepts a `frame` in the definition to choose
+  the frame shown on completion; use `animationcomplete` plus a `frame` write
+  when that behavior must be portable.
   `play('attack', { then: 'idle' })` chains natively — each queued name
   (a string or an array) plays as the previous non-looping animation
   finishes, no `animationcomplete` juggling in JS.
@@ -684,10 +683,11 @@ gameView.add(ground);
 hero.solidWith = ['wall'];         // blocked by the water tiles like by any solid
 ```
 
-One layer holds a whole map as a grid of frame indices — no sprite per
-tile, no per-tile objects at all. Per frame the renderer draws only the
-cells inside the camera rect, so map size is free: `tilemap.js` scrolls a
-120x90 island from one layer, and 1000x1000 would cost the same. Stack
+One layer holds a whole map as a grid of frame indices, with no sprite or
+object per cell. Per frame the renderer draws only the cells inside the
+camera rect. A larger grid uses more memory, but does not increase draw work
+when the viewport is unchanged. `tilemap.js` scrolls a 120x90 island from one
+layer. Stack
 layers for ground/decoration/foreground; `scrollFactor` makes a layer a
 parallax backdrop, `tintColor`/`opacity` shade it (night, fog of war).
 
@@ -781,11 +781,10 @@ works on any sprite, not just text — see the Sprite methods reference.
 ### Depth in top-down scenes
 
 `ySort: true` sorts sprites within the same `zIndex` by their **bottom
-edge** (feet, trunk base) instead of a fixed order — walk below a tree
-and you draw in front of it, walk above and you vanish behind the canopy.
+edge** (feet or trunk base) instead of a fixed order. Walk below a tree and
+the player draws in front; walk above it and the player draws behind.
 Give the player, trees and buildings the same `zIndex` with `ySort`, keep
-ground tiles on a lower `zIndex`, and the Zelda-style depth illusion
-falls out automatically (see `topdown.js`).
+ground tiles on a lower `zIndex`; see `topdown.js`.
 
 ### Debug HUD
 
@@ -880,42 +879,46 @@ shared piece is `example/backnav.js`, the "back to the launcher" control
 
 | Demo | Shows |
 |---|---|
-| `basic.js` | Sheets, animations, drag/pinch/rotate, tween chaining |
-| `puzzle.js` | Drag & drop with snapping, press-to-lift, tween-back-home, multi-touch (one piece per finger) |
-| `flappy.js` | Gravity + tap impulse, trigger zones, parallax wrapping |
-| `platformer.js` | `solidWith`, `onGround`/`land` (trampolines via the landed-on solid), one-way staircase (`oneWay`), tween-driven moving platform that carries the player, camera `follow`, multitouch d-pad buttons, Bluetooth gamepad via one `buttondown`/`buttonup` action table |
-| `volley.js` | `restitution` ball, JS-driven hit response, simple AI timer |
-| `racing.js` | `carMode` drifting, skid marks, pixel art, lap/checkpoint logic |
-| `cards.js` | Deck dealing, fanned hand UI, selection tweens, idle wobble |
-| `asteroids.js` | `thrust`/`angularVelocity`, `wrapAround`, bullet pooling, laser/explosion effects + looping thruster sound, additive bolts (`blend: 'add'`), crash damage flash (`flash()`) |
-| `topdown.js` | Tile map from a string array, solid tiles/house, `ySort` depth, 8-way d-pad, follower NPC on a decision timer |
-| `skate.js` | Endless runner: pixel-art parallax street, jump-button ollie over pooled obstacles, raised road sections to ride, crash sprite on collision |
-| `pointclick.js` | Adventure scene: tap-to-walk via `findPath` + `followPath` (the player routes around the oak's trunk, an invisible obstacle box), verb-coin icons on a hotspot, JS hit-testing vs. view taps, `ySort` depth |
-| `particles.js` | Emitter playground: continuous spark fountain, tap-for-fireworks bursts, smoke trail following a dragged sprite, debug HUD on (`debug: { hud: 'topRight' }`) |
-| `rhythm.js` | DDR-style note catcher: pooled notes on native velocity, `press`-event pads, timing-based good/bad sounds, tinted hit bursts, miss trigger zone |
-| `camera.js` | Camera playground: two-axis dead-zone follow with smoothing, `cameraBounds`, zoom buttons (`cameraScale`), shake, fullscreen tint/glitch effects (`cameraEffect`), `tileRepeat` ground, `scrollFactor` parallax (1.35x cloud shadows, a scrollFactor-0 sun pinned to the view), debug HUD on in `bottomLeft` — the one demo where every camera feature meets it at once |
-| `rope.js` | Native Verlet ropes: one hanging from a draggable ball (`head`), one from a fixed anchor with a weight pinned to the `tail` |
-| `flip.js` | `flipX`/`flipY` from movement: tween patrol mirrors on turn-around, velocity runners face their `velocityX` sign, tap inverts gravity and walks the ceiling upside down |
-| `hitbox.js` | `debug: true` overlays explained: two identical adventurers walk against a wall — the full-frame one stops a body's width early and hovers on its frame padding, the `hitboxScaleX`/`hitboxScaleY`-tuned one gets flush and lands its feet; tap to toggle the tuning live |
-| `blend.js` | Blend & flash gallery: identical tinted spark rows with `blend: 'normal'` vs `'add'` vs `'multiply'` vs `'screen'` (the multiply/screen rows sit on a bright meadow strip, drifting on idle wobble), tap-to-`flash()` ships with different colors/durations + auto-blink |
-| `text.js` | Bitmap-font text: screen-fixed HUD (score pop + flash, wobbling glowing title, a `[ RESET ]` text button) over a camera-followed world with scrolling signpost labels and a centered multi-line block |
-| `swept.js` | Swept AABB comparison: two lanes fire identical bullets at a thin wall with rising speed — the `swept: false` lane starts tunneling straight through, the `swept: true` lane never misses |
-| `circles.js` | Three emitters stay aligned over their respective hitbox shapes, but every emitted ball can hit all three solids and collide with the other balls as a bilateral `'push'` body. Each falls vertically from a random horizontal point within its assigned shape: `'rect'` sends it off flat faces and corners, `'circle'` deflects along the center-to-center normal, and `'rotatedRect'` on a 45°-turned square catches it on its real faces instead of a grown axis-aligned box. Below, the same shot fired at both `solidMode` values keeps the `'block'`/`'push'` comparison side by side |
-| `slopes.js` | Tilted `'rotatedRect'` ramps with two riders that take different paths through the engine: a rect crate resolved by separating axes, and a circle taken into the ramp's own frame. Both settle on the face and slide down it instead of standing on an invisible ledge. The green surfaces — the floor and both side walls — carry a `restitution` of their own, so the same ball that slides down a ramp at 0.1 rebounds off them at 0.5. The bounce is a property of the surface, not only of what lands on it; leave the walls at 0 and everything ends up parked in a corner no matter how well the floor bounces |
-| `plinko.js` | A staggered wall of 86 circular solids: each peg is a `hitboxShape: 'circle'` sprite, so a ball comes off its shoulder along the center-to-center normal and which way it goes is decided by fractions of a pixel. As bounding boxes every peg would be a square with a flat top and the balls would stack instead of scatter. `swept: true` keeps a fast ball from stepping over a small peg between frames. Speed-sensitive `solidimpact` clicks cover pegs, walls, dividers and chip-to-chip pushes; a short cadence and pair index keep crowded drops crisp without playing both sides of one hit. Board taps choose an exact release point, while the bracketed controls drop one random chip or spread ten across the board |
-| `pool.js` | Bilateral circle solids: 16 balls on a felt table, all `solidMode: 'push'`, so each pair separates once and swaps its normal velocity — a break shot scatters the rack. Rails are ordinary rect solids, pockets are circular trigger zones, and `linearDamping` is the felt that brings everything to a stop. Rails and every ball listen for `solidimpact`; an index-based pair rule prevents both sides of one ball contact from playing the same hit twice. The 8-ball is red because black disappears against the demo's dark green felt on small screens. RESET rebuilds the full rack at any point |
-| `drum.js` | Bingo drum with inward containment: 25 balls inside one `solidMode: 'contain'` circle, with no ring of wall sprites — the boundary is analytic, so there are no seams to squeeze through. The balls are `push` too, so they pile up under gravity instead of overlapping. SHAKE kicks them once; TUMBLE uses a thin contact launcher at the bottom. The shell and balls listen for `solidimpact`: the shell keeps its glass hit, while three shorter clacks cover ball-to-ball contacts on an independent cadence; an index-based pair rule lets exactly one ball play each physical hit |
-| `wind.js` | `gravityX`: falling leaves drift sideways under a wind you change with buttons — every leaf answers at once with no per-frame JavaScript, because the value is read natively each tick the way `gravity` is. Below, the other use, which has nothing to do with wind: a top-down puck with `gravity: 0` whose only acceleration is horizontal, for a table seen from above |
-| `path.js` | Path & chain: a ship on a smoothed looping circuit (`rotate: true`), a guard patrolling a sharp rectangle while its walk loop plays, tap-to-chain (`play('hop', { then: 'walk' })`, array chains on the bird), and a dog running one-shot zig-zag paths to taps with `pathcomplete` |
-| `raycast.js` | Raycast playground: a guard's line-of-sight beam blocked by a draggable crate (beam shortens to `hit.distance` and turns red), a ledge-probing walker that turns before the platform edge, and a tap-fired turret hitscan that flashes `hit.sprite` and reports group + distance |
-| `zones.js` | `collision`/`collisionend` lifecycle: a water pool that tints the hero while he's inside, a pressure plate holding a door open exactly while the ball rests on it, and a remove-ball button showing that deleting a contact partner still fires the exit |
-| `demoscene.js` | Old-school cracktro: per-character sine text scroller on rotated copies of one closed `followPath` loop, additive copper bars bobbing on circle paths (constant speed on a circle = perfect sine), glowing floating logo, tween-scrolled `tileRepeat` starfield, looping chiptune on the music backend |
-| `tilemap.js` | Tile maps: a 120x90 island (10,800 cells) generated in JS and drawn by one `createTileLayer` — only the cells in view are rendered; water tiles are `solid` behind the layer's `collisionGroup`, so the walker is blocked without a single collision sprite and `findPath` (with a `bounds` window around the walker) routes around the lakes; BUILD mode lays planks with `setTile` (art + collision update live), DEBUG outlines the solid cells; the performance HUD (`debug: { hud: 'topRight' }`) shows draw calls and frame time staying flat while the camera scrolls |
-| `maze.js` | A* playground: tap a tile and `findPath` routes the player through a wall-tile maze (`cellSize` = tile size, so the grid matches the map) — faint dots show every grid cell of the raw route (`simplify: false`), gold dots the simplified waypoints handed to `followPath`; a hound re-paths to the player on a `gameView.every` timer and sends you `flash`ing back on contact |
-| `timescale.js` | `gameView.timeScale`: running dog, bouncing ball and a spark fountain slowed to ½×/⅒× or frozen (`0`) by buttons — rendering and touch keep going; a GAME clock on `gameView.every(1000, ...)` freezes with the scene while a REAL `setInterval` clock keeps ticking |
-| `worldwrap.js` | Circular-world acceptance playground: a six-screen `worldWrapX`, shortest-path camera follow, a full-width solid `TileLayer` floor, a participating player and touchable overlap target, plus an automated `swept` bolt blocked by that target through the seam; hold either overlay button to orbit repeatedly without JS position writes |
+| `basic.js` | Sheets, frame animations, drag/pinch/rotate and tween completion |
+| `puzzle.js` | Multi-touch drag, snapping and tween-back |
+| `flappy.js` | Gravity impulse, invisible trigger zones and wrapping parallax |
+| `platformer.js` | Platform solids, one-way platforms, rider carrying, camera follow, multi-touch controls and gamepad buttons |
+| `volley.js` | Restitution, landing and a coarse AI timer |
+| `racing.js` | `carMode`, drift, skid marks, checkpoints and laps |
+| `cards.js` | Dealing, a fanned hand, selection tweens and idle wobble |
+| `asteroids.js` | Thrust, angular velocity, wrapping, pooling, blend/flash effects and audio |
+| `topdown.js` | A small sprite-built map, `ySort`, eight-way input and a decision timer |
+| `skate.js` | Endless-runner pooling, carried terrain, parallax, particles and audio hooks |
+| `pointclick.js` | Tap-to-walk with `findPath()` and `followPath()`, hotspots and `ySort` |
+| `particles.js` | Continuous and burst emitters, a sprite target and HUD telemetry |
+| `rhythm.js` | Pooled notes, native velocity, view `press` controls and audio feedback |
+| `camera.js` | Two-axis follow, bounds, zoom, shake, camera effects, parallax and a `topRight` HUD |
+| `rope.js` | A rope pinned to a sprite and a fixed-head rope with a tail weight |
+| `flip.js` | Draw-only flips driven by direction and inverted gravity |
+| `hitbox.js` | Global and per-sprite debug overlays with per-axis hitbox correction |
+| `blend.js` | Normal/add/multiply/screen blending and `flash()` |
+| `text.js` | Screen-fixed HUD, world labels, text buttons, wrapping and attachment |
+| `swept.js` | Fast bullets with and without continuous collision |
+| `path.js` | Looped/smoothed paths, one-shot paths and animation chains |
+| `raycast.js` | Line of sight, ledge probes and tap-fired hitscan |
+| `zones.js` | `collision`/`collisionend`, a pressure plate and contact removal |
+| `demoscene.js` | Path-driven scrollers, glow, blend modes and music |
+| `maze.js` | Raw/simplified A*, tap routing and timer-based re-pathing |
+| `timescale.js` | Slow/frozen scenes and game-time versus real-time timers |
+| `circles.js` | Rect/circle/rotated-rect contacts and `block` versus bilateral `push` |
+| `slopes.js` | Rotated-rect ramp normals and restitution supplied by a surface |
+| `plinko.js` | Circular pegs, swept balls, trigger slots and `solidimpact` audio |
+| `pool.js` | Bilateral circle momentum, rails, pockets, damping and `solidimpact` |
+| `drum.js` | Circular containment, contact impulses and `solidimpact` |
+| `wind.js` | `gravityX` as wind and as top-down acceleration |
+| `tilemap.js` | A 120x90 TileLayer, visible-cell rendering, cell collision, live edits, A* and HUD telemetry |
+| `worldwrap.js` | `worldWrapX` camera, touch, collision, swept movement and a full-width TileLayer |
 
-Run them with `ti build -p android` from `android/` (executes
+These demos do not cover every public member. In particular, there is no
+dedicated demo for `wallhit`/`wallSlideSpeed`, resource `unload()`, every
+gamepad event or every creation-time option.
+
+Run them with `ti build -p android --sdk 13.3.1.GA` from `android/` (executes
 `example/app.js` on a device/emulator).
 
 ## Names and percentages
@@ -929,8 +932,9 @@ Game.createSprite({ anchorX: 0, anchorY: 1, hitboxScaleY: 0.55, opacity: 0.8 });
 Game.createSprite({ anchor: 'bottom-left', hitboxScaleY: '55%', opacity: '80%' });
 ```
 
-`anchorX` takes `left`, `center`, `right`; `anchorY` takes `top`, `middle`,
-`bottom`; and `anchor` sets both from one of the nine corners and edges —
+`anchorX` takes `left`, `center`/`centre`/`middle`, `right`; `anchorY` takes
+`top`, `center`/`centre`/`middle`, `bottom`; and `anchor` sets both from one of
+the nine corners and edges —
 `'top-left'`, `'bottom'`, `'center'`, `'right'` — in either order. Read `anchor`
 back and you get the preset the sprite is on, or `'custom'`.
 
@@ -940,6 +944,7 @@ Percentages work on every ratio the engine exposes: `scale`, `scaleX`, `scaleY`,
 `startScale`, `endScale`, `startOpacity` and `endOpacity`, a rope's `damping`, a
 sound's `volume`, and on the GameView `cameraScale`, `timeScale`,
 `cameraEffectIntensity` and the four `follow` margins plus its `smoothing`.
+TileLayer `opacity`, `scrollFactor` and `restitution` accept percentages too.
 
 They do **not** apply to coordinates, sizes, degrees, speeds or the car model's
 `grip` and `drag` — those are 1/s friction coefficients, not fractions, and a
@@ -958,57 +963,84 @@ Nothing in those two numbers says that, and the combination is easy to miss —
 box start lower without lifting off the ground. `anchor: 'bottom'` and
 `hitboxScaleY: '55%'` say it out loud.
 
-A value that cannot be understood logs a warning and leaves the property at what
-it already held, so a typo degrades to the current value instead of taking the
-app down mid-frame.
+An invalid ratio or percentage logs a warning instead of throwing. At creation
+time both platforms keep the default. On a later write, Android keeps the
+current value while iOS resets that property to its default. Validate values in
+app code rather than relying on either fallback.
 
 ## API reference
 
+The tables in this section describe the API that works on both Android and
+iOS. `R/W` means a live property, `read-only` means writes do not affect the
+engine, and `creation` means the value must be passed to the factory. Every
+`R/W` property may also be supplied at creation unless its row says otherwise.
+
+Current platform differences:
+
+- Pass `raycast()` groups as an array. Android also accepts loose group
+  arguments, while iOS treats a non-array fifth argument as no filter.
+- Pass `animations` to `createSprite()`. iOS allows later assignment, Android
+  does not. Android alone supports the animation definition's completion
+  `frame`; both platforms support `frame` in `animate()`.
+- Treat `TileLayer` `legend`, `firstGid`, `cols` and `rows` as creation-only.
+  iOS has live setters for them; Android exposes only the resulting dimensions.
+- An invalid ratio write keeps the current value on Android and resets the
+  property to its default on iOS. Unknown blend/effect/shape names use their
+  documented defaults on both platforms.
+- Controller `keyCode` is an Android key code and is always `0` on iOS.
+  Performance payloads add `averagePresentMs` and `presentFailures` only on iOS.
+- Effect/music formats differ: Android supports WAV, MP3 and OGG; iOS supports
+  WAV, MP3 and M4A.
+
 ### Module
 
-- `createGameView(options)` → GameView
-- `createSpriteSheet(options)` → SpriteSheet
-- `createSprite(options)` → Sprite
-- `createSound(options)` → Sound
-- `createEmitter(options)` → Emitter
-- `createRope(options)` → Rope
-- `createTileLayer(options)` → TileLayer
-- `createFont(options)` → Font
-- `createText(options)` → Text
-- Easing constants: `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`,
-  `EASE_BOUNCE`, `EASE_ELASTIC`
+| Factory | Returns |
+|---|---|
+| `createGameView(options)` | `GameView`, the Titanium view and native scene owner |
+| `createSpriteSheet(options)` | `SpriteSheet`, a grid or TexturePacker texture |
+| `createSprite(options)` | `Sprite` |
+| `createSound(options)` | `Sound` |
+| `createEmitter(options)` | `Emitter` |
+| `createRope(options)` | `Rope` |
+| `createTileLayer(options)` | `TileLayer` |
+| `createFont(options)` | `Font` |
+| `createText(options)` | `Text`, a `Sprite` backed by bitmap glyphs |
+
+Tween easing constants are `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`,
+`EASE_IN_OUT`, `EASE_BOUNCE` and `EASE_ELASTIC`.
 
 ### GameView
 
-| Member | Description |
-|---|---|
-| `add(object)` / `add([objects])` / `remove(object)` | Manage sprites, emitters, ropes and tile layers; an array is committed in one native scene update |
-| `removeAllSprites()` | Clear the scene |
-| `pause()` / `resume()` | Render loop control (activity lifecycle is automatic) |
-| `maxFps` | Frame rate cap, e.g. `60` to keep 120 Hz (ProMotion) displays from doubling the render work; `0` (default) = display refresh rate |
-| `timeScale` | Global time multiplier for everything the engine ticks (physics, animations, tweens, particles, camera): `1` normal, `0.5` slow motion, `0` freezes the scene while rendering and touch keep running — a pause that still draws (menus, hit-stop) |
-| `backgroundColor` | GL clear color |
-| `surfaceWidth` / `surfaceHeight` | Surface size in px (read-only) |
-| `cameraX` / `cameraY` | World-space offset of the view (scrolling) |
-| `cameraScale` | Zoom, anchored on the view center (default 1) |
-| `cameraBounds` | `{ minX, minY, maxX, maxY }` world rect the visible area is clamped into; `null` = unbounded |
-| `worldWrapX` | `{ minX, maxX }` enables a circular horizontal world; `null` disables it. The interval must have positive finite width. Horizontal camera bounds are ignored while active; vertical bounds remain in force |
-| `follow(sprite, options)` | Native dead-zone camera follow. Vertical: `topMargin`/`bottomMargin` (fractions of the visible height, defaults 0.33/0.7), clamped to `maxY` (default 0). Horizontal: enabled by `leftMargin`/`rightMargin` (defaults 0.35/0.65). `smoothing` (0..1, default 0 = snap) eases by that fraction of the remaining distance per 1/60 s. Every call resets all of them to their defaults first, so `follow(sprite)` with no options wipes a configuration set earlier |
-| `stopFollow()` | Stop following; the camera stays where it is |
-| `shake({ strength, duration })` | Camera shake: `strength` px (default 12), `duration` ms (default 400) — offsets only the projection, so follow/bounds/touches are unaffected |
-| `raycast(x0, y0, x1, y1, groups)` | One-shot nearest-hit query along the segment against visible sprites whose `collisionGroup` is in `groups` (omit for any tagged sprite). Returns `null` for a clear ray, else `{ x, y, distance, group, sprite, normal: { x, y } }`. Rect hitboxes use their AABB, circle hitboxes intersect exactly; a ray starting inside a hitbox reports it at distance 0. Pass `groups` as an **array**: Android also accepts loose arguments, iOS reads only the array and silently falls back to testing every tagged sprite. For discrete checks — line of sight on an AI timer, ledge/ground probes, tap hitscan — not per-frame JS polling |
-| `findPath(from, to, options)` | Grid A* from `from` to `to` (`{ x, y }` world points) around the visible sprites — and the solid cells of tile layers — whose `collisionGroup` is in `options.groups` (omit for any tagged sprite or layer). Returns an array of `{ x, y }` waypoints ready for `sprite.followPath()`, or `null` when no route exists. Options: `cellSize` (grid resolution in px, default 32), `clearance` (extra obstacle inflation in px — about half the walker's width keeps it from scraping corners), `bounds` (`{ minX, minY, maxX, maxY }` search rect, default the surface), `diagonals` (default `true`, never cuts corners), `simplify` (line-of-sight waypoint reduction, default `true`). A blocked start/goal snaps to the nearest free cell a few cells out, so tapping an obstacle walks to its edge. Like `raycast`, a discrete query — run it on taps and AI timers, not per frame |
-| `after(ms, callback)` | Runs the callback once after `ms` of **game time**: the delay stretches with slow motion and freezes at `timeScale: 0`, unlike `setTimeout`. Returns an id for `cancelTimer()`. Without a callback, the view fires a `timer` event with the id instead |
-| `every(ms, callback)` | Like `after()`, repeating every `ms` of game time until cancelled (at most once per frame). Returns an id for `cancelTimer()` |
-| `cancelTimer(id)` | Cancels a timer from `after()`/`every()` |
-| `cameraEffect` | Fullscreen shader over the whole scene: `'none'` (default), `'tint'`, `'glitch'` |
-| `cameraTint` | Color for the `'tint'` effect, e.g. `'#4f8'` |
-| `cameraEffectIntensity` | Effect strength 0..1 (tint mix / glitch amount; default 1) |
-| `gamepads` | Connected game controllers as `[{ id, name }]` (read-only) |
-| `gamepad` | Snapshot of the most recently used controller: `{ id, name, leftX, leftY, rightX, rightY, l2, r2, buttons: { a: true, ... } }`, `null` until a pad has sent input — for polling from a game timer; prefer the events |
-| `gamepadDeadzone` | Radial dead zone for the analog sticks, 0..0.9 (default 0.2) |
-| `gamepadStickPress` / `gamepadStickRelease` | Left-stick deflection that presses a direction button (0.1..0.95, default 0.5) and the lower value that releases it again (default 0.4; clamped to at most `gamepadStickPress`) |
-| `debug` | Developer aids: `true` = collision shapes for every sprite (shorthand for `{ hitbox: true }`), or `{ hitbox, hud, hudFont }` where `hud` is `true`/`false` or a corner name (`'topLeft'`, `'topRight'`, `'bottomLeft'`, `'bottomRight'`) and `hudFont` is any `createFont` font — see [Debug HUD](#debug-hud). Reads back as the normalized object |
+| Member | Access | Default | Description |
+|---|---|---|---|
+| `add(object)` / `add([objects])` | method | — | Add Sprite/Text, Emitter, Rope or TileLayer objects. An array crosses the bridge once and is committed in one native scene update |
+| `remove(object)` | method | — | Remove one object. Removing a Sprite/Text also removes its attached descendants recursively |
+| `removeAllSprites()` | method | — | Remove Sprite/Text objects and their attachments only. Emitters, ropes and tile layers remain and must be removed separately |
+| `pause()` / `resume()` | method | — | Stop or restart the render loop. App lifecycle handling is automatic |
+| `backgroundColor` | R/W | — | GL clear color |
+| `maxFps` | R/W | `0` | Frame cap; `0` uses the display refresh rate |
+| `timeScale` | R/W | `1` | Multiplier for physics, animations, tweens, particles, timers and camera. `0` freezes those systems while rendering and touch continue |
+| `surfaceWidth` / `surfaceHeight` | read-only | — | Current surface size in pixels |
+| `cameraX` / `cameraY` | R/W | `0` | World-space camera offset |
+| `cameraScale` | R/W | `1` | Zoom around the view center |
+| `cameraBounds` | R/W | `null` | `{ minX, minY, maxX, maxY }`; `null` removes the clamp |
+| `worldWrapX` | R/W | `null` | `{ minX, maxX }` enables a finite circular horizontal world. Invalid or non-positive intervals disable it. Horizontal camera bounds are ignored while it is active |
+| `follow(sprite, options)` | method | — | Native dead-zone camera follow. Options: `topMargin` (`0.33`), `bottomMargin` (`0.7`), `leftMargin` (`0.35`), `rightMargin` (`0.65`), `smoothing` (`0`) and `maxY` (`0`). Horizontal follow starts only when a horizontal margin is supplied. Every call resets omitted options to their defaults; a non-Sprite target clears follow |
+| `stopFollow()` | method | — | Stop following without changing the current camera position |
+| `shake({ strength, duration })` | method | `12` px, `400` ms | Offset the projection only; follow, bounds and touch mapping keep their normal coordinates |
+| `raycast(x0, y0, x1, y1, groups)` | method | — | Return the nearest visible, non-`screenFixed` Sprite with a matching `collisionGroup`, or `null`. The hit is `{ x, y, distance, group, sprite, normal: { x, y } }`. Plain rectangles use their AABB; circles and `rotatedRect` hitboxes use their actual shape. TileLayer cells are not queried. Pass `groups` as an array for portable behavior |
+| `findPath(from, to, options)` | method | — | Grid A* around visible, non-`screenFixed` tagged sprites and fully solid TileLayer cells. Returns `{ x, y }` waypoints or `null`. Options: `cellSize` (`32`), `groups` (all tagged obstacles), `clearance` (`0`), `bounds` (the surface), `diagonals` (`true`) and `simplify` (`true`). One-way cells remain walkable |
+| `after(ms, callback)` | method | — | Run once after `ms` of game time and return a timer id. Without a callback, fires `timer` with that id |
+| `every(ms, callback)` | method | — | Repeat on game time until cancelled. Fires at most once per frame and does not burst after a stall |
+| `cancelTimer(id)` | method | — | Cancel an `after()` or `every()` timer |
+| `cameraEffect` | R/W | `'none'` | `'none'`, `'tint'` or `'glitch'` |
+| `cameraTint` | R/W | — | Color used by the tint camera effect |
+| `cameraEffectIntensity` | R/W | `1` | Tint mix or glitch amount, 0..1 |
+| `gamepads` | read-only | `[]` | Connected controllers as `[{ id, name }]` |
+| `gamepad` | read-only | `null` | Most recently used controller snapshot: `{ id, name, leftX, leftY, rightX, rightY, l2, r2, buttons }` |
+| `gamepadDeadzone` | R/W | `0.2` | Radial stick dead zone, clamped to 0..0.9 |
+| `gamepadStickPress` / `gamepadStickRelease` | R/W | `0.5` / `0.4` | Left-stick direction press and release thresholds. Press is clamped to 0.1..0.95; release stays between 0.05 and press |
+| `debug` | R/W | `false` | Boolean hitbox shorthand or `{ hitbox, hud, hudFont }`; `hud` accepts a boolean or a corner name. Readback is normalized; see [Debug HUD](#debug-hud) |
 
 Events: `press`, `tap`, `release` (any touch; payload `x`, `y`),
 `resize` (payload `width`, `height`), `timer` (payload `id` — only for
@@ -1016,27 +1048,39 @@ Events: `press`, `tap`, `release` (any touch; payload `x`, `y`),
 (render telemetry, at most once a second, only while a listener is
 attached — see [Debug HUD](#debug-hud)), and the controller events
 `buttondown` / `buttonup` (payload `button`, `input`, `gamepad`,
-`keyCode`), `stick` (`stick`, `x`, `y`, `gamepad`; ~20 Hz), `trigger`
+`keyCode`; iOS reports `keyCode: 0`), `stick` (`stick`, `x`, `y`, `gamepad`; ~20 Hz), `trigger`
 (`trigger`, `value`, `gamepad`; ~20 Hz), `gamepadconnected` /
 `gamepaddisconnected` (`gamepad`, `name`) — see [Gamepads](#gamepads).
 
 ### SpriteSheet
 
-Options: `image`, `frameWidth`/`frameHeight` **or** `atlas`,
-`smoothing` (default true), `repeat` (default false — GL_REPEAT wrap for
-`tileRepeat` sprites; needs power-of-two texture dimensions).
+The source options are creation-only: required `image`, `frameWidth`/`frameHeight`
+**or** `atlas`, `smoothing` (default `true`) and `repeat` (default `false`).
+`repeat` enables GL_REPEAT for `tileRepeat` sprites and requires a
+power-of-two texture on OpenGL ES 2.0.
 
-| Member | Description |
-|---|---|
-| `frameCount` | Number of frames (0 until loaded for grid sheets) |
-| `frameNames` | Atlas frame names, sorted (atlas sheets only) |
-| `frameIndex(name)` | Index for an atlas frame name, `-1` if unknown |
-| `unload()` | Frees the GPU texture on the next frame. Permanent — sprites still using the sheet stop drawing. Use when streaming levels: unload the old level's atlases instead of accumulating GPU memory |
+| Member | Access | Description |
+|---|---|---|
+| `frameCount` | read-only | Number of frames (`0` until a grid sheet is loaded) |
+| `frameNames` | read-only | Sorted atlas frame names; empty for a grid sheet |
+| `frameIndex(name)` | method | Index for an atlas frame name, `-1` if unknown |
+| `unload()` | method | Permanently dispose the GPU texture on the render thread. There is no reload; remaining sprites that reference it stop drawing |
 
 ### Sprite
 
-All properties are live: reading returns the current native value, even
-mid-drag or mid-tween. All can be passed at creation.
+Sprite properties are live and R/W unless noted here. `animation`,
+`attachedTo`, `drifting`, `onGround`, `onWallLeft` and `onWallRight` are
+read-only. `animations` is portable only as a `createSprite()` option: iOS
+also accepts later assignments, while Android does not expose a setter.
+
+| Area | Defaults |
+|---|---|
+| Transform | `x`, `y`, `rotation`, `zIndex`: `0`; `width`, `height`: sheet frame size; `scale`, `scaleX`, `scaleY`, `opacity`, `scrollFactor`: `1`; `anchor`: `'center'`; `visible`: `true`; `pixelSnap`, `screenFixed`, `ySort`, `flipX`, `flipY`: `false` |
+| Sheet and touch | `sheet`: `null`; `frame`: `0`; no animations; `tileRepeat`: `false`; `draggable`, `pinchable`, `rotatable`: `false`; `touchEnabled`: `true` |
+| Motion | `velocityX`, `velocityY`, `gravity`, `gravityX`, `linearDamping`, `angularVelocity`, `thrust`, `wrapX`, `wrapShift`: `0`; `maxSpeed`: `500`; `wrapAround`, `wrapWorldX`: `false` |
+| Solids and collision | no groups; wall/ground flags: `false`; `wallSlideSpeed`: `0`; `restitution`: `0`; `impactThreshold`: `40`; `oneWay`: `false`; `carryRiders`: `true`; `solidMode`: `'block'`; hitbox scales: `1`; `hitboxShape`: `'rect'`; `swept`, `debug`: `false` |
+| Car | `carMode`: `false`; `throttle`, `steering`: `0`; `enginePower`: `600`; `turnRate`: `200`; `grip`: `4`; `drag`: `0.6`; `skidMarks`: `false`; `skidThreshold`: `0` |
+| Idle and color | `idleAnimation`: `false`; `idleRotation`: `3`; `idleMovement`: `4`; `idleSpeed`: `1`; no tint or glow color; `glowBlur`: `0`; `glowOpacity`: `1`; `blend`: `'normal'` |
 
 #### Transform
 
@@ -1064,7 +1108,7 @@ mid-drag or mid-tween. All can be passed at creation.
 |---|---|
 | `sheet` | The SpriteSheet to draw frames from; no sheet = invisible trigger sprite |
 | `frame` | Current sheet frame index (stops a running animation when set) |
-| `animations` | Named animation definitions: `{ frames, fps, loop, frame }` |
+| `animations` | Creation-only portable definitions: `{ frames, fps, loop }`. Android also accepts an optional completion `frame`; iOS currently ignores that key |
 | `animation` | Name of the running animation (read-only) |
 | `tileRepeat` | `true`/`'x'`/`'y'` — tile the frame at native size instead of stretching; sheet needs `repeat: true` and a frame spanning the whole texture |
 
@@ -1192,90 +1236,137 @@ mid-drag or mid-tween. All can be passed at creation.
 | `pathcomplete` | `x`, `y` | Non-looping `followPath` run reached the end |
 | `collision` | `group`, `other`, `x`, `y` | Overlap with a `collidesWith` group began |
 | `collisionend` | `group`, `other`, `x`, `y` | That overlap ended (separation — also when the partner is removed or hidden) |
-| `land` | `x`, `y`, `other` (the solid), `group` | Landed on top of a `solidWith` solid |
+| `land` | `x`, `y`, optional `other`, optional `group` | Landed on top of a `solidWith` solid; TileLayer cells omit `other` and `group` |
 | `wallhit` | `side` (`'left'`/`'right'`), `x`, `y`, `other` (the solid), `group` | Started pressing against the side of a `solidWith` solid, or switched to the other side (`other`/`group` are absent for tile-layer walls) |
 | `solidimpact` | `group`, `other`, `x`, `y`, `contactX`, `contactY`, `normalX`, `normalY`, `speed`, `restitution` | A sprite-to-sprite `solidWith` response met this sprite's threshold. `x`/`y` is the receiver position; both events share the contact point and speed, carry opposite normals, identify the other sprite's group, and use the effective mixed restitution. `other` can be `null` if its proxy was released before event delivery. Tile cells do not emit it |
 
 ### Sound
 
-Options: `url` (required), `volume` (0..1, default 1), `loop`,
-`music` (default false; choose at creation, not changeable later).
+`url` is required and creation-only. `music` (default `false`) also works only
+at creation because it selects the effect or music backend. `volume` and
+`loop` are live.
 
-| Member | Description |
-|---|---|
-| `play()` | Start playback (effects: overlapping; queued until the sample is loaded) |
-| `pause()` | Pause; `play()` continues where it stopped |
-| `stop()` | Stop and rewind to the beginning |
-| `volume` | Live volume, 0..1 |
-| `loop` | Repeat until `stop()` |
-| `music` | Which backend was chosen (read-only) |
+| Member | Access | Default | Description |
+|---|---|---|---|
+| `play()` | method | — | Start playback. Effects overlap and a play requested while loading is queued |
+| `pause()` | method | — | Pause; the next `play()` resumes from that position |
+| `stop()` | method | — | Stop and rewind |
+| `volume` | R/W | `1` | Volume from 0 to 1 |
+| `loop` | R/W | `false` | Repeat until stopped |
+| `music` | read-only | `false` | Backend selected at creation |
 
 ### Font
 
-Options — pick one source:
+Source and filtering options are creation-only. Pick one source:
 
-| Source | Options |
+| Source | Creation options |
 |---|---|
-| BMFont | `font` (.fnt path — AngelCode text or JSON export; kerning supported). Page image loads from next to the descriptor, or pass `image` to override |
-| Grid | `image` + `charWidth`/`charHeight` (monospace cells, row-major); `characters` (default: ASCII 32..126) |
-| Built-in | no options — the embedded 9x15 pixel font (also used when `font` fails to parse) |
+| BMFont | `font` (`.fnt` AngelCode text or JSON; kerning supported). The page image loads next to the descriptor unless `image` overrides it |
+| Grid | `image`, `charWidth`, `charHeight`, and optional `characters` (default ASCII 32..126) |
+| Built-in | No source options; uses the embedded 9x15 pixel font, also used when parsing fails |
 
-`smoothing` (default true; the built-in font is always crisp) filters the
-glyph texture like a sprite sheet. `lineHeight` (read-only) is the font's
-natural line height in px. `unload()` frees the glyph texture like
-`SpriteSheet.unload()` (permanent). Generate either format from a TTF with
-`tools/genfont.py`.
+`smoothing` defaults to `true`; the built-in font stays crisp. `lineHeight` is
+read-only and reports the natural line height in pixels. `unload()` permanently
+disposes the glyph texture just like `SpriteSheet.unload()`. Generate either
+custom format from a TTF with `tools/genfont.py`.
 
 ### Text
 
 Everything from **Sprite** (text objects are sprites — tint, tweens,
 touch, `screenFixed`, ...) plus:
 
-| Member | Description |
-|---|---|
-| `text` | The string; `\n` breaks lines. Updates re-layout natively |
-| `font` | A Font object; omit for the built-in pixel font |
-| `align` | Multi-line alignment: `'left'` (default), `'center'`, `'right'` |
-| `letterSpacing` | Extra px between glyphs (negative tightens) |
-| `lineSpacing` | Multiplier on the font's line height (default 1) |
-| `maxWidth` | Wrap width in px — lines break on word boundaries (0 = no wrap, default) |
+| Member | Access | Default | Description |
+|---|---|---|---|
+| `text` | R/W | `''` | String to draw; `\n` breaks lines. Updates re-layout natively |
+| `font` | R/W | built-in | Font object; `null` restores the embedded font |
+| `align` | R/W | `'left'` | Multi-line alignment: `'left'`, `'center'` or `'right'`; invalid names become `'left'` |
+| `letterSpacing` | R/W | `0` | Extra pixels between glyphs; negative values tighten |
+| `lineSpacing` | R/W | `1` | Multiplier on the font's line height |
+| `maxWidth` | R/W | `0` | Word-wrap width in font-space pixels; `0` disables wrapping |
+| `width` / `height` | read-only | laid-out size | Derived from the glyph layout; scale the sprite to change displayed size |
 
-`width`/`height` read the laid-out text block size; there is no font
-"size" — scale the sprite (`scale`) like any pixel art.
+There is no font-size property. Use the Sprite `scale`; `maxWidth` is measured
+before that scale is applied.
 
 ### Emitter
 
 Add/remove via `gameView.add(emitter)` / `remove(emitter)`, like sprites.
-All properties are live.
+All properties are live. `tint` is write-only; the others read back their
+current native values.
 
-| Group | Properties |
-|---|---|
-| Placement | `x`, `y`, `target` (sprite to follow, null to detach), `offsetX`, `offsetY`, `zIndex` |
-| Look | `sheet`, `frame`, `size` (base px width; 0 = frame size), `tint`, `blend` (`'normal'`/`'add'`/`'multiply'`/`'screen'` — additive particles brighten instead of cover: fire, sparks, magic; multiply darkens: smoke, dust; screen lightens softly), `startScale`/`endScale`, `startOpacity`/`endOpacity` |
-| Motion | `speed` (px/s, randomized 50–100%), `angle` (0 = up, clockwise), `spread` (degrees), `gravity` (px/s²), `lifetime` (ms) |
-| Emission | `rate` (particles/s), `emitting`, `maxParticles` (default 200, max 1000) |
+| Property | Default | Description |
+|---|---|---|
+| `sheet`, `frame` | `null`, `0` | Shared particle frame |
+| `x`, `y` | `0`, `0` | Fixed origin; ignored while `target` is set |
+| `target` | `null` | Sprite to follow; set `null` to detach |
+| `offsetX`, `offsetY` | `0`, `0` | Offset from the target |
+| `zIndex` | `0` | Emitters draw above sprites at the same z-index |
+| `rate` | `0` | Particles per second while `emitting` |
+| `emitting` | `true` | Enable continuous emission |
+| `lifetime` | `800` | Lifetime in milliseconds |
+| `speed` | `100` | Initial px/s, randomized between 50% and 100% |
+| `angle`, `spread` | `0`, `360` | Clockwise emission direction and cone width in degrees; 0 points up |
+| `gravity` | `0` | Vertical acceleration in px/s² |
+| `size` | `0` | Base width in pixels; `0` uses the frame width |
+| `startScale`, `endScale` | `1`, `1` | Scale interpolation over the lifetime |
+| `startOpacity`, `endOpacity` | `1`, `0` | Opacity interpolation over the lifetime |
+| `tint` | white | Write-only particle tint |
+| `blend` | `'normal'` | `'normal'`, `'add'`, `'multiply'` or `'screen'`; invalid names become `'normal'` |
+| `maxParticles` | `200` | Pool size, capped at 1000 |
 
 Methods: `emit(n)` (one-shot burst on top of `rate`), `clear()` (kill all
 live particles).
 
+### Rope
+
+Add and remove a Rope through the GameView. Every property below is live and
+R/W except `endX` and `endY`.
+
+| Property | Default | Description |
+|---|---|---|
+| `sheet`, `frame` | `null`, `0` | Frame drawn along every link |
+| `segments` | `10` | Number of links |
+| `segmentLength` | `30` | Link length in pixels |
+| `maxLength` | `0` | Maximum head-to-tail distance when a tail is attached; `0` disables the tether |
+| `thickness` | `10` | Drawn width in pixels |
+| `gravity` | `1500` | Vertical acceleration in px/s² |
+| `damping` | `0.98` | Velocity retained per step |
+| `iterations` | `3` | Constraint passes per frame; higher values are stiffer and cost more |
+| `head` | `null` | Sprite pinned to the first point. Without one, `x`/`y` are the fixed anchor |
+| `tail` | `null` | Sprite pinned to the last point |
+| `x`, `y` | `0`, `0` | Fixed head anchor when `head` is `null` |
+| `zIndex` | `0` | Draw order |
+| `visible` | `true` | Rendering toggle |
+| `endX`, `endY` | — | Read-only live position of the final rope point |
+
+With a `tail`, `maxLength` also pulls the endpoint sprites back inside the
+limit and cancels their outward velocity. The end not being dragged yields,
+which lets either endpoint tow the other.
+
 ### TileLayer
 
 Add/remove via `gameView.add(layer)` / `remove(layer)`. Draws under
-sprites of the same `zIndex`. All properties are live; grid edits take
-effect on the next frame.
+sprites of the same `zIndex`. Grid edits take effect on the next frame.
 
-| Group | Properties |
-|---|---|
-| Grid | `data` (rows of ids, a flat row-major array sized by `cols`/`rows`, or strings decoded through `legend`; `-1`/unlisted = empty), `legend` (`{ char: id }`), `cols`, `rows`, `firstGid` (Tiled gid offset; gid 0 = empty, flip bits ignored), `width`/`height` (world size, read-only) |
-| Placement | `x`, `y` (world position of cell 0,0), `tileWidth`, `tileHeight` (world size per cell; default the sheet's frame size), `zIndex`, `scrollFactor` (parallax, like a sprite's) |
-| Look | `sheet`, `visible`, `opacity`, `tintColor` |
-| Collision | `collisionGroup` (movers list it in `solidWith`; `findPath` sees it in `groups`), `solid` (ids or legend chars that block from every side), `oneWay` (ids that only catch riders falling onto their top face), `restitution` (bounce of the cells, mixed like a solid sprite's), `debug` (outline solid cells; `gameView.debug` shows every layer) |
+| Group | Members | Access and defaults |
+|---|---|---|
+| Grid data | `data` | Live write-only input: nested numeric rows, strings decoded with `legend`, or a flat row-major array sized by `cols`/`rows`. `-1` and unmapped characters are empty |
+| Grid structure | `legend`, `firstGid`, `cols`, `rows` | Creation-only for portable code. `firstGid` defaults to `0`; `cols`/`rows` read back from the parsed grid. iOS exposes live setters, Android does not |
+| Derived size | `width`, `height` | Read-only world dimensions |
+| Placement | `x`, `y`, `tileWidth`, `tileHeight`, `zIndex`, `scrollFactor` | Live R/W. Positions and z-index default to `0`; tile sizes default to the sheet frame; `scrollFactor` defaults to `1` |
+| Look | `sheet`, `visible`, `opacity`, `tintColor` | Live R/W. Defaults: `null`, `true`, `1`, white |
+| Collision | `collisionGroup`, `solid`, `oneWay`, `restitution`, `debug` | Live R/W. `solid`/`oneWay` accept tile ids or legend characters. Defaults: no group or ids, restitution `0`, debug `false` |
 
 Methods: `getTile(col, row)` (id or -1), `setTile(col, row, id)` (the
 solid flag follows the id lists), `isBlocked(col, row)`, `setBlocked(col,
-row, blocked)` (per-cell override until the next `data`/`solid` change),
+row, blocked)` (per-cell override until the next `data`, `solid` or `oneWay`
+change),
 `tileAt(x, y)` → `{ col, row, tile, solid, x, y }` or `null` (world point →
 cell, `x`/`y` = cell center), `cellAt(col, row)` → the same for a cell.
+
+`findPath()` uses fully solid cells from matching layers. One-way cells remain
+walkable. TileLayer cells do not participate in `raycast()`, do not fire
+`collision`/`collisionend`, and do not emit `solidimpact`.
 
 ## Architecture & source layout
 
@@ -1292,6 +1383,7 @@ android/src/ti/game/
 ├── TileLayerProxy.java      createTileLayer() — JS-facing tile map layer
 ├── FontProxy.java           createFont() — BMFont, grid or built-in
 ├── TextProxy.java           createText() — JS-facing text sprite
+├── Values.java              Shared parsing for ratios and named anchors
 └── engine/                  Pure native engine (no per-frame bridge use)
     ├── Scene.java           Scene graph, solids, collisions, wrapping
     ├── ParticleEmitter.java Pooled particles: spawn, integrate, fade, draw
@@ -1309,6 +1401,10 @@ android/src/ti/game/
     ├── ScreenOverlay.java   Screen-space pass: surface-pixel projection
     ├── DebugHud.java        On-screen performance HUD
     ├── FrameStats.java      Opt-in render telemetry, one-second windows
+    ├── GamepadController.java Normalized gamepad input and event throttling
+    ├── Path.java            Native path-following data
+    ├── Pathfinder.java      Grid A* over sprites and TileLayer cells
+    ├── PostEffect.java      Fullscreen tint/glitch shader pass
     ├── SkidTrail.java       Fading skid-mark ring buffer
     ├── TextureManager.java  GL upload, context-loss recovery
     ├── TouchController.java Hit test, drag, pinch, rotate
@@ -1321,10 +1417,11 @@ Contribution rules for the codebase live in `AGENTS.md`; planned features
 
 ### iOS
 
-`ios/` contains an Obj-C twin of the module — same JS API, same engine
-class-per-class (`Classes/TG*` mirrors `engine/`, `Classes/TiGame*` the
-proxies), rendered with OpenGL ES 2.0 and driven by a `CADisplayLink` on
-a dedicated render thread. Implementation notes (threading, pixel
+`ios/` contains the Obj-C twin of the module. It implements the portable API
+above, with the listed platform differences, and mirrors the engine class by
+class (`Classes/TG*` mirrors `engine/`, `Classes/TiGame*` mirrors the proxies).
+Rendering uses OpenGL ES 2.0 and a `CADisplayLink` on a dedicated render
+thread. Implementation notes (threading, pixel
 coordinates, backgrounding) are in `ios/README.md`; when changing engine
 behavior, change both platforms (see `AGENTS.md`).
 
@@ -1332,8 +1429,8 @@ behavior, change both platforms (see `AGENTS.md`).
 
 ```bash
 cd android
-ti build -p android --build-only   # package android/dist/ti.game-android-<version>.zip
-ti build -p android                # run the example app on a device/emulator
+ti build -p android --build-only --sdk 13.3.1.GA   # package android/dist/ti.game-android-<version>.zip
+ti build -p android --sdk 13.3.1.GA                # run the example app on a device/emulator
 
 cd ios                             # macOS only
 ti build -p ios --build-only       # package the iOS module zip
