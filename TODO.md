@@ -1,8 +1,7 @@
 # ti.game — TODO
 
-Planned engine features, in priority order. Everything follows the house
-rule: JS describes and reacts, the engine runs per frame — no bridge
-traffic in the loop.
+Planned engine features, in priority order. The same rule applies throughout:
+JS describes and reacts; the engine runs each frame without bridge traffic.
 
 ## 1. Camera completion
 
@@ -40,8 +39,8 @@ traffic in the loop.
 
 ## 2. Sprite color & blending
 
-- [x] `tint` on sprites (the batcher already has vertex color — nearly
-      free)
+- [x] `tintColor` on sprites (the batcher already has vertex color, so the
+      added cost is small).
 - [x] a `flash(color, duration)` helper for damage/invincibility —
       solid-color silhouette overlay (glow shader) that fades out
       natively; asteroids flashes the ship on crash.
@@ -116,13 +115,14 @@ traffic in the loop.
       for both collision events and solid blocking (clamped to the
       impact point, then resolved by the normal static pass); the swept
       demo compares both lanes side by side.
-- [x] `gameView.raycast(x0, y0, x1, y1, groups)` one-shot query —
-      line-of-sight, ground probes. Nearest hit as { x, y, distance,
+- [x] `gameView.raycast(x0, y0, x1, y1, groups)` one-shot sprite query —
+      line-of-sight, ground probes. Nearest sprite hit as { x, y, distance,
       group, sprite, normal } or null; slab test on rect AABBs, exact
-      ray/circle for circle hitboxes; thread-safe for JS-initiated
-      calls (own scratch, no GL-thread buffers). Discrete queries only
-      (timers, taps) — not per-frame JS polling. raycast.js demos
-      line of sight, ledge probes and tap hitscan.
+      ray/circle for circle hitboxes and local-space tests for rotated
+      rectangles; thread-safe for JS-initiated calls (own scratch, no
+      GL-thread buffers). TileLayer cells remain a follow-up. Discrete
+      queries only (timers, taps), not per-frame JS polling. raycast.js
+      demos line of sight, ledge probes and tap hitscan.
 - [x] Oriented rect hitboxes (`hitboxShape: 'rotatedRect'`) — the collision
       rect turns with the sprite instead of being re-boxed to the screen
       axes, so a tilted solid is hit on its real face and the normal comes
@@ -164,10 +164,10 @@ traffic in the loop.
       clearance, bounds, diagonals, simplify })` returns waypoints ready
       for `followPath` — a discrete query like `raycast`, no per-frame
       JS (Godot AStar2D / GameMaker mp_grid equivalent). Rasterizes the
-      `collisionGroup` sprites into a grid per query (no corner-cutting
-      diagonals, octile A*, line-of-sight waypoint simplification;
-      blocked start/goal snaps to the nearest free cell); when the
-      tilemap collision layer lands it should feed the same grid.
+      `collisionGroup` sprites and matching TileLayer solid cells into a
+      grid per query (no corner-cutting diagonals, octile A*, line-of-sight
+      waypoint simplification; blocked start/goal snaps to the nearest free
+      cell). One-way cells remain walkable.
       pointclick walks around the oak with it; maze.js is the full
       showcase (route visualization, tap-to-walk, a re-pathing chaser).
 
@@ -297,7 +297,6 @@ traffic in the loop.
 ## Deliberately out of scope
 
 2D lighting/shadows, skeletal animation (Spine), full rigid-body physics
-(Box2D-class), render-to-texture — each is a project the size of
-everything built so far and the target genres rarely miss them. If
-"lighting" ever comes up: a screen-dim overlay plus additive light
-sprites gets 90% for 1% of the cost (needs item 2's `blend: 'add'`).
+(Box2D-class) and render-to-texture are outside the module's scope. A dim
+overlay plus additive sprites can cover simple light effects with the existing
+`blend: 'add'` mode.
