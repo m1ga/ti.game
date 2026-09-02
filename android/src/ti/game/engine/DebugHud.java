@@ -62,6 +62,11 @@ public class DebugHud
 	private final FrameStats.Snapshot latest = new FrameStats.Snapshot();
 	private boolean hasData = false;
 	private boolean builtExpanded = false;
+	// Column widths are re-measured only when the text, font or glyph
+	// scale changed — not per frame (that cost showed up in the HUD itself)
+	private boolean widthsDirty = true;
+	private BitmapFont measuredFont;
+	private int measuredGlyphScale;
 
 	public boolean isExpanded()
 	{
@@ -139,16 +144,23 @@ public class DebugHud
 		int usedColumns = 0;
 		int maxRows = 0;
 		float contentWidth = 0f;
+		if (widthsDirty || hudFont != measuredFont || glyphScale != measuredGlyphScale) {
+			for (int c = 0; c < COLUMNS; c++) {
+				float width = 0f;
+				for (int r = 0; r < rowCounts[c]; r++) {
+					width = Math.max(width, measure(hudFont, columns[c][r], glyphScale));
+				}
+				columnWidths[c] = width;
+			}
+			measuredFont = hudFont;
+			measuredGlyphScale = glyphScale;
+			widthsDirty = false;
+		}
 		for (int c = 0; c < COLUMNS; c++) {
 			if (rowCounts[c] == 0) {
 				continue;
 			}
-			float width = 0f;
-			for (int r = 0; r < rowCounts[c]; r++) {
-				width = Math.max(width, measure(hudFont, columns[c][r], glyphScale));
-			}
-			columnWidths[c] = width;
-			contentWidth += width;
+			contentWidth += columnWidths[c];
 			maxRows = Math.max(maxRows, rowCounts[c]);
 			usedColumns++;
 		}
@@ -237,6 +249,7 @@ public class DebugHud
 	{
 		boolean full = expanded;
 		builtExpanded = full;
+		widthsDirty = true;
 		for (int c = 0; c < COLUMNS; c++) {
 			rowCounts[c] = 0;
 		}

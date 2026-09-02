@@ -27,7 +27,12 @@ static const char *kTintFragmentShader =
 static const char *kGlitchFragmentShader =
 	"precision mediump float;\n"
 	"uniform sampler2D uTex;\n"
+	// mediump (fp16) cannot resolve uTime * 40; highp where the fragment stage has it
+	"#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
+	"uniform highp float uTime;\n"
+	"#else\n"
 	"uniform float uTime;\n"
+	"#endif\n"
 	"uniform float uIntensity;\n"
 	"varying vec2 vUV;\n"
 	"float rnd(vec2 co) {\n"

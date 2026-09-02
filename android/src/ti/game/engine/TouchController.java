@@ -1,5 +1,7 @@
 package ti.game.engine;
 
+import java.util.List;
+
 import android.content.Context;
 import android.util.SparseArray;
 import android.view.MotionEvent;
@@ -64,6 +66,12 @@ public class TouchController implements View.OnTouchListener
 	private Sprite modifierTarget;
 	private boolean rotating = false;
 	private float lastAngle = 0f;
+	// 'rotate'/'pinch' cross the bridge at the same ~10 Hz as 'drag'; the
+	// pending flags make sure the final value still goes out on release
+	private long lastRotateEventMs = 0;
+	private boolean rotatePending = false;
+	private long lastPinchEventMs = 0;
+	private boolean pinchPending = false;
 
 	// Set while the first finger landed on the debug HUD: that gesture
 	// belongs to the HUD and reaches neither the sprites nor the view
@@ -82,13 +90,27 @@ public class TouchController implements View.OnTouchListener
 				if (s != null && s.pinchable) {
 					s.scaleX *= detector.getScaleFactor();
 					s.scaleY *= detector.getScaleFactor();
-					KrollDict data = new KrollDict();
-					data.put("scaleX", s.scaleX);
-					data.put("scaleY", s.scaleY);
-					fire(s, "pinch", data);
+					long now = detector.getEventTime();
+					if (now - lastPinchEventMs >= DRAG_EVENT_INTERVAL_MS) {
+						lastPinchEventMs = now;
+						pinchPending = false;
+						firePinch(s);
+					} else {
+						pinchPending = true;
+					}
 					return true;
 				}
 				return false;
+			}
+
+			@Override
+			public void onScaleEnd(ScaleGestureDetector detector)
+			{
+				Sprite s = modifierTarget;
+				if (pinchPending && s != null) {
+					firePinch(s); // the last throttled value is the one that sticks
+				}
+				pinchPending = false;
 			}
 		});
 	}
@@ -140,11 +162,25 @@ public class TouchController implements View.OnTouchListener
 				Sprite target = modifierTarget;
 				if (rotating && event.getPointerCount() >= 2 && target != null) {
 					float angle = angleBetween(event);
-					target.rotation += angle - lastAngle;
+					// atan2 flips from +180 to -180 between the fingers'
+					// two positions: the delta must take the short way round
+					// or one move adds a whole turn to the rotation
+					float delta = angle - lastAngle;
+					if (delta > 180f) {
+						delta -= 360f;
+					} else if (delta < -180f) {
+						delta += 360f;
+					}
+					target.rotation += delta;
 					lastAngle = angle;
-					KrollDict data = new KrollDict();
-					data.put("rotation", target.rotation);
-					fire(target, "rotate", data);
+					long now = event.getEventTime();
+					if (now - lastRotateEventMs >= DRAG_EVENT_INTERVAL_MS) {
+						lastRotateEventMs = now;
+						rotatePending = false;
+						fireRotate(target);
+					} else {
+						rotatePending = true;
+					}
 				}
 
 				for (int i = 0; i < event.getPointerCount(); i++) {
@@ -168,6 +204,10 @@ public class TouchController implements View.OnTouchListener
 					scene.screenToWorldY(event.getY(index)),
 					event.getEventTime(), true);
 				if (event.getPointerCount() <= 2) {
+					if (rotatePending && modifierTarget != null) {
+						fireRotate(modifierTarget);
+					}
+					rotatePending = false;
 					rotating = false;
 					modifierTarget = null;
 				}
@@ -183,7 +223,7 @@ public class TouchController implements View.OnTouchListener
 				float upX = scene.screenToWorldX(event.getX());
 				float upY = scene.screenToWorldY(event.getY());
 				if (event.getEventTime() - downTime < TAP_TIMEOUT_MS
-						&& distance(upX, upY, downX, downY) <= touchSlop) {
+						&& distance(upX, upY, downX, downY) <= worldSlop()) {
 					fireOnView("tap", upX, upY);
 				}
 				fireOnView("release", upX, upY);
@@ -255,7 +295,7 @@ public class TouchController implements View.OnTouchListener
 		Sprite s = g.sprite;
 		tx = toSpriteSpaceX(s, tx);
 		ty = toSpriteSpaceY(s, ty);
-		if (!g.dragging && distance(tx, ty, g.downX, g.downY) > touchSlop) {
+		if (!g.dragging && distance(tx, ty, g.downX, g.downY) > slopFor(s)) {
 			g.dragging = true;
 			s.dragged = true;
 			s.clearPositionTweens();
@@ -273,7 +313,9 @@ public class TouchController implements View.OnTouchListener
 		// other end when a finger owns that one too (multi-touch: both
 		// ends held, neither yields — see Rope.update). A free other
 		// end is skipped: the rope tows it behind the drag instead.
-		for (Rope r : scene.ropesSnapshot()) {
+		List<Rope> ropes = scene.hasRopes() ? scene.ropesSnapshot() : null;
+		for (int i = 0, n = (ropes != null) ? ropes.size() : 0; i < n; i++) {
+			Rope r = ropes.get(i);
 			if (r.maxLength <= 0f) {
 				continue;
 			}
@@ -324,7 +366,7 @@ public class TouchController implements View.OnTouchListener
 		if (g.dragging) {
 			fire(s, "dragend", positionData(s));
 		} else if (allowTap && time - g.downTime < TAP_TIMEOUT_MS
-				&& distance(upX, upY, g.downX, g.downY) <= touchSlop) {
+				&& distance(upX, upY, g.downX, g.downY) <= slopFor(s)) {
 			KrollDict data = positionData(s);
 			data.put("touchX", upX);
 			data.put("touchY", upY);
@@ -358,6 +400,37 @@ public class TouchController implements View.OnTouchListener
 	private Sprite heldSprite()
 	{
 		return gestures.size() > 0 ? gestures.valueAt(0).sprite : null;
+	}
+
+	/**
+	 * The system touch slop is a screen-pixel distance, but gestures are
+	 * tracked in world units, which shrink as the camera zooms in. Scaling
+	 * the slop the same way keeps a tap a tap at every zoom level.
+	 */
+	private float worldSlop()
+	{
+		return touchSlop / Math.max(0.0001f, scene.cameraScale);
+	}
+
+	/** screenFixed sprites already live in screen pixels. */
+	private float slopFor(Sprite s)
+	{
+		return s.screenFixed ? touchSlop : worldSlop();
+	}
+
+	private void fireRotate(Sprite target)
+	{
+		KrollDict data = new KrollDict();
+		data.put("rotation", target.rotation);
+		fire(target, "rotate", data);
+	}
+
+	private void firePinch(Sprite s)
+	{
+		KrollDict data = new KrollDict();
+		data.put("scaleX", s.scaleX);
+		data.put("scaleY", s.scaleY);
+		fire(s, "pinch", data);
 	}
 
 	private static float angleBetween(MotionEvent event)

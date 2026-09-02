@@ -133,7 +133,11 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	if (measuring) {
 		_stats.updateMs = (CACurrentMediaTime() - phaseStart) * 1000.0;
 	}
-	_effectTime += dt;
+	// Wrapped: the glitch shader multiplies uTime by 40, and an unbounded
+	// accumulator loses its sub-frame resolution within minutes (goes NaN
+	// after ~27 min in fp16). 60 s is a whole number of every period the
+	// shader uses, so the wrap itself is invisible.
+	_effectTime = fmodf(_effectTime + dt, 60.0f);
 
 	// Camera effect: render the whole scene into an offscreen texture,
 	// then draw it to the screen through the effect shader at the end
@@ -344,8 +348,10 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 	[_preparedSheets addObject:sheet];
 	if (![sheet isReady]) {
-		[sheet ensureLoaded:_textures];
-		if ([sheet isReady]) {
+		// Tracked as soon as a texture exists — a sheet that uploaded but
+		// ended with zero frames (broken atlas) must still be deleted on
+		// unload and invalidated on context loss
+		if ([sheet ensureLoaded:_textures]) {
 			[_textures track:sheet];
 		}
 	}

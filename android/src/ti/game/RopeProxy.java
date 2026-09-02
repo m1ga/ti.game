@@ -93,10 +93,12 @@ public class RopeProxy extends KrollProxy
 	// --- Sheet / anchors --------------------------------------------------
 
 	@Kroll.setProperty
-	public void setSheet(SpriteSheetProxy value)
+	public void setSheet(Object value)
 	{
-		sheetProxy = value;
-		rope.sheet = (value != null) ? value.getSheet() : null;
+		// Object + instanceof: a mistyped JS value must not reach a typed JNI slot
+		SpriteSheetProxy proxy = (value instanceof SpriteSheetProxy) ? (SpriteSheetProxy) value : null;
+		sheetProxy = proxy;
+		rope.sheet = (proxy != null) ? proxy.getSheet() : null;
 	}
 
 	@Kroll.getProperty
@@ -107,10 +109,11 @@ public class RopeProxy extends KrollProxy
 
 	/** Pin the head to this sprite (null = use the fixed x/y anchor). */
 	@Kroll.setProperty
-	public void setHead(SpriteProxy value)
+	public void setHead(Object value)
 	{
-		headProxy = value;
-		rope.head = (value != null) ? value.getSprite() : null;
+		SpriteProxy proxy = (value instanceof SpriteProxy) ? (SpriteProxy) value : null;
+		headProxy = proxy;
+		rope.head = (proxy != null) ? proxy.getSprite() : null;
 	}
 
 	@Kroll.getProperty
@@ -121,10 +124,11 @@ public class RopeProxy extends KrollProxy
 
 	/** Pin the loose end to this sprite too (bridges); null = free. */
 	@Kroll.setProperty
-	public void setTail(SpriteProxy value)
+	public void setTail(Object value)
 	{
-		tailProxy = value;
-		rope.tail = (value != null) ? value.getSprite() : null;
+		SpriteProxy proxy = (value instanceof SpriteProxy) ? (SpriteProxy) value : null;
+		tailProxy = proxy;
+		rope.tail = (proxy != null) ? proxy.getSprite() : null;
 	}
 
 	@Kroll.getProperty

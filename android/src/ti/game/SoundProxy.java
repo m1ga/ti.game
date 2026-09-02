@@ -69,6 +69,12 @@ public class SoundProxy extends KrollProxy
 			openSource(url);
 		} catch (Exception e) {
 			Log.e(LCAT, "Could not load sound '" + url + "': " + e.getMessage());
+			// A player that failed in setDataSource/prepare would throw
+			// IllegalStateException out of the next play()
+			if (mediaPlayer != null) {
+				mediaPlayer.release();
+				mediaPlayer = null;
+			}
 		}
 	}
 

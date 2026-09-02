@@ -228,10 +228,10 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			sprite.collisionGroup = TiConvert.toString(options.get("collisionGroup"));
 		}
 		if (options.containsKey("collidesWith")) {
-			setCollidesWith((Object[]) options.get("collidesWith"));
+			setCollidesWith(options.get("collidesWith"));
 		}
 		if (options.containsKey("solidWith")) {
-			setSolidWith((Object[]) options.get("solidWith"));
+			setSolidWith(options.get("solidWith"));
 		}
 		if (options.containsKey("oneWay")) {
 			sprite.oneWay = TiConvert.toBoolean(options.get("oneWay"), false);
@@ -309,6 +309,12 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("skidThreshold")) {
 			sprite.skidThreshold = TiConvert.toFloat(options.get("skidThreshold"), sprite.skidThreshold);
 		}
+		if (options.containsKey("throttle")) {
+			setThrottle(options.get("throttle"));
+		}
+		if (options.containsKey("steering")) {
+			setSteering(options.get("steering"));
+		}
 	}
 
 	@SuppressWarnings("unchecked")
@@ -330,22 +336,28 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			Object[] rawFrames = (Object[]) framesValue;
 			int[] frames = new int[rawFrames.length];
 			for (int i = 0; i < rawFrames.length; i++) {
-				frames[i] = TiConvert.toInt(rawFrames[i]);
+				frames[i] = TiConvert.toInt(rawFrames[i], 0);
 			}
-			float fps = def.containsKey("fps") ? TiConvert.toFloat(def.get("fps")) : 12f;
+			// default-tolerant parses: a present key holding undefined must
+			// not throw out of createSprite
+			float fps = TiConvert.toFloat(def.get("fps"), 12f);
 			boolean loop = TiConvert.toBoolean(def.get("loop"), false);
-			int endFrame = def.containsKey("frame") ? TiConvert.toInt(def.get("frame")) : -1;
+			int endFrame = TiConvert.toInt(def.get("frame"), -1);
 			sprite.addAnimation(entry.getKey(), new Animation(entry.getKey(), frames, fps, loop, endFrame));
 		}
 	}
 
 	// --- Sheet -----------------------------------------------------------
 
+	// Declared as Object: Kroll passes a mistyped JS value (a string, a
+	// plain object) straight into a typed parameter, which aborts in JNI
+	// instead of raising a JS error — instanceof turns it into a no-op.
 	@Kroll.setProperty
-	public void setSheet(SpriteSheetProxy value)
+	public void setSheet(Object value)
 	{
-		sheetProxy = value;
-		sprite.sheet = (value != null) ? value.getSheet() : null;
+		SpriteSheetProxy proxy = (value instanceof SpriteSheetProxy) ? (SpriteSheetProxy) value : null;
+		sheetProxy = proxy;
+		sprite.sheet = (proxy != null) ? proxy.getSheet() : null;
 	}
 
 	@Kroll.getProperty
@@ -1216,17 +1228,28 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setCollidesWith(Object[] groups)
+	public void setCollidesWith(Object groups)
+	{
+		sprite.collidesWith = groupSet(groups);
+	}
+
+	/** An array of group names, or a single name as shorthand; null clears. */
+	private static Set<String> groupSet(Object groups)
 	{
 		if (groups == null) {
-			sprite.collidesWith = null;
-			return;
+			return null;
 		}
 		Set<String> set = new HashSet<>();
-		for (Object g : groups) {
-			set.add(TiConvert.toString(g));
+		if (groups instanceof Object[]) {
+			for (Object g : (Object[]) groups) {
+				if (g != null) {
+					set.add(TiConvert.toString(g));
+				}
+			}
+		} else {
+			set.add(TiConvert.toString(groups));
 		}
-		sprite.collidesWith = set;
+		return set;
 	}
 
 	// --- Solid collision (platformer) -------------------------------------
@@ -1239,17 +1262,9 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	}
 
 	@Kroll.setProperty
-	public void setSolidWith(Object[] groups)
+	public void setSolidWith(Object groups)
 	{
-		if (groups == null) {
-			sprite.solidWith = null;
-			return;
-		}
-		Set<String> set = new HashSet<>();
-		for (Object g : groups) {
-			set.add(TiConvert.toString(g));
-		}
-		sprite.solidWith = set;
+		sprite.solidWith = groupSet(groups);
 	}
 
 	/** True while standing on a solid (read-only; e.g. gate jumping on it). */

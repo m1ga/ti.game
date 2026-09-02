@@ -151,7 +151,11 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		if (measuring) {
 			stats.updateMs = (System.nanoTime() - phaseStart) / 1_000_000.0;
 		}
-		effectTime += dt;
+		// Wrapped: the glitch shader multiplies uTime by 40, and an unbounded
+		// accumulator loses its sub-frame resolution within minutes (goes
+		// NaN after ~27 min on fp16 GPUs). 60 s is a whole number of every
+		// period the shader uses, so the wrap itself is invisible.
+		effectTime = (effectTime + dt) % 60f;
 
 		// Camera effect: render the whole scene into an offscreen texture,
 		// then draw it to the screen through the effect shader at the end
@@ -362,8 +366,10 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	private void ensureSheetLoaded(SpriteSheet sheet)
 	{
 		if (sheet != null && !sheet.isReady()) {
-			sheet.ensureLoaded(textures);
-			if (sheet.isReady()) {
+			// Tracked as soon as a texture exists — a sheet that uploaded
+			// but ended with zero frames (broken atlas) must still be
+			// deleted on unload and invalidated on context loss
+			if (sheet.ensureLoaded(textures)) {
 				textures.track(sheet);
 			}
 		}
@@ -381,6 +387,8 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	private final float[] debugCenter = new float[2];
 	private final float[] debugBox = new float[5];
 	private final float[] debugCorners = new float[8];
+	private final float[] debugCornerX = new float[4];
+	private final float[] debugCornerY = new float[4];
 
 	/**
 	 * Debug visualization: green = collision AABB (with hitboxScale and the
@@ -454,8 +462,8 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			double rad = Math.toRadians(s.rotation);
 			float cos = (float) Math.cos(rad);
 			float sin = (float) Math.sin(rad);
-			float[] cx = new float[4];
-			float[] cy = new float[4];
+			float[] cx = debugCornerX;
+			float[] cy = debugCornerY;
 			for (int i = 0; i < 4; i++) {
 				float lx = (((i & 1) == 0) ? -ax : w - ax) * s.scaleX;
 				float ly = ((i < 2) ? -ay : h - ay) * s.scaleY;

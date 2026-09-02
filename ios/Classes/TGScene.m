@@ -324,6 +324,9 @@ static float bottomEdge(TGSprite *s)
 		return;
 	}
 	[_sprites removeObjectIdenticalTo:sprite];
+	if (self.followTarget == sprite) {
+		self.followTarget = nil; // the camera must not chase (or retain) a sprite that left
+	}
 	[sprite markImpactGatesStale];
 	sprite.scene = nil;
 	sprite.attachTarget = nil;
@@ -354,6 +357,7 @@ static float bottomEdge(TGSprite *s)
 		}
 		[_sprites removeAllObjects];
 		_snapshotCache = nil;
+		self.followTarget = nil;
 	}
 }
 

@@ -60,8 +60,10 @@ public class TextProxy extends SpriteProxy
 	}
 
 	@Kroll.setProperty
-	public void setFont(FontProxy value)
+	public void setFont(Object fontValue)
 	{
+		// Object + instanceof: a mistyped JS value must not reach a typed JNI slot
+		FontProxy value = (fontValue instanceof FontProxy) ? (FontProxy) fontValue : null;
 		fontProxy = value;
 		boolean explicit = (value != null && value.getFont() != null);
 		textSprite.usesDefaultFont = !explicit;

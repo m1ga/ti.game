@@ -43,6 +43,12 @@ static const NSTimeInterval kTapTimeout = 0.3;
 	BOOL _rotating;
 	float _lastAngle;
 	float _lastPinchDistance;
+	// 'rotate'/'pinch' cross the bridge at the same ~10 Hz as 'drag'; the
+	// pending flags make sure the final value still goes out on release
+	NSTimeInterval _lastRotateEventTime;
+	BOOL _rotatePending;
+	NSTimeInterval _lastPinchEventTime;
+	BOOL _pinchPending;
 
 	// Set while the first finger landed on the debug HUD: that gesture
 	// belongs to the HUD and reaches neither the sprites nor the view
@@ -65,6 +71,33 @@ static const NSTimeInterval kTapTimeout = 0.3;
 }
 
 // --- Geometry helpers ---------------------------------------------------
+
+/** The touch slop is a screen-pixel distance, but gestures are tracked in
+ *  world units, which shrink as the camera zooms in. Scaling the slop the
+ *  same way keeps a tap a tap at every zoom level. */
+- (float)worldSlop
+{
+	return _touchSlop / MAX(0.0001f, _scene.cameraScale);
+}
+
+/** screenFixed sprites already live in screen pixels. */
+- (float)slopFor:(TGSprite *)s
+{
+	return s.screenFixed ? _touchSlop : [self worldSlop];
+}
+
+- (void)fireRotate:(TGSprite *)target
+{
+	fireOnSprite(target, @"rotate", @{ @"rotation": @(target.rotation) });
+}
+
+- (void)firePinch:(TGSprite *)s
+{
+	fireOnSprite(s, @"pinch", @{
+		@"scaleX": @(s.scaleX),
+		@"scaleY": @(s.scaleY)
+	});
+}
 
 /** Touch in surface pixels — what the screen-space overlay is laid out in. */
 - (CGPoint)surfacePoint:(UITouch *)touch inView:(UIView *)view
@@ -253,11 +286,27 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	TGSprite *target = _modifierTarget;
 
 	if (_activeTouches.count >= 2 && target != nil) {
+		NSTimeInterval now = [touches anyObject].timestamp;
 		if (_rotating) {
 			float angle = [self angleBetweenFirstTwoTouches:view];
-			target.rotation += angle - _lastAngle;
+			// atan2 flips from +180 to -180 between the fingers' two
+			// positions: the delta must take the short way round or one
+			// move adds a whole turn to the rotation
+			float delta = angle - _lastAngle;
+			if (delta > 180.0f) {
+				delta -= 360.0f;
+			} else if (delta < -180.0f) {
+				delta += 360.0f;
+			}
+			target.rotation += delta;
 			_lastAngle = angle;
-			fireOnSprite(target, @"rotate", @{ @"rotation": @(target.rotation) });
+			if (now - _lastRotateEventTime >= kDragEventInterval) {
+				_lastRotateEventTime = now;
+				_rotatePending = NO;
+				[self fireRotate:target];
+			} else {
+				_rotatePending = YES;
+			}
 		}
 		// Pinch-to-scale (the ScaleGestureDetector equivalent): incremental
 		// factor from the change in finger distance
@@ -267,10 +316,13 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 				float factor = dist / _lastPinchDistance;
 				target.scaleX *= factor;
 				target.scaleY *= factor;
-				fireOnSprite(target, @"pinch", @{
-					@"scaleX": @(target.scaleX),
-					@"scaleY": @(target.scaleY)
-				});
+				if (now - _lastPinchEventTime >= kDragEventInterval) {
+					_lastPinchEventTime = now;
+					_pinchPending = NO;
+					[self firePinch:target];
+				} else {
+					_pinchPending = YES;
+				}
 			}
 			_lastPinchDistance = dist;
 		}
@@ -294,7 +346,7 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	TGSprite *s = g.sprite;
 	tx = [self toSpriteSpaceX:s x:tx];
 	ty = [self toSpriteSpaceY:s y:ty];
-	if (!g.dragging && distanceBetween(tx, ty, g.downX, g.downY) > _touchSlop) {
+	if (!g.dragging && distanceBetween(tx, ty, g.downX, g.downY) > [self slopFor:s]) {
 		g.dragging = YES;
 		s.dragged = YES;
 		[s clearPositionTweens];
@@ -361,6 +413,15 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 			// ACTION_POINTER_UP
 			[self finishGestureForTouch:touch x:upX y:upY time:touch.timestamp allowTap:YES];
 			if (_activeTouches.count < 2) {
+				// the last throttled values are the ones that stick
+				if (_rotatePending && _modifierTarget != nil) {
+					[self fireRotate:_modifierTarget];
+				}
+				if (_pinchPending && _modifierTarget != nil) {
+					[self firePinch:_modifierTarget];
+				}
+				_rotatePending = NO;
+				_pinchPending = NO;
 				_rotating = NO;
 				_modifierTarget = nil;
 				_lastPinchDistance = 0.0f;
@@ -375,7 +436,7 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 			continue;
 		}
 		if (touch.timestamp - _downTime < kTapTimeout
-				&& distanceBetween(upX, upY, _downX, _downY) <= _touchSlop) {
+				&& distanceBetween(upX, upY, _downX, _downY) <= [self worldSlop]) {
 			[self fireOnView:@"tap" x:upX y:upY];
 		}
 		[self fireOnView:@"release" x:upX y:upY];
@@ -430,7 +491,7 @@ static void fireOnSprite(TGSprite *sprite, NSString *event, NSDictionary *data)
 	if (g.dragging) {
 		fireOnSprite(s, @"dragend", [self positionData:s]);
 	} else if (allowTap && time - g.downTime < kTapTimeout
-			&& distanceBetween(upX, upY, g.downX, g.downY) <= _touchSlop) {
+			&& distanceBetween(upX, upY, g.downX, g.downY) <= [self slopFor:s]) {
 		NSMutableDictionary *data = [self positionData:s];
 		data[@"touchX"] = @(upX);
 		data[@"touchY"] = @(upY);

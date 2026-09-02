@@ -376,10 +376,12 @@ public class TileLayerProxy extends KrollProxy
 	// --- Look & placement -------------------------------------------------------
 
 	@Kroll.setProperty
-	public void setSheet(SpriteSheetProxy value)
+	public void setSheet(Object value)
 	{
-		sheetProxy = value;
-		layer.sheet = (value != null) ? value.getSheet() : null;
+		// Object + instanceof: a mistyped JS value must not reach a typed JNI slot
+		SpriteSheetProxy proxy = (value instanceof SpriteSheetProxy) ? (SpriteSheetProxy) value : null;
+		sheetProxy = proxy;
+		layer.sheet = (proxy != null) ? proxy.getSheet() : null;
 	}
 
 	@Kroll.getProperty

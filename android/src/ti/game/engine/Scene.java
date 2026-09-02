@@ -22,6 +22,19 @@ public class Scene
 	private final List<Rope> ropes = new ArrayList<>();
 	private final List<TileLayer> tileLayers = new ArrayList<>();
 	private volatile boolean zOrderDirty = false;
+	// Cached draw-order copies, replaced (never mutated) whenever the order
+	// changes — the GL thread, touch thread and JS queries share them, so a
+	// caller must treat the returned lists as read-only.
+	private List<Sprite> ordered = new ArrayList<>();
+	private List<ParticleEmitter> orderedEmitters = new ArrayList<>();
+	private List<Rope> orderedRopes = new ArrayList<>();
+	private List<TileLayer> orderedLayers = new ArrayList<>();
+	private boolean emittersDirty = true;
+	private boolean ropesDirty = true;
+	private boolean layersDirty = true;
+	// Per-frame scratch (GL thread only): the sprites that can take part in
+	// a collision at all, so movers don't rescan every decorative sprite
+	private final List<Sprite> tagged = new ArrayList<>();
 	private double physicsTime = 0d;
 
 	/** Renders debug overlays for every sprite (GameView.debug = { hitbox: true }). */
@@ -267,25 +280,90 @@ public class Scene
 	public volatile float effectTintB = 1f;
 	public volatile float effectIntensity = 1f; // 0..1 mix/strength
 
+	// Compares keys captured under `lock` right before the sort (see
+	// snapshot()), not the live volatile fields: JS writes y/zIndex/scale
+	// mid-sort, and an inconsistent comparator makes TimSort throw
+	// "Comparison method violates its general contract" on the GL thread.
 	private static final Comparator<Sprite> BY_Z = new Comparator<Sprite>() {
 		@Override
 		public int compare(Sprite a, Sprite b)
 		{
-			int z = Integer.compare(a.zIndex, b.zIndex);
+			int z = Integer.compare(a.sortZ, b.sortZ);
 			if (z != 0) {
 				return z;
 			}
-			if (a.ySort && b.ySort) {
-				return Float.compare(bottomEdge(a), bottomEdge(b));
+			if (a.sortYSort && b.sortYSort) {
+				return Float.compare(a.sortBottom, b.sortBottom);
 			}
 			return 0;
 		}
 	};
 
-	private static float bottomEdge(Sprite s)
+	private static void captureSortKeys(Sprite s)
 	{
-		return s.y + s.drawHeight() * Math.abs(s.scaleY) * (1f - s.anchorY);
+		s.sortZ = s.zIndex;
+		s.sortYSort = s.ySort;
+		s.sortBottom = s.y + s.drawHeight() * Math.abs(s.scaleY) * (1f - s.anchorY);
 	}
+
+	/** Reads every z once, then a stable insertion sort — the side lists are tiny. */
+	private static <T> void sortByZ(List<T> list, ZKey<T> key)
+	{
+		int n = list.size();
+		int[] keys = new int[n];
+		for (int i = 0; i < n; i++) {
+			keys[i] = key.z(list.get(i));
+		}
+		for (int i = 1; i < n; i++) {
+			T item = list.get(i);
+			int k = keys[i];
+			int j = i - 1;
+			while (j >= 0 && keys[j] > k) {
+				list.set(j + 1, list.get(j));
+				keys[j + 1] = keys[j];
+				j--;
+			}
+			list.set(j + 1, item);
+			keys[j + 1] = k;
+		}
+	}
+
+	/** True while a cached z-ordered copy is still in order (a zIndex may have been written since). */
+	private static <T> boolean sortedByZ(List<T> list, ZKey<T> key)
+	{
+		for (int i = 1; i < list.size(); i++) {
+			if (key.z(list.get(i - 1)) > key.z(list.get(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private interface ZKey<T> {
+		int z(T item);
+	}
+
+	private static final ZKey<ParticleEmitter> EMITTER_Z = new ZKey<ParticleEmitter>() {
+		@Override
+		public int z(ParticleEmitter e)
+		{
+			return e.zIndex;
+		}
+	};
+	private static final ZKey<Rope> ROPE_Z = new ZKey<Rope>() {
+		@Override
+		public int z(Rope r)
+		{
+			return r.zIndex;
+		}
+	};
+	private static final ZKey<TileLayer> LAYER_Z = new ZKey<TileLayer>() {
+		@Override
+		public int z(TileLayer l)
+		{
+			return l.zIndex;
+		}
+	};
 
 	private volatile boolean hasYSort = false;
 
@@ -364,16 +442,19 @@ public class Scene
 			for (ParticleEmitter emitter : newEmitters) {
 				if (emitter != null && !emitters.contains(emitter)) {
 					emitters.add(emitter);
+					emittersDirty = true;
 				}
 			}
 			for (Rope rope : newRopes) {
 				if (rope != null && !ropes.contains(rope)) {
 					ropes.add(rope);
+					ropesDirty = true;
 				}
 			}
 			for (TileLayer layer : newLayers) {
 				if (layer != null && !tileLayers.contains(layer)) {
 					tileLayers.add(layer);
+					layersDirty = true;
 				}
 			}
 			if (spritesAdded) {
@@ -399,6 +480,10 @@ public class Scene
 	{
 		if (!sprites.remove(sprite)) {
 			return;
+		}
+		zOrderDirty = true;
+		if (followTarget == sprite) {
+			followTarget = null; // the camera must not chase (or retain) a sprite that left
 		}
 		sprite.markImpactGatesStale();
 		sprite.scene = null;
@@ -430,6 +515,8 @@ public class Scene
 				s.attachOpacity = 1f;
 			}
 			sprites.clear();
+			zOrderDirty = true;
+			followTarget = null;
 		}
 	}
 
@@ -443,6 +530,7 @@ public class Scene
 		synchronized (lock) {
 			if (!emitters.contains(emitter)) {
 				emitters.add(emitter);
+				emittersDirty = true;
 			}
 		}
 	}
@@ -450,33 +538,32 @@ public class Scene
 	public void removeEmitter(ParticleEmitter emitter)
 	{
 		synchronized (lock) {
-			emitters.remove(emitter);
+			if (emitters.remove(emitter)) {
+				emittersDirty = true;
+			}
 		}
 	}
 
-	/** Snapshot sorted by zIndex (emitters are few; sorted every call). */
+	/** Snapshot sorted by zIndex — a cached copy, rebuilt only when membership or order changed. Read-only. */
 	public List<ParticleEmitter> emittersSnapshot()
 	{
 		synchronized (lock) {
-			List<ParticleEmitter> copy = new ArrayList<>(emitters);
-			Collections.sort(copy, BY_EMITTER_Z);
-			return copy;
+			if (emittersDirty || !sortedByZ(orderedEmitters, EMITTER_Z)) {
+				List<ParticleEmitter> copy = new ArrayList<>(emitters);
+				sortByZ(copy, EMITTER_Z);
+				orderedEmitters = copy;
+				emittersDirty = false;
+			}
+			return orderedEmitters;
 		}
 	}
-
-	private static final Comparator<ParticleEmitter> BY_EMITTER_Z = new Comparator<ParticleEmitter>() {
-		@Override
-		public int compare(ParticleEmitter a, ParticleEmitter b)
-		{
-			return Integer.compare(a.zIndex, b.zIndex);
-		}
-	};
 
 	public void addRope(Rope rope)
 	{
 		synchronized (lock) {
 			if (!ropes.contains(rope)) {
 				ropes.add(rope);
+				ropesDirty = true;
 			}
 		}
 	}
@@ -484,33 +571,40 @@ public class Scene
 	public void removeRope(Rope rope)
 	{
 		synchronized (lock) {
-			ropes.remove(rope);
+			if (ropes.remove(rope)) {
+				ropesDirty = true;
+			}
 		}
 	}
 
-	/** Snapshot sorted by zIndex (ropes are few; sorted every call). */
+	/** Snapshot sorted by zIndex — a cached copy, rebuilt only when membership or order changed. Read-only. */
 	public List<Rope> ropesSnapshot()
 	{
 		synchronized (lock) {
-			List<Rope> copy = new ArrayList<>(ropes);
-			Collections.sort(copy, BY_ROPE_Z);
-			return copy;
+			if (ropesDirty || !sortedByZ(orderedRopes, ROPE_Z)) {
+				List<Rope> copy = new ArrayList<>(ropes);
+				sortByZ(copy, ROPE_Z);
+				orderedRopes = copy;
+				ropesDirty = false;
+			}
+			return orderedRopes;
 		}
 	}
 
-	private static final Comparator<Rope> BY_ROPE_Z = new Comparator<Rope>() {
-		@Override
-		public int compare(Rope a, Rope b)
-		{
-			return Integer.compare(a.zIndex, b.zIndex);
+	/** Cheap membership test for the touch thread (drag tethering). */
+	public boolean hasRopes()
+	{
+		synchronized (lock) {
+			return !ropes.isEmpty();
 		}
-	};
+	}
 
 	public void addTileLayer(TileLayer layer)
 	{
 		synchronized (lock) {
 			if (!tileLayers.contains(layer)) {
 				tileLayers.add(layer);
+				layersDirty = true;
 			}
 		}
 	}
@@ -518,36 +612,65 @@ public class Scene
 	public void removeTileLayer(TileLayer layer)
 	{
 		synchronized (lock) {
-			tileLayers.remove(layer);
+			if (tileLayers.remove(layer)) {
+				layersDirty = true;
+			}
 		}
 	}
 
-	/** Snapshot sorted by zIndex (layers are few; sorted every call). */
+	/** Snapshot sorted by zIndex — a cached copy, rebuilt only when membership or order changed. Read-only. */
 	public List<TileLayer> tileLayersSnapshot()
 	{
 		synchronized (lock) {
-			List<TileLayer> copy = new ArrayList<>(tileLayers);
-			Collections.sort(copy, BY_LAYER_Z);
-			return copy;
+			if (layersDirty || !sortedByZ(orderedLayers, LAYER_Z)) {
+				List<TileLayer> copy = new ArrayList<>(tileLayers);
+				sortByZ(copy, LAYER_Z);
+				orderedLayers = copy;
+				layersDirty = false;
+			}
+			return orderedLayers;
 		}
 	}
 
-	private static final Comparator<TileLayer> BY_LAYER_Z = new Comparator<TileLayer>() {
-		@Override
-		public int compare(TileLayer a, TileLayer b)
-		{
-			return Integer.compare(a.zIndex, b.zIndex);
-		}
-	};
-
-	/** Snapshot in draw order (back to front). Caller holds no lock. */
+	/**
+	 * Snapshot in draw order (back to front), re-sorted every call while
+	 * ySort sprites exist. GL thread, once per frame. Caller holds no lock
+	 * and must not mutate the list.
+	 */
 	public List<Sprite> snapshot()
 	{
+		return snapshot(hasYSort);
+	}
+
+	/**
+	 * The current draw order without a ySort re-sort: the order of the last
+	 * drawn frame, refreshed only for membership/zIndex changes. For the
+	 * touch thread (hit testing), which must not pay for a sort per event.
+	 */
+	public List<Sprite> orderedSnapshot()
+	{
+		return snapshot(false);
+	}
+
+	private List<Sprite> snapshot(boolean resort)
+	{
 		synchronized (lock) {
-			if (zOrderDirty || hasYSort) {
+			if (zOrderDirty || resort) {
+				for (int i = 0, n = sprites.size(); i < n; i++) {
+					captureSortKeys(sprites.get(i));
+				}
 				Collections.sort(sprites, BY_Z);
 				zOrderDirty = false;
+				ordered = new ArrayList<>(sprites);
 			}
+			return ordered;
+		}
+	}
+
+	/** Plain copy for queries that don't care about draw order (raycast, pathfinding). */
+	public List<Sprite> unorderedSnapshot()
+	{
+		synchronized (lock) {
 			return new ArrayList<>(sprites);
 		}
 	}
@@ -699,7 +822,7 @@ public class Scene
 		Sprite best = null;
 		float bestNormalX = 0f;
 		float bestNormalY = 0f;
-		for (Sprite s : snapshot()) {
+		for (Sprite s : unorderedSnapshot()) {
 			String group = s.collisionGroup;
 			if (group == null || !s.visible || s.screenFixed
 					|| (groups != null && !groups.isEmpty() && !groups.contains(group))) {
@@ -809,7 +932,7 @@ public class Scene
 							float minX, float minY, float maxX, float maxY,
 							boolean diagonals, boolean simplify)
 	{
-		return Pathfinder.find(snapshot(), tileLayersSnapshot(), groups, startX, startY, goalX, goalY,
+		return Pathfinder.find(unorderedSnapshot(), tileLayersSnapshot(), groups, startX, startY, goalX, goalY,
 			cellSize, clearance, minX, minY, maxX, maxY, diagonals, simplify);
 	}
 
@@ -883,21 +1006,35 @@ public class Scene
 	{
 		dt *= Math.max(0f, timeScale);
 		physicsTime += dt;
-		List<Sprite> list = snapshot();
-		for (Sprite s : list) {
+		// Last frame's draw order is good enough for ticking; the renderer
+		// takes the one ySort re-sort of the frame right after this.
+		List<Sprite> list = orderedSnapshot();
+		for (int i = 0, n = list.size(); i < n; i++) {
+			Sprite s = list.get(i);
 			s.consumeImpactGatesStale(this);
 			s.update(dt);
 		}
-		for (ParticleEmitter e : emittersSnapshot()) {
-			e.update(dt);
+		List<ParticleEmitter> emitters = emittersSnapshot();
+		for (int i = 0, n = emitters.size(); i < n; i++) {
+			emitters.get(i).update(dt);
 		}
 		// Ropes after sprites, so a dragged/physics-moved head is current
-		for (Rope rope : ropesSnapshot()) {
-			rope.update(dt);
+		List<Rope> ropes = ropesSnapshot();
+		for (int i = 0, n = ropes.size(); i < n; i++) {
+			ropes.get(i).update(dt);
 		}
 		skidTrail.update(dt);
 		updateTimers(dt);
 		wrapSprites(list);
+		// Only tagged, visible sprites can be hit or block anything — the
+		// inner collision loops scan this list instead of the whole scene
+		tagged.clear();
+		for (int i = 0, n = list.size(); i < n; i++) {
+			Sprite s = list.get(i);
+			if (s.collisionGroup != null && s.visible) {
+				tagged.add(s);
+			}
+		}
 		resolveSolids(list, tileLayersSnapshot());
 		applyAttachments(list);
 		normalizeWrappedSprites(list);
@@ -1359,16 +1496,17 @@ public class Scene
 	 */
 	private void resolveBilateralPairs(List<Sprite> list)
 	{
-		int n = list.size();
+		// A pair needs a collisionGroup on both sides: `tagged` suffices
+		int n = tagged.size();
 		for (int i = 0; i < n; i++) {
-			Sprite a = list.get(i);
+			Sprite a = tagged.get(i);
 			Set<String> ga = a.solidWith;
 			if (!a.circleHitbox || !a.visible || ga == null || ga.isEmpty()
 					|| a.solidMode != Sprite.SOLID_PUSH) {
 				continue;
 			}
 			for (int j = i + 1; j < n; j++) {
-				Sprite b = list.get(j);
+				Sprite b = tagged.get(j);
 				if (!bilateralPair(a, b, ga)) {
 					continue;
 				}
@@ -1469,7 +1607,8 @@ public class Scene
 			// The level comes first, moving solids on top of it
 			int tiles = resolveTileRect(s, layers, groups);
 			s.computeAABB(aabbA);
-			for (Sprite solid : list) {
+			for (int i = 0, n = tagged.size(); i < n; i++) {
+				Sprite solid = tagged.get(i);
 				String group = solid.collisionGroup;
 				if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
 					continue;
@@ -1645,7 +1784,8 @@ public class Scene
 		// (the same approximation a circle gets against a rect solid)
 		float earliest = sweepAgainstTiles(s, layers, groups, cx, cy, dx, dy,
 			circle ? r : hw, circle ? r : hh);
-		for (Sprite solid : list) {
+		for (int ti = 0, tn = tagged.size(); ti < tn; ti++) {
+			Sprite solid = tagged.get(ti);
 			String group = solid.collisionGroup;
 			if (solid == s || group == null || !solid.visible || !groups.contains(group)
 					|| solid.solidMode != Sprite.SOLID_BLOCK) {
@@ -1898,7 +2038,8 @@ public class Scene
 		int tiles = resolveTileCircle(s, layers, groups, r);
 		grounded = (tiles & CONTACT_GROUND) != 0;
 		int wall = wallFromContact(tiles);
-		for (Sprite solid : list) {
+		for (int i = 0, n = tagged.size(); i < n; i++) {
+			Sprite solid = tagged.get(i);
 			String group = solid.collisionGroup;
 			if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
 				continue;
@@ -2410,7 +2551,8 @@ public class Scene
 				endAllCollisions(s);
 				continue;
 			}
-			for (Sprite other : list) {
+			for (int i = 0, n = tagged.size(); i < n; i++) {
+				Sprite other = tagged.get(i);
 				String group = other.collisionGroup;
 				if (other == s || group == null || !other.visible || !groups.contains(group)) {
 					continue;
@@ -2473,7 +2615,7 @@ public class Scene
 	/** Topmost sprite under the point (front to back), or null. */
 	public Sprite hitTest(float x, float y)
 	{
-		List<Sprite> list = snapshot();
+		List<Sprite> list = orderedSnapshot();
 		for (int i = list.size() - 1; i >= 0; i--) {
 			Sprite s = list.get(i);
 			float hitX = (worldWrapXEnabled && s.wrapWorldX && !s.screenFixed)

@@ -657,15 +657,25 @@ public final class GamepadController implements InputManager.InputDeviceListener
 		return true;
 	}
 
+	// Joystick MOTION events arrive every frame while a stick is held —
+	// results go into this scratch pair instead of a fresh array each time
+	private final float[] deadzoneOut = new float[2];
+	private final float[] stickValues = new float[4];
+
 	private float[] applyDeadzone(float x, float y)
 	{
 		float dz = deadzone;
 		float len = (float) Math.sqrt(x * x + y * y);
+		float[] out = deadzoneOut;
 		if (len <= dz || len == 0f) {
-			return new float[] { 0f, 0f };
+			out[0] = 0f;
+			out[1] = 0f;
+			return out;
 		}
 		float scaled = Math.min(1f, (len - dz) / (1f - dz));
-		return new float[] { x / len * scaled, y / len * scaled };
+		out[0] = x / len * scaled;
+		out[1] = y / len * scaled;
+		return out;
 	}
 
 	private static float clamp01(float v)
@@ -676,7 +686,11 @@ public final class GamepadController implements InputManager.InputDeviceListener
 	private void updateStickDirections(DeviceState state, float x, float y)
 	{
 		// order matches DIRECTION_NAMES: up, down, left, right
-		float[] values = { -y, y, -x, x };
+		float[] values = stickValues;
+		values[0] = -y;
+		values[1] = y;
+		values[2] = -x;
+		values[3] = x;
 		for (int d = 0; d < 4; d++) {
 			boolean was = state.stickDirs[d];
 			boolean now = was ? values[d] > stickRelease : values[d] > stickPress;

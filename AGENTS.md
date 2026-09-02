@@ -43,6 +43,10 @@ build output — never edit them.
    `Scene.snapshot()`; sprite scalar fields are `volatile`. GL calls
    (texture upload, drawing) happen only on the GL thread —
    `SpriteSheet.ensureLoaded` is called from `onDrawFrame` for that reason.
+   The `*Snapshot()` lists are cached, shared copies — read-only for
+   callers. A sort comparator must never read live volatile fields
+   (TimSort throws when a value changes mid-sort): capture keys under the
+   lock first, as `Scene.captureSortKeys` does.
 4. **Context loss.** Anything that creates GL resources must survive EGL
    context recreation: recreate in `onSurfaceCreated` (see
    `SpriteBatch.createGLResources`, `TextureManager.invalidateAll`).
@@ -77,6 +81,12 @@ to the corresponding `TG*` file by hand.
 - Kroll annotations: `@Kroll.proxy(creatableInModule = TiGameModule.class)`
   makes `Game.createXyz()` factories automatically; `@Kroll.getProperty` /
   `@Kroll.setProperty` / `@Kroll.method` for the JS surface.
+- Kroll never runs a `@Kroll.setProperty` setter for a creation-dict key:
+  every settable property needs its own branch in `handleCreationDict`.
+- A setter that takes another proxy (`sheet`, `font`, `target`, `head`)
+  must declare the parameter as `Object` and `instanceof`-check it — the
+  generated JNI passes a mistyped JS value straight into a typed slot and
+  aborts the process instead of raising a JS error.
 - JS-facing durations are milliseconds (Titanium convention); the engine
   uses seconds internally — convert at the proxy boundary.
 - `manifest` (version, minsdk, architectures) and `android/timodule.xml`

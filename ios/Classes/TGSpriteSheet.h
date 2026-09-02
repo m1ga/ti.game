@@ -56,7 +56,8 @@ typedef struct {
  * Called from the render thread each frame until the texture exists. Decodes
  * the image via the loader, builds grid frames if needed, and uploads.
  */
-- (void)ensureLoaded:(TGTextureManager *)textures;
+/** Returns YES when this call uploaded a texture (the caller tracks it). */
+- (BOOL)ensureLoaded:(TGTextureManager *)textures;
 
 /** Drops the GL texture reference after context loss so it reloads. */
 - (void)invalidateTexture;

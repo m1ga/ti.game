@@ -222,6 +222,12 @@ public class Sprite
 	public volatile Set<String> collidesWith;
 	final Set<Sprite> colliding = new HashSet<>(); // overlap-enter tracking, GL thread only
 
+	// Draw-order keys captured under Scene.lock right before a sort, so the
+	// comparator never sees a value change mid-sort (see Scene.snapshot)
+	int sortZ;
+	float sortBottom;
+	boolean sortYSort;
+
 	// Solid collision: groups whose AABBs block this sprite's movement
 	// (platformer floors/walls). Resolved natively each frame; landing on
 	// top sets onGround and fires the 'land' event.
@@ -881,6 +887,9 @@ public class Sprite
 
 	private void updateTweens(float dt)
 	{
+		if (tweens.isEmpty()) {
+			return; // the COW iterator below is an allocation per sprite per frame
+		}
 		for (Tween t : tweens) {
 			if (t.update(this, dt)) {
 				tweens.remove(t);

@@ -92,18 +92,18 @@
 		&& atomic_load_explicit(&_publishedFrameCount, memory_order_acquire) > 0;
 }
 
-- (void)ensureLoaded:(TGTextureManager *)textures
+- (BOOL)ensureLoaded:(TGTextureManager *)textures
 {
 	if (atomic_load_explicit(&_textureId, memory_order_acquire) >= 0
 		|| atomic_load_explicit(&_loadFailed, memory_order_acquire)
 		|| atomic_load_explicit(&_disposed, memory_order_acquire)) {
-		return;
+		return NO;
 	}
 	id<TGSpriteSheetLoader> loader = _loader;
 	UIImage *image = (loader != nil) ? [loader loadSpriteSheet:self] : nil;
 	if (image == nil || image.CGImage == NULL) {
 		atomic_store_explicit(&_loadFailed, true, memory_order_release);
-		return;
+		return NO;
 	}
 	int imageWidth = (int)CGImageGetWidth(image.CGImage);
 	int imageHeight = (int)CGImageGetHeight(image.CGImage);
@@ -114,9 +114,9 @@
 															frameHeight:_gridFrameHeight
 																  inset:self.smoothing]];
 	}
-	atomic_store_explicit(&_textureId,
-		(GLint)[textures upload:image smoothing:self.smoothing repeat:self.repeat],
-		memory_order_release);
+	GLint textureId = (GLint)[textures upload:image smoothing:self.smoothing repeat:self.repeat];
+	atomic_store_explicit(&_textureId, textureId, memory_order_release);
+	return textureId >= 0;
 }
 
 - (void)invalidateTexture

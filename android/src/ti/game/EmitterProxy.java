@@ -135,10 +135,12 @@ public class EmitterProxy extends KrollProxy
 	// --- Sheet / target ---------------------------------------------------
 
 	@Kroll.setProperty
-	public void setSheet(SpriteSheetProxy value)
+	public void setSheet(Object value)
 	{
-		sheetProxy = value;
-		emitter.sheet = (value != null) ? value.getSheet() : null;
+		// Object + instanceof: a mistyped JS value must not reach a typed JNI slot
+		SpriteSheetProxy proxy = (value instanceof SpriteSheetProxy) ? (SpriteSheetProxy) value : null;
+		sheetProxy = proxy;
+		emitter.sheet = (proxy != null) ? proxy.getSheet() : null;
 	}
 
 	@Kroll.getProperty
@@ -149,10 +151,11 @@ public class EmitterProxy extends KrollProxy
 
 	/** Follow this sprite instead of the fixed x/y (null to detach). */
 	@Kroll.setProperty
-	public void setTarget(SpriteProxy value)
+	public void setTarget(Object value)
 	{
-		targetProxy = value;
-		emitter.target = (value != null) ? value.getSprite() : null;
+		SpriteProxy proxy = (value instanceof SpriteProxy) ? (SpriteProxy) value : null;
+		targetProxy = proxy;
+		emitter.target = (proxy != null) ? proxy.getSprite() : null;
 	}
 
 	@Kroll.getProperty

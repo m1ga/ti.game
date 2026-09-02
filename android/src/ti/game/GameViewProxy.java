@@ -116,6 +116,20 @@ public class GameViewProxy extends TiViewProxy
 		if (options.containsKey("worldWrapX")) {
 			setWorldWrapX(options.getKrollDict("worldWrapX"));
 		}
+		// Kroll never runs @Kroll.setProperty setters for creation keys —
+		// every property with a setter needs a branch here
+		if (options.containsKey("cameraX")) {
+			scene.cameraX = TiConvert.toFloat(options.get("cameraX"), scene.cameraX);
+		}
+		if (options.containsKey("cameraY")) {
+			scene.cameraY = TiConvert.toFloat(options.get("cameraY"), scene.cameraY);
+		}
+		if (options.containsKey("cameraScale")) {
+			setCameraScale(options.get("cameraScale"));
+		}
+		if (options.containsKey("cameraBounds")) {
+			setCameraBounds(options.getKrollDict("cameraBounds"));
+		}
 	}
 
 	// --- Game controllers -------------------------------------------------
@@ -561,14 +575,10 @@ public class GameViewProxy extends TiViewProxy
 			scene.cameraBoundsEnabled = false;
 			return;
 		}
-		scene.boundsMinX = bounds.containsKey("minX")
-			? TiConvert.toFloat(bounds.get("minX")) : -Float.MAX_VALUE;
-		scene.boundsMinY = bounds.containsKey("minY")
-			? TiConvert.toFloat(bounds.get("minY")) : -Float.MAX_VALUE;
-		scene.boundsMaxX = bounds.containsKey("maxX")
-			? TiConvert.toFloat(bounds.get("maxX")) : Float.MAX_VALUE;
-		scene.boundsMaxY = bounds.containsKey("maxY")
-			? TiConvert.toFloat(bounds.get("maxY")) : Float.MAX_VALUE;
+		scene.boundsMinX = TiConvert.toFloat(bounds.get("minX"), -Float.MAX_VALUE);
+		scene.boundsMinY = TiConvert.toFloat(bounds.get("minY"), -Float.MAX_VALUE);
+		scene.boundsMaxX = TiConvert.toFloat(bounds.get("maxX"), Float.MAX_VALUE);
+		scene.boundsMaxY = TiConvert.toFloat(bounds.get("maxY"), Float.MAX_VALUE);
 		scene.cameraBoundsEnabled = true;
 	}
 

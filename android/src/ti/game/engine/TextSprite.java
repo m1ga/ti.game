@@ -59,7 +59,10 @@ public class TextSprite extends Sprite
 		return text;
 	}
 
-	public void setText(String value)
+	// The setters are synchronized on the same monitor layout() rebuilds
+	// under: an unsynchronized `layout = null` can land while the GL thread
+	// is inside buildLayout() and be overwritten by the stale result.
+	public synchronized void setText(String value)
 	{
 		text = (value != null) ? value : "";
 		layout = null;
@@ -70,7 +73,7 @@ public class TextSprite extends Sprite
 		return align;
 	}
 
-	public void setAlign(int value)
+	public synchronized void setAlign(int value)
 	{
 		align = value;
 		layout = null;
@@ -81,7 +84,7 @@ public class TextSprite extends Sprite
 		return letterSpacing;
 	}
 
-	public void setLetterSpacing(float value)
+	public synchronized void setLetterSpacing(float value)
 	{
 		letterSpacing = value;
 		layout = null;
@@ -92,7 +95,7 @@ public class TextSprite extends Sprite
 		return lineSpacing;
 	}
 
-	public void setLineSpacing(float value)
+	public synchronized void setLineSpacing(float value)
 	{
 		lineSpacing = value;
 		layout = null;
@@ -103,13 +106,13 @@ public class TextSprite extends Sprite
 		return maxWidth;
 	}
 
-	public void setMaxWidth(float value)
+	public synchronized void setMaxWidth(float value)
 	{
 		maxWidth = Math.max(0f, value);
 		layout = null;
 	}
 
-	public void setFont(BitmapFont value)
+	public synchronized void setFont(BitmapFont value)
 	{
 		font = value;
 		sheet = (value != null) ? value.sheet : null; // renderer's lazy texture upload

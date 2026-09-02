@@ -163,7 +163,8 @@ busy app thread can't cause stutter.
   few per 80 ms tick); don't poll them in a tight loop.
 - *Events* — fired natively only when something discrete happens, and only
   if a listener is registered (`hasListeners` is checked before paying the
-  bridge cost). Continuous gestures are throttled (`drag` at ~10 Hz);
+  bridge cost). Continuous gestures are throttled (`drag`, `pinch` and
+  `rotate` at ~10 Hz, the final value always delivered on release);
   nothing fires per frame by design.
 
 When building a level, collect its sprites, emitters, ropes and tile
@@ -282,8 +283,8 @@ Enable behaviors per sprite: `draggable` (native drag & drop),
 `pinchable` (two-finger scale), `rotatable` (two-finger rotate). The
 engine hit-tests taps against the sprites' transformed shapes (rotation
 and scale included, topmost first) and fires `press`, `tap`, `dragstart`,
-`drag` (~10 Hz), `dragend`, `release`, `pinch`, `rotate`. The drag itself
-happens natively — JS only hears the milestones.
+`drag`, `pinch`, `rotate` (each ~10 Hz), `dragend`, `release`. The drag
+itself happens natively — JS only hears the milestones.
 
 Sprite touches are multi-touch: every finger runs its own gesture, so
 several sprites can be pressed, tapped or dragged at the same time (each
@@ -1150,7 +1151,7 @@ also accepts later assignments, while Android does not expose a setter.
 | Property | Description |
 |---|---|
 | `collisionGroup` | This sprite's group tag (what others test against) |
-| `collidesWith` | Groups that fire `collision`/`collisionend` events on overlap |
+| `collidesWith` | Groups that fire `collision`/`collisionend` events on overlap (an array, or a single group name) |
 | `hitboxScale` | Shrinks the hitbox **around the anchor** (default 1, or `'80%'`); slightly small hitboxes feel fairer. Pair it with `anchor` to move which edge stays put. Collision only — the touch area stays the full drawn frame |
 | `hitboxScaleX` / `hitboxScaleY` | Per-axis corrections multiplied on top of `hitboxScale` (default 1), for art that fills its frame by a different fraction on each axis; ignored by circle hitboxes |
 | `hitboxShape` | `'rect'` (default), `'circle'` or `'rotatedRect'`. Circles bounce off solid corners along the contact normal, and a circle solid is resolved as a circle instead of its bounding box. `'rotatedRect'` keeps the collision rect **turned with the sprite** (an oriented bounding box, OBB) instead of re-boxing it square to the screen every frame — a tilted platform or a diamond post is then hit on its real face, with the normal perpendicular to it. Only matters once `rotation` is non-zero; it costs a little more per test, which is why plain `'rect'` stays the default |

@@ -104,16 +104,17 @@ public class SpriteSheet
 	/**
 	 * Called from the GL thread each frame until the texture exists. Decodes
 	 * the bitmap via the loader, builds grid frames if needed, and uploads.
+	 * Returns true when this call uploaded a texture (the caller tracks it).
 	 */
-	public void ensureLoaded(TextureManager textures)
+	public boolean ensureLoaded(TextureManager textures)
 	{
 		if (textureId >= 0 || loadFailed || disposed) {
-			return;
+			return false;
 		}
 		Bitmap bitmap = (loader != null) ? loader.load(this) : null;
 		if (bitmap == null) {
 			loadFailed = true;
-			return;
+			return false;
 		}
 		if (frames.length == 0 && gridFrameWidth > 0 && gridFrameHeight > 0) {
 			setFrames(buildGridFrames(bitmap.getWidth(), bitmap.getHeight(),
@@ -121,6 +122,7 @@ public class SpriteSheet
 		}
 		textureId = textures.upload(bitmap, smoothing, repeat);
 		bitmap.recycle();
+		return textureId >= 0;
 	}
 
 	/** Drops the GL texture reference after context loss so it reloads. */

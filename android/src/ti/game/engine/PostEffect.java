@@ -49,7 +49,12 @@ public class PostEffect
 	private static final String GLITCH_FRAGMENT_SHADER =
 		"precision mediump float;\n"
 		+ "uniform sampler2D uTex;\n"
+		// mediump (fp16) cannot resolve uTime * 40; highp where the fragment stage has it
+		+ "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
+		+ "uniform highp float uTime;\n"
+		+ "#else\n"
 		+ "uniform float uTime;\n"
+		+ "#endif\n"
 		+ "uniform float uIntensity;\n"
 		+ "varying vec2 vUV;\n"
 		+ "float rnd(vec2 co) {\n"
@@ -149,14 +154,15 @@ public class PostEffect
 	 * leaves the screen framebuffer bound) if the FBO can't be set up —
 	 * the caller then renders directly, skipping the effect.
 	 */
+	private final int[] prevFbo = new int[1]; // glGetIntegerv scratch
+
 	public boolean begin(int width, int height)
 	{
 		if (width <= 0 || height <= 0) {
 			return false;
 		}
-		int[] prev = new int[1];
-		GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, prev, 0);
-		previousFbo = prev[0];
+		GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, prevFbo, 0);
+		previousFbo = prevFbo[0];
 		if (!ensureFbo(width, height)) {
 			return false;
 		}
