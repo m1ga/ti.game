@@ -1118,6 +1118,18 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	if (dx * dx + dy * dy < 1e-4f) {
 		return NO;
 	}
+	if (s.circleHitbox && other.circleHitbox) {
+		[s hitCenter:_centerA];
+		[self shiftedHitCenter:other offsetX:otherOffsetX out:_centerB];
+		// Relative segment against the Minkowski circle, not its bounding box.
+		float fx = _centerA[0] - _centerB[0] - dx;
+		float fy = _centerA[1] - _centerB[1] - dy;
+		float t = fmaxf(0.0f, fminf(1.0f, -(fx * dx + fy * dy) / (dx * dx + dy * dy)));
+		float px = fx + t * dx;
+		float py = fy + t * dy;
+		float radius = [s hitRadius] + [other hitRadius];
+		return px * px + py * py < radius * radius;
+	}
 	[s computeAABB:_aabbA];
 	[self shiftedAABB:other offsetX:otherOffsetX out:_aabbB];
 	float hw = (_aabbA[2] - _aabbA[0]) / 2.0f;

@@ -948,6 +948,18 @@ public class Scene
 		if (dx * dx + dy * dy < 1e-4f) {
 			return false;
 		}
+		if (s.circleHitbox && other.circleHitbox) {
+			s.hitCenter(centerA);
+			shiftedHitCenter(other, otherOffsetX, centerB);
+			// Relative segment against the Minkowski circle, not its bounding box.
+			float fx = centerA[0] - centerB[0] - dx;
+			float fy = centerA[1] - centerB[1] - dy;
+			float t = Math.max(0f, Math.min(1f, -(fx * dx + fy * dy) / (dx * dx + dy * dy)));
+			float px = fx + t * dx;
+			float py = fy + t * dy;
+			float radius = s.hitRadius() + other.hitRadius();
+			return px * px + py * py < radius * radius;
+		}
 		s.computeAABB(aabbA);
 		shiftedAABB(other, otherOffsetX, aabbB);
 		float hw = (aabbA[2] - aabbA[0]) / 2f;
