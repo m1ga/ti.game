@@ -1344,6 +1344,13 @@ With a `tail`, `maxLength` also pulls the endpoint sprites back inside the
 limit and cancels their outward velocity. The end not being dragged yields,
 which lets either endpoint tow the other.
 
+At zero game delta, rope nodes and their previous positions stay unchanged;
+constraint relaxation and tether response wait until time advances. A new
+rope still initializes its geometry so it can render in a paused scene.
+Run `python3 tests/test_rope_pause.py` for the Java and Objective-C update
+fixtures (Objective-C requires macOS). These test node history and tether
+state without a renderer.
+
 ### TileLayer
 
 Add/remove via `gameView.add(layer)` / `remove(layer)`. Draws under
