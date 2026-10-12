@@ -941,6 +941,25 @@ public class Scene
 	 * cross the target's box at any point this frame? Relative motion, so
 	 * a fast target can't slip past a slow bullet either.
 	 */
+	/** Circle centre segment against a box expanded by the circle radius. */
+	private boolean sweptCircleBoxOverlap(float x, float y, float dx, float dy,
+										 float hw, float hh, float radius)
+	{
+		// Two face strips and four corner disks form the rounded rectangle.
+		if (sweptHit(x, y, dx, dy, -hw - radius, -hh, hw + radius, hh)
+				|| sweptHit(x, y, dx, dy, -hw, -hh - radius, hw, hh + radius)) {
+			return true;
+		}
+		for (int i = 0; i < 4; i++) {
+			float cx = ((i & 1) == 0) ? -hw : hw;
+			float cy = (i < 2) ? -hh : hh;
+			if (segmentVsCircle(x, y, dx, dy, cx, cy, radius) >= 0f) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private boolean sweptShapesOverlap(Sprite s, Sprite other, float otherOffsetX)
 	{
 		float dx = s.frameDeltaX - other.frameDeltaX;
@@ -959,6 +978,33 @@ public class Scene
 			float py = fy + t * dy;
 			float radius = s.hitRadius() + other.hitRadius();
 			return px * px + py * py < radius * radius;
+		}
+		if (s.circleHitbox || other.circleHitbox) {
+			Sprite circle = s.circleHitbox ? s : other;
+			Sprite rect = s.circleHitbox ? other : s;
+			shiftedHitCenter(circle, circle == other ? otherOffsetX : 0f, centerA);
+			float rectOffsetX = rect == other ? otherOffsetX : 0f;
+			if (rect.obbHitbox) {
+				shiftedHitBox(rect, rectOffsetX, boxB);
+			} else {
+				shiftedAABB(rect, rectOffsetX, aabbB);
+				boxB[0] = (aabbB[0] + aabbB[2]) / 2f;
+				boxB[1] = (aabbB[1] + aabbB[3]) / 2f;
+				boxB[2] = (aabbB[2] - aabbB[0]) / 2f;
+				boxB[3] = (aabbB[3] - aabbB[1]) / 2f;
+				boxB[4] = 0f;
+			}
+			// Freeze the box at its end position and sweep the relative centre.
+			float direction = circle == s ? 1f : -1f;
+			dx *= direction;
+			dy *= direction;
+			float x = centerA[0] - boxB[0] - dx;
+			float y = centerA[1] - boxB[1] - dy;
+			float cos = (float) Math.cos(boxB[4]);
+			float sin = (float) Math.sin(boxB[4]);
+			return sweptCircleBoxOverlap(x * cos + y * sin, -x * sin + y * cos,
+				dx * cos + dy * sin, -dx * sin + dy * cos,
+				boxB[2], boxB[3], circle.hitRadius());
 		}
 		s.computeAABB(aabbA);
 		shiftedAABB(other, otherOffsetX, aabbB);
