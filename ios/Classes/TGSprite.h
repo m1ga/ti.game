@@ -284,6 +284,9 @@ typedef NS_ENUM(int, TGSolidMode) {
 @property (atomic, assign) float frameAccelX;
 @property (atomic, assign) float frameAccelY;
 
+// Complete the low-speed damping decision after scene solid resolution.
+- (void)finishDamping;
+
 // The solid this sprite stood on last frame (render thread only).
 @property (atomic, weak) TGSprite *groundSprite;
 

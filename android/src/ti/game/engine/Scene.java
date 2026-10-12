@@ -1036,6 +1036,9 @@ public class Scene
 			}
 		}
 		resolveSolids(list, tileLayersSnapshot());
+		for (Sprite s : list) {
+			s.finishDamping();
+		}
 		applyAttachments(list);
 		normalizeWrappedSprites(list);
 		checkCollisions(list);

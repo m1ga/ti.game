@@ -32,6 +32,8 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 @end
 
 @implementation TGSprite {
+	// Applied acceleration for the post-contact damping decision; render thread only.
+	float _driveX, _driveY, _driveTolerance;
 	// Idle wobble state (render thread only)
 	float _idlePhase;
 	float _idleTime;
@@ -299,6 +301,7 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 
 - (void)update:(float)dt
 {
+	_driveX = _driveY = _driveTolerance = 0.0f;
 	float startX = self.x;
 	float startY = self.y;
 	float startVelocityX = self.velocityX;
@@ -313,8 +316,13 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	float thrust = self.thrust;
 	if (thrust != 0.0f) {
 		float rad = self.rotation * (float)M_PI / 180.0f;
-		float velocityX = self.velocityX + sinf(rad) * thrust * dt;
-		float velocityY = self.velocityY - cosf(rad) * thrust * dt;
+		float ax = sinf(rad) * thrust;
+		float ay = -cosf(rad) * thrust;
+		_driveX += ax;
+		_driveY += ay;
+		_driveTolerance += fabsf(thrust);
+		float velocityX = self.velocityX + ax * dt;
+		float velocityY = self.velocityY + ay * dt;
 		float speed = sqrtf(velocityX * velocityX + velocityY * velocityY);
 		float maxSpeed = self.maxSpeed;
 		if (speed > maxSpeed && speed > 0.0f) {
@@ -328,21 +336,25 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	float gravity = self.gravity;
 	if (gravity != 0.0f) {
 		self.velocityY += gravity * dt;
+		_driveY += gravity;
+		_driveTolerance += fabsf(gravity);
 	}
 	float gravityX = self.gravityX;
 	if (gravityX != 0.0f) {
 		self.velocityX += gravityX * dt;
+		_driveX += gravityX;
+		_driveTolerance += fabsf(gravityX);
 	}
+	// Ignore cancellation residue at float precision, relative to the inputs.
+	_driveTolerance *= 1e-6f;
 	float linearDamping = self.linearDamping;
 	if (linearDamping > 0.0f && (self.velocityX != 0.0f || self.velocityY != 0.0f)) {
 		// Clamped so a long frame can't reverse the sprite instead of slowing it
 		float keep = 1.0f - MIN(1.0f, linearDamping * dt);
 		float dvx = self.velocityX * keep;
 		float dvy = self.velocityY * keep;
-		// Let active acceleration accumulate below the coasting cutoff.
-		BOOL accelerating = thrust != 0.0f || gravity != 0.0f || gravityX != 0.0f
-			|| (self.carMode && self.throttle != 0.0f && self.enginePower != 0.0f);
-		if (!accelerating && dvx * dvx + dvy * dvy < 16.0f) {
+		BOOL coasting = _driveX * _driveX + _driveY * _driveY <= _driveTolerance * _driveTolerance;
+		if (coasting && dvx * dvx + dvy * dvy < 16.0f) {
 			dvx = 0.0f; // under 4 px/s: invisible, so stop for real
 			dvy = 0.0f;
 		}
@@ -425,6 +437,30 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	_idleAppliedY = newY;
 }
 
+/** Scene calls this after solid resolution, when blocked motion is known. */
+- (void)finishDamping
+{
+	float vx = self.velocityX;
+	float vy = self.velocityY;
+	// Rect walls retain inward velocity for held-button movement. It is
+	// blocked motion, so exclude it from the tangential rest decision.
+	BOOL blockedX = (self.wallSide == 1 && vx > 0.0f) || (self.wallSide == -1 && vx < 0.0f);
+	if (blockedX) {
+		vx = 0.0f;
+	}
+	float speed2 = vx * vx + vy * vy;
+	if (self.linearDamping <= 0.0f || speed2 >= 16.0f) {
+		return;
+	}
+	float work = vx * _driveX + vy * _driveY;
+	if (work <= 0.0f || work * work <= _driveTolerance * _driveTolerance * speed2) {
+		if (!blockedX) {
+			self.velocityX = 0.0f;
+		}
+		self.velocityY = 0.0f;
+	}
+}
+
 /**
  * Arcade top-down car model — see the Android twin for the full physics
  * commentary. Finite lateral grip is what makes the car drift.
@@ -446,7 +482,8 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	float steerFactor = MAX(-1.0f, MIN(1.0f, vForward / (maxSpeed * 0.25f)));
 	self.rotation += self.steering * self.turnRate * steerFactor * dt;
 
-	vForward += self.throttle * self.enginePower * dt;
+	float motor = self.throttle * self.enginePower;
+	vForward += motor * dt;
 	vForward -= vForward * MIN(1.0f, self.drag * dt);
 	vLateral -= vLateral * MIN(1.0f, self.grip * dt);
 
@@ -462,6 +499,9 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	fwdY = -cosf(rad);
 	rightX = cosf(rad);
 	rightY = sinf(rad);
+	_driveX += fwdX * motor;
+	_driveY += fwdY * motor;
+	_driveTolerance += fabsf(motor);
 	self.velocityX = fwdX * vForward + rightX * vLateral;
 	self.velocityY = fwdY * vForward + rightY * vLateral;
 

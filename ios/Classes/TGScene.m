@@ -589,6 +589,9 @@ static float bottomEdge(TGSprite *s)
 	[self updateTimers:dt];
 	[self wrapSprites:list];
 	[self resolveSolids:list layers:layerList];
+	for (TGSprite *s in list) {
+		[s finishDamping];
+	}
 	[self applyAttachments:list];
 	[self normalizeWrappedSprites:list];
 	[self checkCollisions:list];

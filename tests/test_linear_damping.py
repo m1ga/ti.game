@@ -33,12 +33,13 @@ public class DampingCheck {
  float x,y,velocityX,velocityY,rotation,angularVelocity,thrust,gravity,gravityX,linearDamping;
  float maxSpeed=500,throttle,enginePower=600,steering,turnRate=200,grip=4,drag=.6f,skidThreshold;
  float frameAccelX,frameAccelY,frameDeltaX,frameDeltaY,wrapShift,wrapX,flashRemaining;
- boolean carMode,skidMarks,drifting,wrapWorldX;
+ boolean carMode,skidMarks,drifting,wrapWorldX; int wallSide; float driveX,driveY,driveTolerance;
  Scene scene; Path path; SpriteEventListener eventListener; float[] pathOut=new float[3];
  void updateAnimation(float dt){} void updateTweens(float dt){} void updateIdle(float dt){}
  void emitSkidMarks(float a,float b,float c,float d,float e,float f){}
  UPDATE
  CAR
+ FINISH
  }
  static int failures=0,checks=0;
  static void check(boolean ok,String name){checks++;if(!ok){failures++;System.err.println("FAIL Java: "+name);}}
@@ -59,6 +60,21 @@ public class DampingCheck {
  Sprite reverse=new Sprite();reverse.thrust=-100;reverse.linearDamping=1.2f;reverse.update(1f/120);check(reverse.velocityY>0,"negative thrust accelerates");
  Sprite still=new Sprite();still.linearDamping=1.2f;still.update(1f/60);close(still.x,0,"stationary x");close(still.y,0,"stationary y");
  Sprite cap=new Sprite();cap.velocityX=600;cap.thrust=100;cap.linearDamping=1.2f;cap.update(1f/60);check(Math.hypot(cap.velocityX,cap.velocityY)<=500,"speed cap retained");
+
+ Sprite cancelled=new Sprite();cancelled.velocityX=2;cancelled.thrust=30;cancelled.gravity=30;cancelled.linearDamping=1.2f;cancelled.update(1f/60);cancelled.finishDamping();close(cancelled.velocityX,0,"cancelled forces restore cutoff");
+ Sprite floor=new Sprite();floor.velocityX=3;floor.gravity=30;floor.linearDamping=1.2f;
+ for(int i=0;i<600;i++){floor.update(1f/60);floor.y=0;floor.velocityY=0;floor.finishDamping();}
+ close(floor.velocityX,0,"floor tangential rest");check(floor.x<.1f,"floor does not creep repeatedly");
+ Sprite wall=new Sprite();wall.velocityY=3;wall.gravityX=30;wall.linearDamping=1.2f;wall.update(1f/60);wall.velocityX=0;wall.finishDamping();close(wall.velocityY,0,"wall tangential rest");
+ Sprite ceiling=new Sprite();ceiling.velocityX=3;ceiling.thrust=100;ceiling.linearDamping=1.2f;ceiling.update(1f/60);ceiling.velocityY=0;ceiling.finishDamping();close(ceiling.velocityX,0,"blocked thrust does not preserve drift");
+ Sprite tiny=new Sprite();tiny.thrust=1;tiny.linearDamping=1.2f;
+ for(int i=0;i<600;i++){tiny.update(1f/60);tiny.finishDamping();}
+ check(tiny.velocityY<-.8f,"driven equilibrium below4 persists");
+ Sprite braking=new Sprite();braking.velocityX=2;braking.rotation=90;braking.thrust=-100;braking.linearDamping=1.2f;braking.update(1f/60);braking.finishDamping();close(braking.velocityX,0,"opposing force can settle");braking.update(1f/60);braking.finishDamping();check(braking.velocityX<0,"opposing force relaunches in reverse");
+ Sprite noDamping=new Sprite();noDamping.velocityX=2;noDamping.update(1f/60);noDamping.finishDamping();close(noDamping.velocityX,2,"zero damping unchanged");
+
+ Sprite held=new Sprite();held.wallSide=1;held.velocityX=20;held.velocityY=3;held.gravityX=30;held.linearDamping=1.2f;held.update(1f/60);held.finishDamping();close(held.velocityY,0,"retained wall normal does not protect tangent");check(held.velocityX>0,"wall normal velocity retained");
+ Sprite heldLeft=new Sprite();heldLeft.wallSide=-1;heldLeft.velocityX=-20;heldLeft.velocityY=3;heldLeft.gravityX=-30;heldLeft.linearDamping=1.2f;heldLeft.update(1f/60);heldLeft.finishDamping();close(heldLeft.velocityY,0,"left wall tangential rest");check(heldLeft.velocityX<0,"left wall normal velocity retained");
  System.out.println("Java: "+(checks-failures)+"/"+checks+" passed");if(failures>0)System.exit(1);
  }
 }
@@ -83,20 +99,23 @@ OBJC = r"""
 @implementation TGPath
 - (BOOL)advance:(float)dt out:(float *)out{return NO;}
 @end
-@interface TGSprite:NSObject { float _pathOut[3]; }
+@interface TGSprite:NSObject { float _pathOut[3], _driveX, _driveY, _driveTolerance; }
 FLOATS
 BOOLS
+@property NSInteger wallSide;
 @property TGScene *scene;
 @property TGPath *path;
 @property id<TGSpriteEventListener> eventListener;
 - (void)update:(float)dt;
 - (void)updateCar:(float)dt;
+- (void)finishDamping;
 @end
 @implementation TGSprite
 - (void)updateAnimation:(float)dt{} - (void)updateTweens:(float)dt{} - (void)updateIdle:(float)dt{}
 - (void)emitSkidMarksFwdX:(float)a fwdY:(float)b rightX:(float)c rightY:(float)d vLateral:(float)e threshold:(float)f{}
 UPDATE
 CAR
+FINISH
 @end
 static int failures=0,checks=0;
 static void check(BOOL ok,const char *name){checks++;if(!ok){failures++;fprintf(stderr,"FAIL Obj-C: %s\n",name);}}
@@ -117,6 +136,21 @@ int main(void){@autoreleasepool {
  TGSprite *reverse=sprite();reverse.thrust=-100;reverse.linearDamping=1.2f;[reverse update:1.0f/120];check(reverse.velocityY>0,"negative thrust");
  TGSprite *still=sprite();still.linearDamping=1.2f;[still update:1.0f/60];closeEnough(still.x,0,"stationary x");closeEnough(still.y,0,"stationary y");
  TGSprite *cap=sprite();cap.velocityX=600;cap.thrust=100;cap.linearDamping=1.2f;[cap update:1.0f/60];check(hypotf(cap.velocityX,cap.velocityY)<=500,"speed cap");
+
+ TGSprite *cancelled=sprite();cancelled.velocityX=2;cancelled.thrust=30;cancelled.gravity=30;cancelled.linearDamping=1.2f;[cancelled update:1.0f/60];[cancelled finishDamping];closeEnough(cancelled.velocityX,0,"cancelled forces restore cutoff");
+ TGSprite *floor=sprite();floor.velocityX=3;floor.gravity=30;floor.linearDamping=1.2f;
+ for(int i=0;i<600;i++){[floor update:1.0f/60];floor.y=0;floor.velocityY=0;[floor finishDamping];}
+ closeEnough(floor.velocityX,0,"floor tangential rest");check(floor.x<.1f,"floor does not creep repeatedly");
+ TGSprite *wall=sprite();wall.velocityY=3;wall.gravityX=30;wall.linearDamping=1.2f;[wall update:1.0f/60];wall.velocityX=0;[wall finishDamping];closeEnough(wall.velocityY,0,"wall tangential rest");
+ TGSprite *ceiling=sprite();ceiling.velocityX=3;ceiling.thrust=100;ceiling.linearDamping=1.2f;[ceiling update:1.0f/60];ceiling.velocityY=0;[ceiling finishDamping];closeEnough(ceiling.velocityX,0,"blocked thrust does not preserve drift");
+ TGSprite *tiny=sprite();tiny.thrust=1;tiny.linearDamping=1.2f;
+ for(int i=0;i<600;i++){[tiny update:1.0f/60];[tiny finishDamping];}
+ check(tiny.velocityY<-.8f,"driven equilibrium below4 persists");
+ TGSprite *braking=sprite();braking.velocityX=2;braking.rotation=90;braking.thrust=-100;braking.linearDamping=1.2f;[braking update:1.0f/60];[braking finishDamping];closeEnough(braking.velocityX,0,"opposing force can settle");[braking update:1.0f/60];[braking finishDamping];check(braking.velocityX<0,"opposing force relaunches in reverse");
+ TGSprite *noDamping=sprite();noDamping.velocityX=2;[noDamping update:1.0f/60];[noDamping finishDamping];closeEnough(noDamping.velocityX,2,"zero damping unchanged");
+
+ TGSprite *held=sprite();held.wallSide=1;held.velocityX=20;held.velocityY=3;held.gravityX=30;held.linearDamping=1.2f;[held update:1.0f/60];[held finishDamping];closeEnough(held.velocityY,0,"retained wall normal does not protect tangent");check(held.velocityX>0,"wall normal velocity retained");
+ TGSprite *heldLeft=sprite();heldLeft.wallSide=-1;heldLeft.velocityX=-20;heldLeft.velocityY=3;heldLeft.gravityX=-30;heldLeft.linearDamping=1.2f;[heldLeft update:1.0f/60];[heldLeft finishDamping];closeEnough(heldLeft.velocityY,0,"left wall tangential rest");check(heldLeft.velocityX<0,"left wall normal velocity retained");
  printf("Obj-C: %d/%d passed\n",checks-failures,checks);return failures?1:0;
 }}
 """
@@ -127,6 +161,8 @@ def run():
     with tempfile.TemporaryDirectory(prefix='ti-game-damping-') as directory:
         folder = Path(directory)
         java = JAVA.replace('UPDATE', method('android/src/ti/game/engine/Sprite.java', 'public void update(float dt)')).replace('CAR', method('android/src/ti/game/engine/Sprite.java', 'private void updateCar(float dt)'))
+        source = (ROOT / 'android/src/ti/game/engine/Sprite.java').read_text()
+        java = java.replace('FINISH', method('android/src/ti/game/engine/Sprite.java', 'void finishDamping(') if 'void finishDamping(' in source else 'void finishDamping(){}')
         (folder / 'DampingCheck.java').write_text(java)
         subprocess.run(['javac', str(folder / 'DampingCheck.java')], check=True)
         failures.append(subprocess.run(['java', '-cp', directory, 'DampingCheck']).returncode)
@@ -134,6 +170,8 @@ def run():
             fields = 'x y velocityX velocityY rotation angularVelocity thrust gravity gravityX linearDamping maxSpeed throttle enginePower steering turnRate grip drag skidThreshold frameAccelX frameAccelY frameDeltaX frameDeltaY wrapShift wrapX flashRemaining'.split()
             objc = OBJC.replace('FLOATS', '\n'.join('@property float '+f+';' for f in fields)).replace('BOOLS', '\n'.join('@property BOOL '+f+';' for f in 'carMode skidMarks drifting wrapWorldX'.split()))
             objc = objc.replace('UPDATE', method('ios/Classes/TGSprite.m', '- (void)update:(float)dt')).replace('CAR', method('ios/Classes/TGSprite.m', '- (void)updateCar:(float)dt'))
+            source = (ROOT / 'ios/Classes/TGSprite.m').read_text()
+            objc = objc.replace('FINISH', method('ios/Classes/TGSprite.m', '- (void)finishDamping') if '- (void)finishDamping' in source else '- (void)finishDamping{}')
             (folder / 'DampingCheck.m').write_text(objc)
             subprocess.run(['clang', '-fobjc-arc', '-framework', 'Foundation', str(folder / 'DampingCheck.m'), '-o', str(folder / 'check')], check=True)
             failures.append(subprocess.run([str(folder / 'check')]).returncode)

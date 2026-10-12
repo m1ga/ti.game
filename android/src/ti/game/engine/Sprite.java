@@ -297,6 +297,9 @@ public class Sprite
 	public float frameAccelX = 0f;
 	public float frameAccelY = 0f;
 
+	// Applied acceleration for the post-contact damping decision; render thread only.
+	private float driveX, driveY, driveTolerance;
+
 	// The solid this sprite stood on last frame (GL thread only).
 	public Sprite groundSprite;
 
@@ -581,6 +584,7 @@ public class Sprite
 	/** Called once per frame from the GL thread with the delta time in seconds. */
 	public void update(float dt)
 	{
+		driveX = driveY = driveTolerance = 0f;
 		float startX = x;
 		float startY = y;
 		float startVelocityX = velocityX;
@@ -593,8 +597,14 @@ public class Sprite
 		}
 		if (thrust != 0f) {
 			double rad = Math.toRadians(rotation);
-			velocityX += (float) Math.sin(rad) * thrust * dt;
-			velocityY += -(float) Math.cos(rad) * thrust * dt;
+			float power = thrust;
+			float ax = (float) Math.sin(rad) * power;
+			float ay = -(float) Math.cos(rad) * power;
+			driveX += ax;
+			driveY += ay;
+			driveTolerance += Math.abs(power);
+			velocityX += ax * dt;
+			velocityY += ay * dt;
 			float speed = (float) Math.sqrt(velocityX * velocityX + velocityY * velocityY);
 			if (speed > maxSpeed && speed > 0f) {
 				velocityX *= maxSpeed / speed;
@@ -602,22 +612,28 @@ public class Sprite
 			}
 		}
 		// Semi-implicit Euler: accelerate first, then move
-		if (gravity != 0f) {
-			velocityY += gravity * dt;
+		float gy = gravity;
+		if (gy != 0f) {
+			velocityY += gy * dt;
+			driveY += gy;
+			driveTolerance += Math.abs(gy);
 		}
-		if (gravityX != 0f) {
-			velocityX += gravityX * dt;
+		float gx = gravityX;
+		if (gx != 0f) {
+			velocityX += gx * dt;
+			driveX += gx;
+			driveTolerance += Math.abs(gx);
 		}
+		// Ignore cancellation residue at float precision, relative to the inputs.
+		driveTolerance *= 1e-6f;
 		if (linearDamping > 0f && (velocityX != 0f || velocityY != 0f)) {
 			// Clamped so a long frame can't reverse the sprite instead of
 			// slowing it
 			float keep = 1f - Math.min(1f, linearDamping * dt);
 			velocityX *= keep;
 			velocityY *= keep;
-			// Let active acceleration accumulate below the coasting cutoff.
-			boolean accelerating = thrust != 0f || gravity != 0f || gravityX != 0f
-					|| (carMode && throttle != 0f && enginePower != 0f);
-			if (!accelerating && velocityX * velocityX + velocityY * velocityY < 16f) {
+			boolean coasting = driveX * driveX + driveY * driveY <= driveTolerance * driveTolerance;
+			if (coasting && velocityX * velocityX + velocityY * velocityY < 16f) {
 				velocityX = 0f; // under 4 px/s: invisible, so stop for real
 				velocityY = 0f;
 			}
@@ -695,6 +711,26 @@ public class Sprite
 		idleAppliedY = newY;
 	}
 
+	/** Scene calls this after solid resolution, when blocked motion is known. */
+	void finishDamping()
+	{
+		// Rect walls retain inward velocity for held-button movement. It is
+		// blocked motion, so exclude it from the tangential rest decision.
+		boolean blockedX = (wallSide == 1 && velocityX > 0f) || (wallSide == -1 && velocityX < 0f);
+		float vx = blockedX ? 0f : velocityX;
+		float speed2 = vx * vx + velocityY * velocityY;
+		if (linearDamping <= 0f || speed2 >= 16f) {
+			return;
+		}
+		float work = vx * driveX + velocityY * driveY;
+		if (work <= 0f || work * work <= driveTolerance * driveTolerance * speed2) {
+			if (!blockedX) {
+				velocityX = 0f;
+			}
+			velocityY = 0f;
+		}
+	}
+
 	/**
 	 * Arcade top-down car model. Velocity is split into forward and lateral
 	 * components along the car's heading; the engine accelerates forward,
@@ -717,7 +753,8 @@ public class Sprite
 		float steerFactor = Math.max(-1f, Math.min(1f, vForward / (maxSpeed * 0.25f)));
 		rotation += steering * turnRate * steerFactor * dt;
 
-		vForward += throttle * enginePower * dt;
+		float motor = throttle * enginePower;
+		vForward += motor * dt;
 		vForward -= vForward * Math.min(1f, drag * dt);
 		vLateral -= vLateral * Math.min(1f, grip * dt);
 
@@ -733,6 +770,9 @@ public class Sprite
 		fwdY = -(float) Math.cos(rad);
 		rightX = (float) Math.cos(rad);
 		rightY = (float) Math.sin(rad);
+		driveX += fwdX * motor;
+		driveY += fwdY * motor;
+		driveTolerance += Math.abs(motor);
 		velocityX = fwdX * vForward + rightX * vLateral;
 		velocityY = fwdY * vForward + rightY * vLateral;
 
