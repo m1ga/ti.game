@@ -339,7 +339,10 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 		float keep = 1.0f - MIN(1.0f, linearDamping * dt);
 		float dvx = self.velocityX * keep;
 		float dvy = self.velocityY * keep;
-		if (dvx * dvx + dvy * dvy < 16.0f) {
+		// Let active acceleration accumulate below the coasting cutoff.
+		BOOL accelerating = thrust != 0.0f || gravity != 0.0f || gravityX != 0.0f
+			|| (self.carMode && self.throttle != 0.0f && self.enginePower != 0.0f);
+		if (!accelerating && dvx * dvx + dvy * dvy < 16.0f) {
 			dvx = 0.0f; // under 4 px/s: invisible, so stop for real
 			dvy = 0.0f;
 		}

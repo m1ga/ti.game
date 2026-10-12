@@ -1129,8 +1129,15 @@ also accepts later assignments, while Android does not expose a setter.
 | `velocityX`, `velocityY` | px/s, integrated every frame |
 | `gravity` | px/s² applied to `velocityY` |
 | `gravityX` | px/s² applied to `velocityX` — wind, conveyors, a top-down game whose "down" is sideways. `gravity` stays the vertical one; this is its sibling, not half of a vector |
-| `linearDamping` | Fraction of speed shed per second to the surface (0 = none, the default; ~0.6 ≈ a pool ball on felt). Rolling friction for ordinary sprites — the car model's `drag` is the same idea but only applies inside `carMode`. Proportional on purpose: a fast body sheds a lot and a slow one very little, which is what a ball trickling to a halt looks like. A constant deceleration was tried and stops slow bodies dead, all at once, which reads as wrong. Below 4 px/s the sprite is stopped outright, since a proportion never reaches zero on its own |
+| `linearDamping` | Fraction of speed shed per second to the surface (0 = none, the default; ~0.6 ≈ a pool ball on felt). Rolling friction for ordinary sprites — the car model's `drag` is the same idea but only applies inside `carMode`. Proportional on purpose: a fast body sheds a lot and a slow one very little, which is what a ball trickling to a halt looks like. A constant deceleration was tried and stops slow bodies dead, all at once, which reads as wrong. Below 4 px/s a coasting sprite is stopped outright. Active thrust, gravity, gravityX or powered car throttle can accumulate velocity below that cutoff |
 | `maxSpeed` | Speed cap in px/s for `thrust` and `carMode` (default 500) |
+
+Damping still applies while the sprite accelerates. The low-speed rest cutoff
+applies when no native acceleration is active, so a small thrust step can
+build momentum from rest. Run `python3 tests/test_linear_damping.py` for the
+Java and Objective-C scalar regression fixtures (Objective-C requires macOS).
+The fixtures compile the production update methods with rendering and
+animation collaborators stubbed.
 
 #### Solids
 

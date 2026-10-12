@@ -614,7 +614,10 @@ public class Sprite
 			float keep = 1f - Math.min(1f, linearDamping * dt);
 			velocityX *= keep;
 			velocityY *= keep;
-			if (velocityX * velocityX + velocityY * velocityY < 16f) {
+			// Let active acceleration accumulate below the coasting cutoff.
+			boolean accelerating = thrust != 0f || gravity != 0f || gravityX != 0f
+					|| (carMode && throttle != 0f && enginePower != 0f);
+			if (!accelerating && velocityX * velocityX + velocityY * velocityY < 16f) {
 				velocityX = 0f; // under 4 px/s: invisible, so stop for real
 				velocityY = 0f;
 			}
