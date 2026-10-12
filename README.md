@@ -1266,6 +1266,20 @@ Source and filtering options are creation-only. Pick one source:
 | Grid | `image`, `charWidth`, `charHeight`, and optional `characters` (default ASCII 32..126) |
 | Built-in | No source options; uses the embedded 9x15 pixel font, also used when parsing fails |
 
+The built-in font uses Press Start 2P, with 9x15 cells and the same ASCII
+character order. It also includes `ÁÉÍÓÚÜÑáéíóúüñ¿¡ÄÖäößËÏëïÈèÊêÀà`.
+These are precomposed characters; combining accents are not supported by
+this font. Capital sharp S (`ẞ`) is absent from the source TTF; use `SS`
+for uppercase German text. Custom grid fonts still default to ASCII only.
+
+Rebuild the embedded image on both platforms with:
+
+```sh
+uv run --with pillow --with fonttools python tools/build_default_font.py
+```
+
+The source TTF and its SIL Open Font License are in `tools/default-font/`.
+
 `smoothing` defaults to `true`; the built-in font stays crisp. `lineHeight` is
 read-only and reports the natural line height in pixels. `unload()` permanently
 disposes the glyph texture just like `SpriteSheet.unload()`. Generate either
