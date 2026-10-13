@@ -56,6 +56,12 @@ public class Rope
 		if (count != pointCount) {
 			rebuild(count, headX, headY);
 		}
+		// Keep new geometry drawable, but freeze motion and tether response.
+		if (dt <= 0f) {
+			endX = px[count - 1];
+			endY = py[count - 1];
+			return;
+		}
 
 		Sprite t = tail;
 		boolean tailPinned = (t != null);

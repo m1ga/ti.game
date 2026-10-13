@@ -45,6 +45,12 @@ static const int kMaxSegments = 200;
 	if (count != _pointCount) {
 		[self rebuild:count headX:headX headY:headY];
 	}
+	// Keep new geometry drawable, but freeze motion and tether response.
+	if (dt <= 0.0f) {
+		self.endX = _px[count - 1];
+		self.endY = _py[count - 1];
+		return;
+	}
 
 	TGSprite *t = self.tail;
 	BOOL tailPinned = (t != nil);
