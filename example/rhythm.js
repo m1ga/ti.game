@@ -1,7 +1,7 @@
 // ti.game rhythm demo — a Dance-Dance-Revolution-style note catcher.
 //
 // - colored gems fall down 3 lanes (random lane, spawned every 400 ms —
-//   an eighth note of the 150 BPM chiptune track playing underneath)
+//   a quarter note of the stated 150 BPM track playing underneath)
 // - press the target ring at the bottom of a lane when its gem arrives:
 //   a tinted particle burst removes the gem, and the sound depends on
 //   your timing — a bright arpeggio when the gem is in range ("PERFECT"
@@ -67,8 +67,8 @@ module.exports = function () {
 		var PAD_Y = H * 0.8;
 		var HIT_RANGE = H * 0.08;      // press counts while a gem is this close
 		var PERFECT = H * 0.03;
-		var SPAWN_MS = 400;            // eighth note at the track's 150 BPM
-		var FALL_SPEED = (PAD_Y + NOTE) / 1.6;  // spawn-to-pad in 4 eighths
+		var SPAWN_MS = 400;            // quarter note at the stated 150 BPM
+		var FALL_SPEED = (PAD_Y + NOTE) / 1.6;  // spawn-to-pad in 4 quarter notes
 
 		// --- Lanes: guide lines + target pads ----------------------------
 
