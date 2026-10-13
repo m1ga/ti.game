@@ -563,10 +563,18 @@ physical normal velocity, so they do not generate `solidimpact` by themselves.
 - **Fast movers tunnel** without help: a bullet that travels further per
   frame than a target is thick never overlaps it on any frame, so the
   discrete test misses. `swept: true` on the moving sprite tests its
-  movement as a path (swept AABB) — `collision` events fire for anything
+  movement as a path — `collision` events fire for anything
   the path crossed, and `solidWith` walls stop it at the impact point
-  instead of letting it teleport through. Circle hitboxes sweep as their
-  bounding box; the swept demo shows the comparison side by side.
+  instead of letting it teleport through. For `collidesWith`, two circles
+  use their summed radii, and a circle against a `rect` or `rotatedRect`
+  uses the box expanded by the radius with rounded corners. Both tests
+  include relative target movement and periodic world offsets. The sweep
+  holds hitbox orientation and size fixed at their end-of-frame values;
+  it does not trace rotation or resizing during the frame. Rectangle pairs
+  retain the AABB sweep. These event checks do not change `solidWith`
+  blocking or tile collision. Run `python3 tests/test_circle_sweep.py` for
+  the Java and Objective-C geometry fixtures (Objective-C requires macOS).
+  The fixtures compile production overlap methods without a renderer.
 - `debug: true` on a sprite (or `debug: { hitbox: true }` on the GameView
   for everything) renders the shapes: **green** = collision AABB (with
   `hitboxScale`), **blue** = sprite/touch bounds, **orange dot** = anchor.
@@ -1166,7 +1174,7 @@ device test as well.
 | `hitboxScale` | Shrinks the hitbox **around the anchor** (default 1, or `'80%'`); slightly small hitboxes feel fairer. Pair it with `anchor` to move which edge stays put. Collision only — the touch area stays the full drawn frame |
 | `hitboxScaleX` / `hitboxScaleY` | Per-axis corrections multiplied on top of `hitboxScale` (default 1), for art that fills its frame by a different fraction on each axis; ignored by circle hitboxes |
 | `hitboxShape` | `'rect'` (default), `'circle'` or `'rotatedRect'`. Circles bounce off solid corners along the contact normal, and a circle solid is resolved as a circle instead of its bounding box. `'rotatedRect'` keeps the collision rect **turned with the sprite** (an oriented bounding box, OBB) instead of re-boxing it square to the screen every frame — a tilted platform or a diamond post is then hit on its real face, with the normal perpendicular to it. Only matters once `rotation` is non-zero; it costs a little more per test, which is why plain `'rect'` stays the default |
-| `swept` | Movement is collision-tested as a path (swept AABB) — fast bullets stop tunneling through thin targets and solids |
+| `swept` | Movement is collision-tested as a path. `collidesWith` uses circular sweeps for circle pairs, rounded-box sweeps for circle/rectangle pairs, and AABB sweeps for rectangle pairs. `solidWith` blocking retains its separate sweep implementation |
 | `debug` | Draw this sprite's collision shapes and anchor |
 
 #### Car physics

@@ -1114,12 +1114,70 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
  * cross the target's box at any point this frame? Relative motion, so a
  * fast target can't slip past a slow bullet either.
  */
+/** Circle centre segment against a box expanded by the circle radius. */
+- (BOOL)sweptCircleBoxFromX:(float)x y:(float)y dx:(float)dx dy:(float)dy
+				 halfWidth:(float)hw halfHeight:(float)hh radius:(float)radius
+{
+	// Two face strips and four corner disks form the rounded rectangle.
+	if ([self sweptHitFromX:x y:y dx:dx dy:dy minX:-hw - radius minY:-hh maxX:hw + radius maxY:hh]
+			|| [self sweptHitFromX:x y:y dx:dx dy:dy minX:-hw minY:-hh - radius maxX:hw maxY:hh + radius]) {
+		return YES;
+	}
+	for (int i = 0; i < 4; i++) {
+		float cx = ((i & 1) == 0) ? -hw : hw;
+		float cy = (i < 2) ? -hh : hh;
+		if ([self segmentFromX:x y:y dx:dx dy:dy vsCircleX:cx y:cy radius:radius] >= 0.0f) {
+			return YES;
+		}
+	}
+	return NO;
+}
+
 - (BOOL)sweptShapesOverlap:(TGSprite *)s with:(TGSprite *)other offsetX:(float)otherOffsetX
 {
 	float dx = s.frameDeltaX - other.frameDeltaX;
 	float dy = s.frameDeltaY - other.frameDeltaY;
 	if (dx * dx + dy * dy < 1e-4f) {
 		return NO;
+	}
+	if (s.circleHitbox && other.circleHitbox) {
+		[s hitCenter:_centerA];
+		[self shiftedHitCenter:other offsetX:otherOffsetX out:_centerB];
+		// Relative segment against the Minkowski circle, not its bounding box.
+		float fx = _centerA[0] - _centerB[0] - dx;
+		float fy = _centerA[1] - _centerB[1] - dy;
+		float t = fmaxf(0.0f, fminf(1.0f, -(fx * dx + fy * dy) / (dx * dx + dy * dy)));
+		float px = fx + t * dx;
+		float py = fy + t * dy;
+		float radius = [s hitRadius] + [other hitRadius];
+		return px * px + py * py < radius * radius;
+	}
+	if (s.circleHitbox || other.circleHitbox) {
+		TGSprite *circle = s.circleHitbox ? s : other;
+		TGSprite *rect = s.circleHitbox ? other : s;
+		[self shiftedHitCenter:circle offsetX:circle == other ? otherOffsetX : 0.0f out:_centerA];
+		float rectOffsetX = rect == other ? otherOffsetX : 0.0f;
+		if (rect.obbHitbox) {
+			[self shiftedHitBox:rect offsetX:rectOffsetX out:_boxB];
+		} else {
+			[self shiftedAABB:rect offsetX:rectOffsetX out:_aabbB];
+			_boxB[0] = (_aabbB[0] + _aabbB[2]) / 2.0f;
+			_boxB[1] = (_aabbB[1] + _aabbB[3]) / 2.0f;
+			_boxB[2] = (_aabbB[2] - _aabbB[0]) / 2.0f;
+			_boxB[3] = (_aabbB[3] - _aabbB[1]) / 2.0f;
+			_boxB[4] = 0.0f;
+		}
+		// Freeze the box at its end position and sweep the relative centre.
+		float direction = circle == s ? 1.0f : -1.0f;
+		dx *= direction;
+		dy *= direction;
+		float x = _centerA[0] - _boxB[0] - dx;
+		float y = _centerA[1] - _boxB[1] - dy;
+		float cos = cosf(_boxB[4]);
+		float sin = sinf(_boxB[4]);
+		return [self sweptCircleBoxFromX:x * cos + y * sin y:-x * sin + y * cos
+			dx:dx * cos + dy * sin dy:-dx * sin + dy * cos
+			halfWidth:_boxB[2] halfHeight:_boxB[3] radius:[circle hitRadius]];
 	}
 	[s computeAABB:_aabbA];
 	[self shiftedAABB:other offsetX:otherOffsetX out:_aabbB];
