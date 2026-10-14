@@ -385,8 +385,15 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	// still carry their riders.
 	TGPath *p = self.path;
 	if (p != nil) {
+		float pathOffsetX = 0.0f;
+		if (sceneWrapX && !self.screenFixed) {
+			// Align the cursor before advancing, preserving steps longer
+			// than half a world instead of reversing their direction.
+			[p advance:0.0f out:_pathOut];
+			pathOffsetX = [self.scene nearestWorldX:_pathOut[0] reference:startX] - _pathOut[0];
+		}
 		BOOL pathFinished = [p advance:dt out:_pathOut];
-		self.x = _pathOut[0];
+		self.x = _pathOut[0] + pathOffsetX;
 		self.y = _pathOut[1];
 		if (p.rotate) {
 			self.rotation = _pathOut[2];

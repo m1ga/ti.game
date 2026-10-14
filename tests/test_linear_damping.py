@@ -26,14 +26,14 @@ def method(file, signature):
 
 JAVA = r"""
 public class DampingCheck {
- static class Scene { boolean worldWrapXEnabled; }
+ static class Scene { boolean worldWrapXEnabled; float nearestWorldX(float x,float reference){return x;} }
  static class Path { boolean rotate; boolean advance(float dt,float[] out){return false;} }
  interface SpriteEventListener { void onPathComplete(Sprite s); }
  static class Sprite {
  float x,y,velocityX,velocityY,rotation,angularVelocity,thrust,gravity,gravityX,linearDamping;
  float maxSpeed=500,throttle,enginePower=600,steering,turnRate=200,grip=4,drag=.6f,skidThreshold;
  float frameAccelX,frameAccelY,frameDeltaX,frameDeltaY,wrapShift,wrapX,flashRemaining;
- boolean carMode,skidMarks,drifting,wrapWorldX; int wallSide; float driveX,driveY,driveTolerance;
+ boolean screenFixed,carMode,skidMarks,drifting,wrapWorldX; int wallSide; float driveX,driveY,driveTolerance;
  Scene scene; Path path; SpriteEventListener eventListener; float[] pathOut=new float[3];
  void updateAnimation(float dt){} void updateTweens(float dt){} void updateIdle(float dt){}
  void emitSkidMarks(float a,float b,float c,float d,float e,float f){}
@@ -91,6 +91,7 @@ OBJC = r"""
 @property BOOL worldWrapXEnabled;
 @end
 @implementation TGScene
+- (float)nearestWorldX:(float)x reference:(float)reference{return x;}
 @end
 @interface TGPath:NSObject
 @property BOOL rotate;
@@ -168,7 +169,7 @@ def run():
         failures.append(subprocess.run(['java', '-cp', directory, 'DampingCheck']).returncode)
         if platform.system() == 'Darwin':
             fields = 'x y velocityX velocityY rotation angularVelocity thrust gravity gravityX linearDamping maxSpeed throttle enginePower steering turnRate grip drag skidThreshold frameAccelX frameAccelY frameDeltaX frameDeltaY wrapShift wrapX flashRemaining'.split()
-            objc = OBJC.replace('FLOATS', '\n'.join('@property float '+f+';' for f in fields)).replace('BOOLS', '\n'.join('@property BOOL '+f+';' for f in 'carMode skidMarks drifting wrapWorldX'.split()))
+            objc = OBJC.replace('FLOATS', '\n'.join('@property float '+f+';' for f in fields)).replace('BOOLS', '\n'.join('@property BOOL '+f+';' for f in 'carMode skidMarks drifting wrapWorldX screenFixed'.split()))
             objc = objc.replace('UPDATE', method('ios/Classes/TGSprite.m', '- (void)update:(float)dt')).replace('CAR', method('ios/Classes/TGSprite.m', '- (void)updateCar:(float)dt'))
             source = (ROOT / 'ios/Classes/TGSprite.m').read_text()
             objc = objc.replace('FINISH', method('ios/Classes/TGSprite.m', '- (void)finishDamping') if '- (void)finishDamping' in source else '- (void)finishDamping{}')
