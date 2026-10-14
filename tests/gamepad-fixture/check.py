@@ -14,7 +14,7 @@ parser.add_argument('source', type=Path, nargs='?', default=Path(__file__).resol
 args = parser.parse_args()
 here = Path(__file__).resolve().parent
 classes = args.source.resolve() / 'ios/Classes'
-with tempfile.TemporaryDirectory(prefix='asteroids-gamepad-test-') as temp:
+with tempfile.TemporaryDirectory(prefix='ti-game-gamepad-') as temp:
     binary = str(Path(temp) / 'receivers')
     subprocess.run(['xcrun', 'clang', '-fobjc-arc', '-fblocks',
                     '-framework', 'Foundation', '-framework', 'GameController', '-framework', 'QuartzCore',

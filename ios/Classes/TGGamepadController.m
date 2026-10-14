@@ -350,11 +350,6 @@ static void TGDetachGamepadDevice(TGGamepadDevice *device)
 	}
 }
 
-- (void)detachController:(GCController *)controller
-{
-	TGDetachGamepadDevice([self deviceForController:controller]);
-}
-
 - (TGGamepadChannel *)channel:(NSString *)event name:(NSString *)name twoAxes:(BOOL)twoAxes gamepadId:(NSInteger)gamepadId
 {
 	TGGamepadChannel *channel = [[TGGamepadChannel alloc] init];
