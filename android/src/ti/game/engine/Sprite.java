@@ -659,8 +659,15 @@ public class Sprite
 		// still carry their riders.
 		Path p = path;
 		if (p != null) {
+			float pathOffsetX = 0f;
+			if (sceneWrapX && !screenFixed) {
+				// Align the cursor BEFORE advancing: using the new point's
+				// nearest image would reverse steps longer than half a world.
+				p.advance(0f, pathOut);
+				pathOffsetX = scene.nearestWorldX(pathOut[0], startX) - pathOut[0];
+			}
 			boolean finished = p.advance(dt, pathOut);
-			x = pathOut[0];
+			x = pathOut[0] + pathOffsetX;
 			y = pathOut[1];
 			if (p.rotate) {
 				rotation = pathOut[2];
