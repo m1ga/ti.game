@@ -358,6 +358,13 @@ better than events. Everything held is released (`buttonup`, and a
 final rest-value `stick`/`trigger` event) when the app goes to the
 background or a pad disconnects, so a direction never sticks.
 
+Each live GameView receives input independently, including a retained menu
+view underneath a modal game. Closing one view releases its held input and
+unregisters only its receiver; the other views keep receiving the controller.
+The application should route these events to its active screen. On iOS the
+receivers share the GameController profile callback; registration, input and
+cleanup run on the main queue.
+
 On Android, gamepad buttons are captured at the activity window — the
 game view does not need focus, and the mapped buttons are consumed so B
 does not act as Back and the d-pad does not move focus between your
