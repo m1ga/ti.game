@@ -142,6 +142,7 @@ static NSString *TGGamepadName(GCController *controller)
 
 @interface TGGamepadDevice : NSObject
 @property (nonatomic, weak) GCController *controller;
+@property (nonatomic, copy) GCExtendedGamepadValueChangedHandler inputHandler;
 @property (nonatomic, assign) NSInteger gamepadId;
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, strong) TGGamepadChannel *leftStick, *rightStick, *leftTrigger, *rightTrigger;
@@ -155,6 +156,45 @@ static NSString *TGGamepadName(GCController *controller)
 	@public BOOL _stickDirs[4];
 }
 @end
+
+// One GCController profile callback fans out to all live GameView receivers.
+// All registration and native input are serialized on the main queue.
+static NSMapTable<GCExtendedGamepad *, NSHashTable<TGGamepadDevice *> *> *TGGamepadReceivers;
+static GCExtendedGamepadValueChangedHandler TGGamepadDispatch;
+
+static void TGAttachGamepadDevice(TGGamepadDevice *device)
+{
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		TGGamepadReceivers = [NSMapTable weakToStrongObjectsMapTable];
+		TGGamepadDispatch = ^(GCExtendedGamepad *pad, GCControllerElement *element) {
+			for (TGGamepadDevice *receiver in [[TGGamepadReceivers objectForKey:pad] allObjects]) {
+				if (receiver.inputHandler != nil) receiver.inputHandler(pad, element);
+			}
+		};
+	});
+	GCExtendedGamepad *pad = device.controller.extendedGamepad;
+	NSHashTable *receivers = [TGGamepadReceivers objectForKey:pad];
+	if (receivers == nil) {
+		receivers = [NSHashTable weakObjectsHashTable];
+		[TGGamepadReceivers setObject:receivers forKey:pad];
+	}
+	[receivers addObject:device];
+	pad.valueChangedHandler = TGGamepadDispatch;
+}
+
+static void TGDetachGamepadDevice(TGGamepadDevice *device)
+{
+	GCExtendedGamepad *pad = device.controller.extendedGamepad;
+	device.inputHandler = nil;
+	if (pad == nil) return;
+	NSHashTable *receivers = [TGGamepadReceivers objectForKey:pad];
+	[receivers removeObject:device];
+	if (receivers.allObjects.count == 0) {
+		if (pad.valueChangedHandler == TGGamepadDispatch) pad.valueChangedHandler = nil;
+		[TGGamepadReceivers removeObjectForKey:pad];
+	}
+}
 
 #pragma mark - Controller
 
@@ -182,6 +222,7 @@ static NSString *TGGamepadName(GCController *controller)
 		[center addObserver:self selector:@selector(applicationWillResignActive:)
 					   name:UIApplicationWillResignActiveNotification object:nil];
 		dispatch_block_t attachExisting = ^{
+			if (_shutdown) return;
 			for (GCController *controller in [GCController controllers]) {
 				// A pad paired before the view existed announces itself on
 				// its first input — JS always hears 'gamepadconnected'
@@ -213,7 +254,7 @@ static NSString *TGGamepadName(GCController *controller)
 		[[NSNotificationCenter defaultCenter] removeObserver:self];
 		[self releaseAll];
 		for (TGGamepadDevice *device in _devices) {
-			[self detachController:device.controller];
+			TGDetachGamepadDevice(device);
 		}
 		@synchronized(_devices) {
 			[_devices removeAllObjects];
@@ -249,6 +290,7 @@ static NSString *TGGamepadName(GCController *controller)
 	@synchronized(_devices) {
 		[_devices removeObject:device];
 	}
+	TGDetachGamepadDevice(device);
 	[self releaseDevice:device];
 	if (device.announced) {
 		[self fireDeviceEvent:@"gamepaddisconnected" device:device];
@@ -275,7 +317,7 @@ static NSString *TGGamepadName(GCController *controller)
 - (void)attachController:(GCController *)controller announce:(BOOL)announce
 {
 	GCExtendedGamepad *gamepad = controller.extendedGamepad;
-	if (gamepad == nil || [self deviceForController:controller] != nil) {
+	if (_shutdown || gamepad == nil || [self deviceForController:controller] != nil) {
 		return; // micro gamepads (Siri Remote) are not game controllers here
 	}
 	TGGamepadDevice *device = [[TGGamepadDevice alloc] init];
@@ -294,23 +336,17 @@ static NSString *TGGamepadName(GCController *controller)
 	__weak TGGamepadController *weakSelf = self;
 	__weak TGGamepadDevice *weakDevice = device;
 	controller.handlerQueue = dispatch_get_main_queue();
-	gamepad.valueChangedHandler = ^(GCExtendedGamepad *pad, GCControllerElement *element) {
+	device.inputHandler = ^(GCExtendedGamepad *pad, GCControllerElement *element) {
 		TGGamepadController *strongSelf = weakSelf;
 		TGGamepadDevice *strongDevice = weakDevice;
 		if (strongSelf != nil && strongDevice != nil) {
 			[strongSelf gamepad:pad changed:element device:strongDevice];
 		}
 	};
+	TGAttachGamepadDevice(device);
 
 	if (announce) {
 		[self announceDevice:device];
-	}
-}
-
-- (void)detachController:(GCController *)controller
-{
-	if (controller.extendedGamepad != nil) {
-		controller.extendedGamepad.valueChangedHandler = nil;
 	}
 }
 
