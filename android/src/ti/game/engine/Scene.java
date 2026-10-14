@@ -1959,7 +1959,17 @@ public class Scene
 					aabbB[0] - hw, aabbB[1] - hh, aabbB[2] + hw, aabbB[3] + hh)) {
 				continue;
 			}
-			if (sweptResult[0] <= 0f) {
+			float normalDelta = Math.abs(sweptResult[1] == 1f ? dy : dx);
+			float normalStep = normalDelta * (1f - sweptResult[0]);
+			boolean restingContact = sweptResult[0] * normalDelta < 0.001f
+				&& normalStep <= 0.5f
+				&& cx + dx >= aabbB[0] - hw && cx + dx <= aabbB[2] + hw
+				&& cy + dy >= aabbB[1] - hh && cy + dy <= aabbB[3] + hh;
+			if (sweptResult[0] <= 0f || restingContact) {
+				// Float round-off can leave a resting body microunits outside
+				// the face (t > 0). Let the static resolver slide that contact.
+				// Only shallow normal motion belongs to the static resolver;
+				// deep entry and full crossings still require the sweep.
 				// Already overlapping when the frame began. There is nothing
 				// to sweep out of a contact you are already in, and pulling
 				// the sprite back for it drags a resting body backwards every
