@@ -47,7 +47,7 @@ Android/iOS contract and calls out the few platform differences.
   for camera-proof HUDs
 - Sprite attachment (`attachTo`) — pin any sprite to another with an
   offset, tracked natively every frame (name tags, health bars, turrets)
-- 34 example demos in `example/`, each focused on a runnable feature set
+- 35 example demos in `example/`, each focused on a runnable feature set
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
