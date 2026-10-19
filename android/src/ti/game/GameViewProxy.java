@@ -18,6 +18,7 @@ import org.appcelerator.titanium.view.TiUIView;
 import android.graphics.Color;
 
 import ti.game.engine.GamepadController;
+import ti.game.engine.InputResolver;
 import ti.game.engine.PostEffect;
 import ti.game.engine.ParticleEmitter;
 import ti.game.engine.Rope;
@@ -36,6 +37,13 @@ import ti.game.engine.Sprite;
 public class GameViewProxy extends TiViewProxy
 	implements Scene.TimerListener
 {
+	private final InputResolver input = new InputResolver((action, context, down) -> {
+		String event = down ? "actiondown" : "actionup";
+		if (hasListeners(event)) {
+			KrollDict data = new KrollDict(); data.put("action", action); data.put("context", context);
+			fireEvent(event, data);
+		}
+	});
 	private final Scene scene = new Scene();
 	private TiGameView gameView;
 	private int maxFps = 0;
@@ -86,6 +94,8 @@ public class GameViewProxy extends TiViewProxy
 	public void handleCreationDict(KrollDict options)
 	{
 		super.handleCreationDict(options);
+		if (options.containsKey("inputMap")) setInputMap(options.get("inputMap"));
+		if (options.containsKey("inputContext")) setInputContext(options.get("inputContext"));
 		if (options.containsKey("debug")) {
 			applyDebug(options.get("debug"));
 		}
@@ -130,6 +140,25 @@ public class GameViewProxy extends TiViewProxy
 		if (options.containsKey("cameraBounds")) {
 			setCameraBounds(options.getKrollDict("cameraBounds"));
 		}
+	}
+
+	public InputResolver getInputResolver() { return input; }
+	@Kroll.setProperty
+	public void setInputMap(Object value) { input.setMap(value); }
+	@Kroll.getProperty
+	public Object getInputMap() { return input.getMap(); }
+	@Kroll.setProperty
+	public void setInputContext(Object value)
+	{
+		if (value != null && !(value instanceof String)) throw new IllegalArgumentException("inputContext must be a string or null");
+		input.setContext((String)value);
+	}
+	@Kroll.getProperty
+	public String getInputContext() { return input.getContext(); }
+	@Kroll.method
+	public void focusInput()
+	{
+		org.appcelerator.kroll.common.TiMessenger.postOnMain(() -> ((TiGameView)getOrCreateView()).focusInput());
 	}
 
 	// --- Game controllers -------------------------------------------------

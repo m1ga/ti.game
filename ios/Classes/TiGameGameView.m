@@ -6,6 +6,9 @@
 #import "TGTouchController.h"
 #import "TiGameGameViewProxy.h"
 #import <objc/runtime.h>
+#import "TGInputResolver.h"
+#import "TGCanvasInput.h"
+#import <GameController/GameController.h>
 
 static NSHashTable<TiGameGameView *> *TGActiveGameViews;
 static __weak id<TiEvaluator> TGActiveRuntimeContext;
@@ -165,6 +168,14 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 		// Bluetooth game controllers (GameController.framework) — like the
 		// Window hook on Android, independent of which view has focus
 		_gamepadController = [[TGGamepadController alloc] initWithViewProxy:self.proxy];
+		_gamepadController.inputResolver = ((TiGameGameViewProxy *)self.proxy).inputResolver;
+		[self addGestureRecognizer:[[TGCanvasInput alloc] initWithResolver:_gamepadController.inputResolver]];
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseInput) name:UIApplicationWillResignActiveNotification object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseInput) name:UIWindowDidResignKeyNotification object:nil];
+		if (@available(iOS 14.0,*)) {
+			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseInput) name:GCKeyboardDidDisconnectNotification object:nil];
+			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseInput) name:GCMouseDidDisconnectNotification object:nil];
+		}
 		_gamepadController.deadzone = _gamepadDeadzoneSet ? _gamepadDeadzone : 0.2f;
 		[self applyStickThresholds];
 		[_glView setMaxFps:_maxFps];
@@ -177,6 +188,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 - (void)dealloc
 {
 	[self shutdownRendering];
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)frameSizeChanged:(CGRect)frame bounds:(CGRect)bounds
@@ -227,6 +239,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 	}
 
 	[TiGameGameView unregisterActiveView:self];
+	[self releaseInput];
 	[glView stopRendering];
 	[_gamepadController shutdown];
 
@@ -247,6 +260,40 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 		dispatch_async(dispatch_get_main_queue(), releaseViewResources);
 	}
 }
+
+- (BOOL)canBecomeFirstResponder { return !_renderingShutdown; }
+- (void)focusInput { if (!_renderingShutdown) [self becomeFirstResponder]; }
+- (void)releaseInput { [((TiGameGameViewProxy *)self.proxy).inputResolver releaseAll]; }
+- (BOOL)resignFirstResponder
+{
+	BOOL result = [super resignFirstResponder];
+	if (result) [self releaseInput];
+	return result;
+}
+- (NSSet<UIPress *> *)handleKeys:(NSSet<UIPress *> *)presses down:(BOOL)down
+{
+	NSMutableSet *unhandled = [presses mutableCopy];
+	if (@available(iOS 13.4,*)) {
+		if (!self.isFirstResponder) return unhandled;
+		TGInputResolver *resolver = ((TiGameGameViewProxy *)self.proxy).inputResolver;
+		for (UIPress *press in presses) {
+			UIKey *key = press.key;
+			NSString *code = key ? TGKeyboardCode(key.keyCode) : nil;
+			if (!code) continue;
+			[unhandled removeObject:press];
+			if (![resolver transition:@"keyboard" identity:@"keyboard" code:code down:down]) continue;
+			NSString *event = down ? @"keydown" : @"keyup";
+			if ([self.proxy _hasListeners:event]) [self.proxy fireEvent:event withObject:@{
+				@"code":code, @"character":key.characters ?: @"", @"modifiers":@{
+					@"shift":@((key.modifierFlags & UIKeyModifierShift)!=0), @"control":@((key.modifierFlags & UIKeyModifierControl)!=0),
+					@"alt":@((key.modifierFlags & UIKeyModifierAlternate)!=0), @"meta":@((key.modifierFlags & UIKeyModifierCommand)!=0)}}];
+		}
+	}
+	return unhandled;
+}
+- (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event { [super pressesBegan:[self handleKeys:presses down:YES] withEvent:event]; }
+- (void)pressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event { [super pressesEnded:[self handleKeys:presses down:NO] withEvent:event]; }
+- (void)pressesCancelled:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event { [self releaseInput];[super pressesCancelled:presses withEvent:event]; }
 
 #pragma mark Properties
 
@@ -315,22 +362,26 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
+	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer) return; }
 	[self glView]; // make sure the controller exists
 	[_touchController touchesBegan:touches inView:self];
 }
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
+	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer) return; }
 	[_touchController touchesMoved:touches inView:self];
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
+	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer) return; }
 	[_touchController touchesEnded:touches inView:self];
 }
 
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
+	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer) return; }
 	[_touchController touchesCancelled:touches inView:self];
 }
 

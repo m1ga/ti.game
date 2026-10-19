@@ -33,6 +33,7 @@
 //   Circular world: seamless world, camera, TileLayer and collisions at both edges
 
 var demos = [
+	{ title: 'Configurable input', start: require('/inputmap') },
 	{ title: 'Asteroids', start: require('/asteroids') },
 	{ title: 'Basic demo', start: require('/basic') },
 	{ title: 'Bingo drum', start: require('/drum') },

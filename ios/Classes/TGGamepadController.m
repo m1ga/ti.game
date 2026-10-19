@@ -1,3 +1,4 @@
+#import "TGInputResolver.h"
 //
 //  ti.game — engine (iOS twin of android/src/ti/game/engine/GamepadController.java)
 //
@@ -511,6 +512,7 @@ static void TGDetachGamepadDevice(TGGamepadDevice *device)
 			[device.pressed removeObject:name];
 		}
 	}
+	[self.inputResolver transition:@"gamepad" identity:[@(device.gamepadId) stringValue] code:name down:down];
 	NSString *event = down ? @"buttondown" : @"buttonup";
 	TiProxy *proxy = _viewProxy;
 	if (proxy != nil && [proxy _hasListeners:event]) {

@@ -298,6 +298,37 @@ not available on the game view — but ordinary Titanium buttons/views
 overlaid on top work normally, and separate views receive simultaneous
 pointers, which is how the demos do multitouch d-pads (hold ▶ + jump).
 
+### Configurable digital input
+
+`GameView.inputMap` is optional and defaults to `{}`. Each context contains named actions with arrays of bindings. `inputContext` defaults to `'gameplay'`; `null` disables actions. Replace the map to rebind controls; there is no new settings UI or persistence.
+
+```js
+var gameView = Game.createGameView({
+    inputMap: {
+        gameplay: {
+            thrust: [{ device: 'keyboard', code: 'KeyW' }, { device: 'keyboard', code: 'ArrowUp' }],
+            fire: [{ device: 'keyboard', code: 'Space' }, { device: 'mouse', button: 'left' }, { device: 'gamepad', button: 'a' }],
+            pause: [{ device: 'keyboard', code: 'Escape' }]
+        },
+        paused: { pause: [{ device: 'keyboard', code: 'Escape' }] }
+    }
+});
+gameView.addEventListener('actiondown', function (e) { /* e.action, e.context */ });
+gameView.addEventListener('actionup', function (e) { /* e.action, e.context */ });
+// After the window opens, or after returning from a native text field:
+gameView.focusInput();
+```
+
+An action goes down on its first active binding and up after its last source releases, including across controllers. Auto-repeat is ignored. A context or valid map change releases previous actions and requires a fresh press; keys already held cannot activate the new context. Invalid maps throw and preserve the previous map and active state. Context names and action names must be nonempty strings; each binding has exactly `device` and either `code` (keyboard) or `button` (mouse/gamepad). Empty contexts and empty action arrays are allowed.
+
+Keyboard codes are `KeyA`…`KeyZ`, `Digit0`…`Digit9`, `ArrowUp/Down/Left/Right`, `Space`, `Escape`, `Enter`, `Tab`, `Backspace`, `Delete`, `Home`, `End`, `PageUp`, `PageDown`, `F1`…`F12`, and `Shift`, `Control`, `Alt`, `Meta` with `Left`/`Right` suffixes. Mouse buttons are `left`, `middle`, `right`; gamepad bindings use the named buttons below. Analog sticks and existing gamepad properties/events are unchanged. Use either action events or individual button events for each gamepad action to avoid dispatching twice. An app retaining its gamepad adapter can omit gamepad bindings from its map.
+
+`keydown` and `keyup` carry `{ code, character, modifiers: { shift, control, alt, meta } }`. The character can be empty for non-text keys; `code` identifies the physical key independently of its character. Keyboard events reach only the focused GameView. `focusInput()` requests focus on the UI thread; it does not capture a keyboard globally or open a software keyboard. Native text fields retain their focus. Mouse input is accepted only when delivered to the canvas; overlaid Titanium controls keep their clicks. Held actions release on cancellation, focus loss, suspension, input-device disconnection or view shutdown. Focus loss can end an action without a physical `keyup`; applications should drive gameplay from action transitions.
+
+Apple keyboard/pointer capture requires iOS/iPadOS 13.4 or later, including Catalyst after the renderer supports it. The source deployment minimum remains iOS 12; UIKit APIs are guarded. On iOS 14+, keyboard/mouse disconnect notifications also release input; earlier UIKit versions deliver cancellation/focus lifecycle events. The upstream Apple OpenGL renderer builds for iOS and Simulator and does not support Catalyst; this feature has no Metal dependency. Android retains its engine touch listener. All resolution runs natively on input transitions, with no per-frame bridge traffic.
+
+Run `python3 tests/input-map/uikit.py` for UIKit focus, raw-key repetition/cancellation and canvas/overlay pointer ownership, using production responder methods with renderer/event-sink fixtures. Run `python3 tests/input-map/run.py` for native resolver regressions and `python3 tests/gamepad-fixture/check.py` for real GameController fanout, disconnect and action delivery without individual listeners. `example/inputmap.js` combines keyboard, mouse and gamepad, with an overlaid text field and focus/close buttons for interactive checks. Physical keyboard/mouse/controller and overlay acceptance must be recorded separately from compilation and automated resolver tests.
+
 ### Gamepads
 
 A Bluetooth or USB controller (Stadia, Xbox, PlayStation, any MFi pad)

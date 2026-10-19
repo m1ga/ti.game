@@ -3,6 +3,7 @@
 //
 #import <TitaniumKit/TitaniumKit.h>
 
+@class TGInputResolver;
 @class TGScene;
 @class TGSceneRenderer;
 
@@ -15,5 +16,6 @@
 @interface TiGameGameViewProxy : TiViewProxy
 
 @property (nonatomic, readonly) TGScene *scene;
+@property (nonatomic, readonly) TGInputResolver *inputResolver;
 
 @end

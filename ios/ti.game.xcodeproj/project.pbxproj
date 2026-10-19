@@ -62,7 +62,11 @@
 		A1B2C3D40B03000000000000 /* TGTween.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40B01000000000000 /* TGTween.h */; };
 		A1B2C3D40B04000000000000 /* TGTween.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40B02000000000000 /* TGTween.m */; };
 		A1B2C3D42403000000000000 /* TGValues.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42401000000000000 /* TGValues.h */; };
+		A1B2C3D42903000000000000 /* TGCanvasInput.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42901000000000000 /* TGCanvasInput.h */; };
+		A1B2C3D42803000000000000 /* TGInputResolver.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42801000000000000 /* TGInputResolver.h */; };
 		A1B2C3D42404000000000000 /* TGValues.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42402000000000000 /* TGValues.m */; };
+		A1B2C3D42904000000000000 /* TGCanvasInput.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42902000000000000 /* TGCanvasInput.m */; };
+		A1B2C3D42804000000000000 /* TGInputResolver.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42802000000000000 /* TGInputResolver.m */; };
 		A1B2C3D40C03000000000000 /* TiGameGameView.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40C01000000000000 /* TiGameGameView.h */; };
 		A1B2C3D40C04000000000000 /* TiGameGameView.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40C02000000000000 /* TiGameGameView.m */; };
 		A1B2C3D40D03000000000000 /* TiGameGameViewProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40D01000000000000 /* TiGameGameViewProxy.h */; };
@@ -158,7 +162,11 @@
 		A1B2C3D40B01000000000000 /* TGTween.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTween.h"; path = "Classes/TGTween.h"; sourceTree = "<group>"; };
 		A1B2C3D40B02000000000000 /* TGTween.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTween.m"; path = "Classes/TGTween.m"; sourceTree = "<group>"; };
 		A1B2C3D42401000000000000 /* TGValues.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGValues.h"; path = "Classes/TGValues.h"; sourceTree = "<group>"; };
+		A1B2C3D42901000000000000 /* TGCanvasInput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGCanvasInput.h"; path = "Classes/TGCanvasInput.h"; sourceTree = "<group>"; };
+		A1B2C3D42801000000000000 /* TGInputResolver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGInputResolver.h"; path = "Classes/TGInputResolver.h"; sourceTree = "<group>"; };
 		A1B2C3D42402000000000000 /* TGValues.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGValues.m"; path = "Classes/TGValues.m"; sourceTree = "<group>"; };
+		A1B2C3D42902000000000000 /* TGCanvasInput.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGCanvasInput.m"; path = "Classes/TGCanvasInput.m"; sourceTree = "<group>"; };
+		A1B2C3D42802000000000000 /* TGInputResolver.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGInputResolver.m"; path = "Classes/TGInputResolver.m"; sourceTree = "<group>"; };
 		A1B2C3D40C01000000000000 /* TiGameGameView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameGameView.h"; path = "Classes/TiGameGameView.h"; sourceTree = "<group>"; };
 		A1B2C3D40C02000000000000 /* TiGameGameView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TiGameGameView.m"; path = "Classes/TiGameGameView.m"; sourceTree = "<group>"; };
 		A1B2C3D40D01000000000000 /* TiGameGameViewProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TiGameGameViewProxy.h"; path = "Classes/TiGameGameViewProxy.h"; sourceTree = "<group>"; };
@@ -278,7 +286,11 @@
 				A1B2C3D40B01000000000000 /* TGTween.h */,
 				A1B2C3D40B02000000000000 /* TGTween.m */,
 				A1B2C3D42401000000000000 /* TGValues.h */,
+				A1B2C3D42901000000000000 /* TGCanvasInput.h */,
+				A1B2C3D42801000000000000 /* TGInputResolver.h */,
 				A1B2C3D42402000000000000 /* TGValues.m */,
+				A1B2C3D42902000000000000 /* TGCanvasInput.m */,
+				A1B2C3D42802000000000000 /* TGInputResolver.m */,
 				A1B2C3D40C01000000000000 /* TiGameGameView.h */,
 				A1B2C3D40C02000000000000 /* TiGameGameView.m */,
 				A1B2C3D40D01000000000000 /* TiGameGameViewProxy.h */,
@@ -379,6 +391,8 @@
 				A1B2C3D42703000000000000 /* TGGamepadController.h in Headers */,
 				A1B2C3D40B03000000000000 /* TGTween.h in Headers */,
 				A1B2C3D42403000000000000 /* TGValues.h in Headers */,
+				A1B2C3D42903000000000000 /* TGCanvasInput.h in Headers */,
+				A1B2C3D42803000000000000 /* TGInputResolver.h in Headers */,
 				A1B2C3D40C03000000000000 /* TiGameGameView.h in Headers */,
 				A1B2C3D40D03000000000000 /* TiGameGameViewProxy.h in Headers */,
 				A1B2C3D40E03000000000000 /* TiGameSpriteProxy.h in Headers */,
@@ -489,6 +503,8 @@
 				A1B2C3D42704000000000000 /* TGGamepadController.m in Sources */,
 				A1B2C3D40B04000000000000 /* TGTween.m in Sources */,
 				A1B2C3D42404000000000000 /* TGValues.m in Sources */,
+				A1B2C3D42904000000000000 /* TGCanvasInput.m in Sources */,
+				A1B2C3D42804000000000000 /* TGInputResolver.m in Sources */,
 				A1B2C3D40C04000000000000 /* TiGameGameView.m in Sources */,
 				A1B2C3D40D04000000000000 /* TiGameGameViewProxy.m in Sources */,
 				A1B2C3D40E04000000000000 /* TiGameSpriteProxy.m in Sources */,

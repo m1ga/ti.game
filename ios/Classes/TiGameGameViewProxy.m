@@ -17,6 +17,7 @@
 #import <float.h>
 #import <math.h>
 #import "TGValues.h"
+#import "TGInputResolver.h"
 
 @interface TiGameGameViewProxy () <TGSceneTimerListener>
 @end
@@ -32,6 +33,12 @@
 {
 	if (self = [super init]) {
 		_scene = [[TGScene alloc] init];
+		__weak TiGameGameViewProxy *weakSelf = self;
+		_inputResolver = [[TGInputResolver alloc] initWithListener:^(NSString *action, NSString *context, BOOL down) {
+			TiGameGameViewProxy *proxy = weakSelf;
+			NSString *event = down ? @"actiondown" : @"actionup";
+			if ([proxy _hasListeners:event]) [proxy fireEvent:event withObject:@{@"action":action,@"context":context}];
+		}];
 		_timerCallbacks = [NSMutableDictionary dictionary];
 		_scene.timerListener = self;
 	}
@@ -63,6 +70,20 @@
 {
 	[[self gameView] shutdownRendering];
 	[super viewWillDetach];
+}
+
+- (void)setInputMap:(id)value { [self.inputResolver setMap:value]; }
+- (NSDictionary *)inputMap { return self.inputResolver.map; }
+- (void)setInputContext:(id)value
+{
+	if (value == [NSNull null]) value = nil;
+	if (value && ![value isKindOfClass:[NSString class]]) [NSException raise:NSInvalidArgumentException format:@"inputContext must be a string or null"];
+	[self.inputResolver setContext:value];
+}
+- (id)inputContext { return self.inputResolver.context ?: (id)[NSNull null]; }
+- (void)focusInput:(id)unused
+{
+	dispatch_async(dispatch_get_main_queue(), ^{ [(TiGameGameView *)[self view] focusInput]; });
 }
 
 #pragma mark Properties

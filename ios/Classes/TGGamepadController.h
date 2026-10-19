@@ -4,6 +4,7 @@
 #import <Foundation/Foundation.h>
 
 @class TiProxy;
+@class TGInputResolver;
 
 /**
  * Game controller input (Bluetooth MFi/Xbox/PlayStation/Stadia pads via
@@ -27,6 +28,8 @@
  * convention (-1 = up), like Android.
  */
 @interface TGGamepadController : NSObject
+
+@property (nonatomic, strong) TGInputResolver *inputResolver;
 
 - (instancetype)initWithViewProxy:(TiProxy *)viewProxy;
 

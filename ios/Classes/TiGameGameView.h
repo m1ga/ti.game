@@ -22,6 +22,7 @@
 + (void)shutdownAllViews;
 + (void)shutdownViewsForRuntimeContext:(id<TiEvaluator>)context;
 
+- (void)focusInput;
 - (void)pauseRendering;
 - (void)resumeRendering;
 - (void)shutdownRendering;

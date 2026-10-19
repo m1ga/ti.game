@@ -19,6 +19,6 @@ with tempfile.TemporaryDirectory(prefix='ti-game-gamepad-') as temp:
     subprocess.run(['xcrun', 'clang', '-fobjc-arc', '-fblocks',
                     '-framework', 'Foundation', '-framework', 'GameController', '-framework', 'QuartzCore',
                     '-I', str(here), '-I', str(classes),
-                    str(classes / 'TGGamepadController.m'), str(here / 'receivers.m'),
+                    str(classes / 'TGGamepadController.m'), str(classes / 'TGInputResolver.m'), str(here / 'receivers.m'),
                     '-o', binary], check=True)
     subprocess.run([binary], check=True)
