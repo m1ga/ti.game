@@ -2,7 +2,7 @@
 //  ti.game — engine (iOS twin of android/src/ti/game/engine/DebugHud.java)
 //
 #import <Foundation/Foundation.h>
-#import <OpenGLES/ES2/gl.h>
+#import "TGMetalContext.h"
 #import "TGFrameStats.h"
 
 @class TGBitmapFont;
@@ -53,7 +53,7 @@
  * the HUD reads the same size at 1x and on a 3x Retina drawable.
  */
 - (void)draw:(TGSpriteBatch *)batch
-	 texture:(GLuint)whiteTexture
+	 texture:(TGMetalTexture *)whiteTexture
 		font:(TGBitmapFont *)hudFont
 surfaceWidth:(float)surfaceWidth
 surfaceHeight:(float)surfaceHeight

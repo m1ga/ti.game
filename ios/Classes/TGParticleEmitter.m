@@ -188,7 +188,7 @@ static const int kHardCap = 1000;
 	float scaleDelta = self.endScale - startScale;
 	float startOpacity = self.startOpacity;
 	float opacityDelta = self.endOpacity - startOpacity;
-	GLint texture = [sh textureId];
+	TGMetalTexture *texture = [sh textureResource];
 	for (int i = 0; i < _count; i++) {
 		float t = _age[i] / _life[i];
 		float scale = startScale + scaleDelta * t;
@@ -197,7 +197,7 @@ static const int kHardCap = 1000;
 			continue;
 		}
 		float halfW = baseWidth * scale * 0.5f;
-		[batch drawFrame:(GLuint)texture frame:f
+		[batch drawFrame:texture frame:f
 					  cx:_px[i] cy:_py[i]
 				   halfW:halfW halfH:halfW * aspect
 					   r:r g:g b:b a:MIN(1.0f, alpha)];

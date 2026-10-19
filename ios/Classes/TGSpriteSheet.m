@@ -11,7 +11,7 @@
 	NSMutableArray<NSData *> *_frameDataHistory;
 	atomic_uintptr_t _publishedFrames;
 	atomic_size_t _publishedFrameCount;
-	atomic_int _textureId;
+	TGMetalTexture *_textureResource;
 	atomic_bool _loadFailed;
 	atomic_bool _disposed;
 }
@@ -28,7 +28,7 @@
 		_frameDataHistory = [NSMutableArray array];
 		atomic_init(&_publishedFrames, (uintptr_t)NULL);
 		atomic_init(&_publishedFrameCount, 0);
-		atomic_init(&_textureId, -1);
+
 		atomic_init(&_loadFailed, false);
 		atomic_init(&_disposed, false);
 	}
@@ -81,59 +81,46 @@
 	return [self frame:index into:&f] ? f.height : 0.0f;
 }
 
-- (GLint)textureId
+- (TGMetalTexture *)textureResource
 {
-	return atomic_load_explicit(&_textureId, memory_order_acquire);
+	@synchronized (self) { return _textureResource; }
 }
 
 - (BOOL)isReady
 {
-	return atomic_load_explicit(&_textureId, memory_order_acquire) >= 0
-		&& atomic_load_explicit(&_publishedFrameCount, memory_order_acquire) > 0;
+	return ![self isDisposed] && [self textureResource] != nil && [self frameCount] > 0;
 }
 
 - (BOOL)ensureLoaded:(TGTextureManager *)textures
 {
-	if (atomic_load_explicit(&_textureId, memory_order_acquire) >= 0
-		|| atomic_load_explicit(&_loadFailed, memory_order_acquire)
-		|| atomic_load_explicit(&_disposed, memory_order_acquire)) {
-		return NO;
+	@synchronized (self) {
+		if (_textureResource != nil || atomic_load(&_loadFailed) || atomic_load(&_disposed)) return NO;
+		id<TGSpriteSheetLoader> loader = _loader;
+		UIImage *image = loader ? [loader loadSpriteSheet:self] : nil;
+		if (!image.CGImage) { atomic_store(&_loadFailed, true); return NO; }
+		if ([self frameCount] == 0 && _gridFrameWidth > 0 && _gridFrameHeight > 0) {
+			[self setFrameData:[TGSpriteSheet buildGridFramesWithImageWidth:(int)CGImageGetWidth(image.CGImage)
+				imageHeight:(int)CGImageGetHeight(image.CGImage) frameWidth:_gridFrameWidth frameHeight:_gridFrameHeight inset:self.smoothing]];
+		}
+		TGMetalTexture *resource = [textures upload:image smoothing:self.smoothing repeat:self.repeat];
+		// A reentrant loader may have unloaded the sheet while decoding.
+		if (atomic_load(&_disposed)) return NO;
+		_textureResource = resource;
+		return resource != nil;
 	}
-	id<TGSpriteSheetLoader> loader = _loader;
-	UIImage *image = (loader != nil) ? [loader loadSpriteSheet:self] : nil;
-	if (image == nil || image.CGImage == NULL) {
-		atomic_store_explicit(&_loadFailed, true, memory_order_release);
-		return NO;
-	}
-	int imageWidth = (int)CGImageGetWidth(image.CGImage);
-	int imageHeight = (int)CGImageGetHeight(image.CGImage);
-	if ([self frameCount] == 0 && _gridFrameWidth > 0 && _gridFrameHeight > 0) {
-		[self setFrameData:[TGSpriteSheet buildGridFramesWithImageWidth:imageWidth
-															imageHeight:imageHeight
-															 frameWidth:_gridFrameWidth
-															frameHeight:_gridFrameHeight
-																  inset:self.smoothing]];
-	}
-	GLint textureId = (GLint)[textures upload:image smoothing:self.smoothing repeat:self.repeat];
-	atomic_store_explicit(&_textureId, textureId, memory_order_release);
-	return textureId >= 0;
 }
 
 - (void)invalidateTexture
 {
-	atomic_store_explicit(&_textureId, -1, memory_order_release);
-	atomic_store_explicit(&_loadFailed, false, memory_order_release);
+	@synchronized (self) { _textureResource = nil; atomic_store(&_loadFailed, false); }
 }
 
 - (void)dispose
 {
-	atomic_store_explicit(&_disposed, true, memory_order_release);
+	@synchronized (self) { atomic_store(&_disposed, true); _textureResource = nil; }
 }
 
-- (BOOL)isDisposed
-{
-	return atomic_load_explicit(&_disposed, memory_order_acquire);
-}
+- (BOOL)isDisposed { return atomic_load(&_disposed); }
 
 /**
  * Grid frame UVs. With `inset` (linear-filtered sheets), interior frame

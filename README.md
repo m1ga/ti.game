@@ -4,8 +4,8 @@
   <img src="assets/intro.jpg" width="100%" alt="intro image"/>
 </p>
 
-A 2D sprite game engine module for Titanium SDK (Android and iOS),
-rendered with OpenGL ES 2.0. You describe your scene and react to events
+A 2D sprite game engine module for Titanium SDK: OpenGL ES 2.0 on Android,
+Metal on iPhone, iPad and Mac Catalyst. You describe your scene and react to events
 from JavaScript; rendering, animation, physics, collision and gestures run
 natively every frame. The API reference below starts with the portable
 Android/iOS contract and calls out the few platform differences.
@@ -1468,8 +1468,8 @@ Contribution rules for the codebase live in `AGENTS.md`; planned features
 `ios/` contains the Obj-C twin of the module. It implements the portable API
 above, with the listed platform differences, and mirrors the engine class by
 class (`Classes/TG*` mirrors `engine/`, `Classes/TiGame*` mirrors the proxies).
-Rendering uses OpenGL ES 2.0 and a `CADisplayLink` on a dedicated render
-thread. Implementation notes (threading, pixel
+Rendering uses Metal with `CAMetalLayer` and a `CADisplayLink` on a dedicated render
+thread. Device pipelines are shared; command queues and three frame slots belong to each view. Implementation notes (threading, pixel
 coordinates, backgrounding) are in `ios/README.md`; when changing engine
 behavior, change both platforms (see `AGENTS.md`).
 
@@ -1477,9 +1477,14 @@ behavior, change both platforms (see `AGENTS.md`).
 
 ```bash
 cd android
-ti build -p android --build-only   # package android/dist/ti.game-android-<version>.zip
-ti build -p android                # run the example app on a device/emulator
+ti build -p android --build-only --sdk 13.3.1.GA   # package android/dist/ti.game-android-<version>.zip
+ti build -p android --sdk 13.3.1.GA                # run the example app on a device/emulator
 
 cd ios                             # macOS only
-ti build -p ios --build-only       # package the iOS module zip
+ti build -p ios --build-only       # package iOS, simulator and Catalyst variants
 ```
+
+
+The Apple backend preserves the JavaScript API, premultiplied colors, filtering, native scene update and draw order. It compiles its embedded Metal shaders once per device, so consuming applications do not need a `default.metallib`. No Apple OpenGL ES backend or public backend selector is included. `ios/README.md` documents builds, native GPU tests and the distinction between the declared iOS 12 minimum and the current toolchain’s validation limits.
+
+On Metal, `averagePresentMs` is CPU time spent acquiring a drawable and submitting presentation, not GPU execution time. `presentFailures` counts missing drawables and reported command errors; command submission alone does not confirm that a frame reached the display.

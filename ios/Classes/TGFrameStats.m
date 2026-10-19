@@ -1,5 +1,6 @@
 #import "TGFrameStats.h"
 #import <math.h>
+#import <limits.h>
 #import <stdlib.h>
 #import <string.h>
 
@@ -79,6 +80,11 @@ static int compareSamples(const void *left, const void *right)
 			_droppedFrames += (int)(intervals - 1);
 		}
 	}
+}
+
+- (void)addCommandFailures:(NSUInteger)count
+{
+	_presentFailures += (int)MIN(count, (NSUInteger)(INT_MAX - _presentFailures));
 }
 
 - (BOOL)windowClosed:(CFTimeInterval)now

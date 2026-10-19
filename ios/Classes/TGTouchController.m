@@ -70,6 +70,12 @@ static const NSTimeInterval kTapTimeout = 0.3;
 	return self;
 }
 
+- (void)updateContentScale:(CGFloat)contentScale
+{
+	_contentScale = MAX(0.01, contentScale);
+	_touchSlop = 8.0f * (float)_contentScale;
+}
+
 // --- Geometry helpers ---------------------------------------------------
 
 /** The touch slop is a screen-pixel distance, but gestures are tracked in
