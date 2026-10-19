@@ -30,7 +30,7 @@ static void TGInvalidInput(void) { [NSException raise:NSInvalidArgumentException
     NSString *device=b[@"device"];BOOL keyboard=[device isEqual:@"keyboard"];
     id code=b[keyboard?@"code":@"button"];
     if (![code isKindOfClass:[NSString class]]) TGInvalidInput();
-    BOOL valid=keyboard ? [codes numberOfMatchesInString:code options:0 range:NSMakeRange(0,[code length])]==1 : [device isEqual:@"mouse"] ? [@[@"left",@"middle",@"right"] containsObject:code] : [device isEqual:@"gamepad"] && [pad containsObject:code];
+    BOOL valid=keyboard ? NSEqualRanges([codes rangeOfFirstMatchInString:code options:0 range:NSMakeRange(0,[code length])],NSMakeRange(0,[code length])) : [device isEqual:@"mouse"] ? [@[@"left",@"middle",@"right"] containsObject:code] : [device isEqual:@"gamepad"] && [pad containsObject:code];
     if (!valid) TGInvalidInput();
     [copy addObject:@{@"device":[device copy],keyboard?@"code":@"button":[code copy]}];
    }

@@ -171,10 +171,10 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 		_gamepadController.inputResolver = ((TiGameGameViewProxy *)self.proxy).inputResolver;
 		[self addGestureRecognizer:[[TGCanvasInput alloc] initWithResolver:_gamepadController.inputResolver]];
 		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseInput) name:UIApplicationWillResignActiveNotification object:nil];
-		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseInput) name:UIWindowDidResignKeyNotification object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(inputWindowResigned:) name:UIWindowDidResignKeyNotification object:nil];
 		if (@available(iOS 14.0,*)) {
-			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseInput) name:GCKeyboardDidDisconnectNotification object:nil];
-			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseInput) name:GCMouseDidDisconnectNotification object:nil];
+			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releaseKeyboardInput) name:GCKeyboardDidDisconnectNotification object:nil];
+			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(releasePointerInput) name:GCMouseDidDisconnectNotification object:nil];
 		}
 		_gamepadController.deadzone = _gamepadDeadzoneSet ? _gamepadDeadzone : 0.2f;
 		[self applyStickThresholds];
@@ -263,6 +263,9 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 
 - (BOOL)canBecomeFirstResponder { return !_renderingShutdown; }
 - (void)focusInput { if (!_renderingShutdown) [self becomeFirstResponder]; }
+- (void)releaseKeyboardInput { [((TiGameGameViewProxy *)self.proxy).inputResolver releaseDevice:@"keyboard" identity:@"keyboard"]; }
+- (void)releasePointerInput { [((TiGameGameViewProxy *)self.proxy).inputResolver releaseDevice:@"mouse" identity:@"pointer"]; }
+- (void)inputWindowResigned:(NSNotification *)notification { if (notification.object == self.window) [self releaseInput]; }
 - (void)releaseInput { [((TiGameGameViewProxy *)self.proxy).inputResolver releaseAll]; }
 - (BOOL)resignFirstResponder
 {
@@ -293,7 +296,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 }
 - (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event { [super pressesBegan:[self handleKeys:presses down:YES] withEvent:event]; }
 - (void)pressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event { [super pressesEnded:[self handleKeys:presses down:NO] withEvent:event]; }
-- (void)pressesCancelled:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event { [self releaseInput];[super pressesCancelled:presses withEvent:event]; }
+- (void)pressesCancelled:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event { [self releaseKeyboardInput];[super pressesCancelled:presses withEvent:event]; }
 
 #pragma mark Properties
 

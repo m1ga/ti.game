@@ -48,7 +48,7 @@ PRODUCTION_METHODS
 @implementation UIKitTests
 - (void)testKeyboardFocusRepeatCancellationAndNativeTextField
 {
- UIWindow *window=UIApplication.sharedApplication.windows.firstObject;
+ UIWindow *window=((UIWindowScene *)UIApplication.sharedApplication.connectedScenes.anyObject).windows.firstObject;
  UIViewController *controller=window.rootViewController;
  CanvasOwner *canvas=[[CanvasOwner alloc] initWithFrame:CGRectMake(0,0,300,300)];
  InputProxy *proxy=[InputProxy new];proxy.events=[NSMutableArray array];canvas.proxy=proxy;
@@ -84,6 +84,21 @@ PRODUCTION_METHODS
  TestEvent *event=[TestEvent new];event.mask=UIEventButtonMaskSecondary;
  [capture touchesBegan:[NSSet setWithObject:touch] withEvent:event];XCTAssertEqualObjects(events.lastObject,@YES);
  [capture touchesCancelled:[NSSet setWithObject:touch] withEvent:event];XCTAssertEqualObjects(events.lastObject,@NO);
+}
+- (void)testKeyboardCancellationPreservesHeldGamepadAction
+{
+ CanvasOwner *canvas=[CanvasOwner new];InputProxy *proxy=[InputProxy new];canvas.proxy=proxy;proxy.events=[NSMutableArray array];
+ NSMutableArray *edges=[NSMutableArray array];
+ proxy.inputResolver=[[TGInputResolver alloc] initWithListener:^(NSString *a,NSString *c,BOOL down){[edges addObject:@(down)];}];
+ [proxy.inputResolver setMap:@{@"gameplay":@{@"fire":@[@{@"device":@"keyboard",@"code":@"Space"},@{@"device":@"gamepad",@"button":@"a"}]}}];
+ [proxy.inputResolver transition:@"gamepad" identity:@"1" code:@"a" down:YES];
+ [proxy.inputResolver transition:@"keyboard" identity:@"keyboard" code:@"Space" down:YES];
+ [canvas pressesCancelled:[NSSet set] withEvent:nil];
+ [canvas releasePointerInput];[canvas releaseKeyboardInput];
+ [canvas inputWindowResigned:[NSNotification notificationWithName:UIWindowDidResignKeyNotification object:[UIWindow new]]];
+ XCTAssertEqual(edges.count,1);
+ [proxy.inputResolver transition:@"gamepad" identity:@"1" code:@"a" down:NO];
+ XCTAssertEqualObjects(edges.lastObject,@NO);
 }
 - (void)testNormalizedCodes
 {

@@ -13,19 +13,10 @@ def method(signature):
  while depth:
   depth+=(source[end]=='{')-(source[end]=='}');end+=1
  return source[start:end].replace('TiGameGameViewProxy','InputProxy')
-methods=[method(sig) for sig in ['- (BOOL)canBecomeFirstResponder','- (void)focusInput','- (void)releaseInput','- (BOOL)resignFirstResponder','- (NSSet<UIPress *> *)handleKeys:','- (void)pressesBegan:','- (void)pressesEnded:','- (void)pressesCancelled:']]
+methods=[method(sig) for sig in ['- (BOOL)canBecomeFirstResponder','- (void)focusInput','- (void)releaseInput','- (void)releaseKeyboardInput','- (void)releasePointerInput','- (void)inputWindowResigned:','- (BOOL)resignFirstResponder','- (NSSet<UIPress *> *)handleKeys:','- (void)pressesBegan:','- (void)pressesEnded:','- (void)pressesCancelled:']]
 (out/'UIKitTests.m').write_text((HERE/'UIKitTests.m').read_text().replace('PRODUCTION_METHODS','\n'.join(methods)))
-(out/'Host.m').write_text('''#import <UIKit/UIKit.h>
-@interface Host : UIResponder <UIApplicationDelegate>
-@property (nonatomic) UIWindow *window;
-@end
-@implementation Host
-- (BOOL)application:(UIApplication *)app didFinishLaunchingWithOptions:(NSDictionary *)options {
- self.window=[[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];self.window.rootViewController=[UIViewController new];[self.window makeKeyAndVisible];return YES;
-}
-@end
-int main(int argc,char **argv) { @autoreleasepool {return UIApplicationMain(argc,argv,nil,NSStringFromClass(Host.class));} }
-''')
+for name in ('Host.m','Host-Info.plist'):
+ (out/name).write_text((HERE/name).read_text())
 (out/'project.yml').write_text(f'''name: InputTests
 settings:
   base:
@@ -43,6 +34,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: mx.codigomovil.tigame.inputhost
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Host-Info.plist
   InputTests:
     type: bundle.unit-test
     platform: iOS
@@ -61,4 +54,4 @@ schemes:
       targets: [InputTests]
 ''')
 subprocess.run(['xcodegen','generate','--spec',str(out/'project.yml')],check=True)
-raise SystemExit(subprocess.run(['xcodebuild','test','-project',str(out/'InputTests.xcodeproj'),'-scheme','InputTests','-destination',args.destination,'-derivedDataPath',str(out/'DerivedData')]).returncode)
+raise SystemExit(subprocess.run(['xcodebuild','test','-project',str(out/'InputTests.xcodeproj'),'-scheme','InputTests','-destination',args.destination,'-derivedDataPath',str(out/'DerivedData'),'SUPPORTS_MACCATALYST=YES','IPHONEOS_DEPLOYMENT_TARGET=15.0']).returncode)

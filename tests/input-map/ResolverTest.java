@@ -6,6 +6,7 @@ public class ResolverTest {
   List<String> events = new ArrayList<>();
   InputResolver r = new InputResolver((action,context,down)->events.add(action+":"+context+":"+down));
   check(!r.hasBindings("mouse"));
+  try {r.setMap(Map.of("gameplay",Map.of("bad",new Object[]{Map.of("device","keyboard","code","KeyA\n")})));throw new AssertionError();}catch(IllegalArgumentException expected){}
   Map<String,Object> actions = new LinkedHashMap<>();
   actions.put("fire", new Object[]{Map.of("device","keyboard","code","Space"), Map.of("device","mouse","button","left"),Map.of("device","gamepad","button","a")});
   r.setMap(Map.of("gameplay",actions)); check(r.hasBindings("mouse"));
