@@ -362,8 +362,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	[_preparedSheets addObject:sheet];
 	if (![sheet isReady]) {
 		// Tracked as soon as a texture exists — a sheet that uploaded but
-		// ended with zero frames (broken atlas) must still be deleted on
-		// unload and invalidated on context loss
+		// ended with zero frames (broken atlas) must still be tracked for
+		// manager cleanup
 		if ([sheet ensureLoaded:_textures]) {
 			[_textures track:sheet];
 		}

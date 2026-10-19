@@ -62,9 +62,9 @@ typedef struct {
 - (void)invalidateTexture;
 
 /**
- * Marks the sheet for texture deletion on the next rendered frame
- * (TGTextureManager deleteDisposed) and blocks any re-upload. Sprites
- * still referencing the sheet simply stop drawing.
+ * Drops the sheet’s strong texture reference immediately and blocks re-upload.
+ * Encoded commands retain their GPU resources until completion; sprites
+ * still referencing the disposed sheet stop drawing.
  */
 - (void)dispose;
 - (BOOL)isDisposed;
