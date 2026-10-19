@@ -41,6 +41,14 @@ static void TGInvalidInput(void) { [NSException raise:NSInvalidArgumentException
  @synchronized(self) { [self releaseActions];_map=[next copy]; }
 }
 - (NSDictionary *)map { @synchronized(self) { return _map; } }
+- (BOOL)hasBindings:(NSString *)device
+{
+ @synchronized(self) {
+  NSDictionary *actions=_context?_map[_context]:nil;
+  for (NSArray *bindings in actions.allValues) for (NSDictionary *binding in bindings) if ([binding[@"device"] isEqual:device]) return YES;
+  return NO;
+ }
+}
 - (NSString *)context { @synchronized(self) { return _context; } }
 - (void)setContext:(NSString *)context
 {

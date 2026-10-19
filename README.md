@@ -323,7 +323,22 @@ An action goes down on its first active binding and up after its last source rel
 
 Keyboard codes are `KeyA`…`KeyZ`, `Digit0`…`Digit9`, `ArrowUp/Down/Left/Right`, `Space`, `Escape`, `Enter`, `Tab`, `Backspace`, `Delete`, `Home`, `End`, `PageUp`, `PageDown`, `F1`…`F12`, and `Shift`, `Control`, `Alt`, `Meta` with `Left`/`Right` suffixes. Mouse buttons are `left`, `middle`, `right`; gamepad bindings use the named buttons below. Analog sticks and existing gamepad properties/events are unchanged. Use either action events or individual button events for each gamepad action to avoid dispatching twice. An app retaining its gamepad adapter can omit gamepad bindings from its map.
 
-`keydown` and `keyup` carry `{ code, character, modifiers: { shift, control, alt, meta } }`. The character can be empty for non-text keys; `code` identifies the physical key independently of its character. Keyboard events reach only the focused GameView. `focusInput()` requests focus on the UI thread; it does not capture a keyboard globally or open a software keyboard. Native text fields retain their focus. Mouse input is accepted only when delivered to the canvas; overlaid Titanium controls keep their clicks. Held actions release on cancellation, focus loss, suspension, input-device disconnection or view shutdown. Focus loss can end an action without a physical `keyup`; applications should drive gameplay from action transitions.
+`keydown` and `keyup` carry `{ code, character, modifiers: { shift, control, alt, meta } }`. The character can be empty for non-text keys; `code` identifies the physical key independently of its character. Keyboard events reach only the focused GameView. `focusInput()` requests focus on the UI thread; it does not capture a keyboard globally or open a software keyboard. Native text fields retain their focus. When the active context defines mouse bindings, canvas pointer gestures feed actions. Empty maps, keyboard-only contexts and disabled actions preserve existing sprite pointer interaction. Mouse input is accepted only when delivered to the canvas; overlaid Titanium controls keep their clicks. Held actions release on cancellation, focus loss, suspension, input-device disconnection or view shutdown. Focus loss can end an action without a physical `keyup`; applications should drive gameplay from action transitions.
+
+For pointer capture on iOS/iPadOS 13.4–16, the consuming application must opt into indirect input in `tiapp.xml` (iOS 17+ defaults this key to true):
+
+```xml
+<ios>
+  <plist>
+    <dict>
+      <key>UIApplicationSupportsIndirectInputEvents</key>
+      <true/>
+    </dict>
+  </plist>
+</ios>
+```
+
+See [Apple’s indirect input configuration](https://developer.apple.com/documentation/bundleresources/information-property-list/uiapplicationsupportsindirectinputevents). This application setting is required to distinguish a mouse pointer from a direct touch on older supported systems; the module does not modify the app’s global input configuration at runtime.
 
 Apple keyboard/pointer capture requires iOS/iPadOS 13.4 or later, including Catalyst after the renderer supports it. The source deployment minimum remains iOS 12; UIKit APIs are guarded. On iOS 14+, keyboard/mouse disconnect notifications also release input; earlier UIKit versions deliver cancellation/focus lifecycle events. The upstream Apple OpenGL renderer builds for iOS and Simulator and does not support Catalyst; this feature has no Metal dependency. Android retains its engine touch listener. All resolution runs natively on input transitions, with no per-frame bridge traffic.
 

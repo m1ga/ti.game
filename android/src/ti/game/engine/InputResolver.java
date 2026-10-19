@@ -69,6 +69,12 @@ public final class InputResolver
 		}
 		return result;
 	}
+	public synchronized boolean hasBindings(String device)
+	{
+		Map<String,Set<String>> actions = map.get(context);
+		if (actions != null) for (Set<String> bindings : actions.values()) for (String binding : bindings) if (binding.startsWith(device+":")) return true;
+		return false;
+	}
 	public synchronized String getContext() { return context; }
 	public synchronized void setContext(String value)
 	{

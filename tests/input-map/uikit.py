@@ -17,7 +17,7 @@ methods=[method(sig) for sig in ['- (BOOL)canBecomeFirstResponder','- (void)focu
 (out/'UIKitTests.m').write_text((HERE/'UIKitTests.m').read_text().replace('PRODUCTION_METHODS','\n'.join(methods)))
 (out/'Host.m').write_text('''#import <UIKit/UIKit.h>
 @interface Host : UIResponder <UIApplicationDelegate>
-@property UIWindow *window;
+@property (nonatomic) UIWindow *window;
 @end
 @implementation Host
 - (BOOL)application:(UIApplication *)app didFinishLaunchingWithOptions:(NSDictionary *)options {
@@ -32,6 +32,7 @@ settings:
     CLANG_ENABLE_OBJC_ARC: YES
     CODE_SIGNING_ALLOWED: NO
     GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
     IPHONEOS_DEPLOYMENT_TARGET: 18.6
     HEADER_SEARCH_PATHS: "{ROOT}/ios/Classes"
 targets:

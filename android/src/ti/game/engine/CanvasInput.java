@@ -34,12 +34,12 @@ public final class CanvasInput
 	{
 		if ((event.getSource() & InputDevice.SOURCE_MOUSE)!=InputDevice.SOURCE_MOUSE) return false;
 		String id=Integer.toString(event.getDeviceId());
-		if (event.getActionMasked()==MotionEvent.ACTION_CANCEL) {resolver.releaseDevice("mouse",id);return true;}
+		if (event.getActionMasked()==MotionEvent.ACTION_CANCEL) {resolver.releaseDevice("mouse",id);return resolver.hasBindings("mouse");}
 		int buttons=event.getButtonState();
 		resolver.transition("mouse",id,"left",(buttons & MotionEvent.BUTTON_PRIMARY)!=0);
 		resolver.transition("mouse",id,"middle",(buttons & MotionEvent.BUTTON_TERTIARY)!=0);
 		resolver.transition("mouse",id,"right",(buttons & MotionEvent.BUTTON_SECONDARY)!=0);
-		return true;
+		return resolver.hasBindings("mouse");
 	}
 	public static String keyCode(int key)
 	{

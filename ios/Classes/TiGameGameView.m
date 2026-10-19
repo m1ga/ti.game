@@ -362,26 +362,26 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
-	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer) return; }
+	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer && [((TiGameGameViewProxy *)self.proxy).inputResolver hasBindings:@"mouse"]) return; }
 	[self glView]; // make sure the controller exists
 	[_touchController touchesBegan:touches inView:self];
 }
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
-	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer) return; }
+	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer && [((TiGameGameViewProxy *)self.proxy).inputResolver hasBindings:@"mouse"]) return; }
 	[_touchController touchesMoved:touches inView:self];
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
-	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer) return; }
+	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer && [((TiGameGameViewProxy *)self.proxy).inputResolver hasBindings:@"mouse"]) return; }
 	[_touchController touchesEnded:touches inView:self];
 }
 
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
-	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer) return; }
+	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer && [((TiGameGameViewProxy *)self.proxy).inputResolver hasBindings:@"mouse"]) return; }
 	[_touchController touchesCancelled:touches inView:self];
 }
 
