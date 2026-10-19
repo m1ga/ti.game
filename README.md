@@ -172,15 +172,14 @@ layers and call `gameView.add(objects)` once. The array crosses the bridge once 
 to the native scene under one lock. `gameView.add(object)` remains available for
 individual objects.
 
-**Rendering.** Sprites are drawn by an ES 2.0 batcher that accumulates
+**Rendering.** Sprites are drawn by a native batcher (OpenGL ES 2.0 on Android, Metal on Apple) that accumulates
 quads and issues one draw call per texture switch (up to 1000 quads per
 batch). Practical consequence: pack your art into as few sheets as
 possible — a scene whose sprites share one atlas renders in a single draw
 call regardless of sprite count. Per-sprite transform math is done on the
 CPU and is trivial at typical scene sizes; hundreds of animated, moving
 sprites are no problem. Textures upload to the GPU once, lazily, on first
-use; the EGL context is preserved across app pauses, and after a real
-context loss everything (textures, shaders) is re-created automatically.
+use. Android preserves the EGL context across app pauses and recreates resources after context loss. Apple retains encoded resources until GPU command completion and keeps mutable frame resources separate for each view.
 
 **Batching pitfalls.** Everything that changes GPU state mid-scene cuts
 the batch and costs one draw call — invisible on screen, so know the four
@@ -227,12 +226,7 @@ keep a single native game loop instead of accumulating GL/render threads. Your
 app should still clear its own JavaScript timers and close unrelated resources
 when appropriate; no special cleanup is required for the `GameView` renderer.
 
-**iOS Simulator.** The simulator renders at a 1x logical drawable, because its
-translated OpenGL path is disproportionately expensive at a 3x Retina backing
-size. Real iPhone and iPad builds keep the device's native screen scale. Even
-so, expect the simulator to render the game noticeably slower due to its
-OpenGL translation layer — on a real phone the game runs a lot smoother, so
-judge performance on device, not in the simulator.
+**iOS Simulator.** The Metal port preserves the previous 1x logical drawable policy for comparison. Real iPhone and iPad builds keep their native screen scale. Simulator performance does not establish physical-device performance; controlled comparisons remain pending.
 
 ## Building blocks
 
