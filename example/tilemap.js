@@ -272,11 +272,12 @@ module.exports = function () {
 			tintColor: '#7ec8ff',
 			zIndex: 20
 		});
-		buildButton.addEventListener('tap', function () {
+		function toggleBuild() {
 			building = !building;
 			buildButton.text = building ? '[ BUILD: ON ]' : '[ BUILD: OFF ]';
 			hint.text = building ? 'TAP WATER TO LAY A PLANK' : 'TAP TO WALK';
-		});
+		}
+		buildButton.addEventListener('tap', toggleBuild);
 		gameView.add(buildButton);
 
 		var debugButton = Game.createText({
@@ -289,10 +290,16 @@ module.exports = function () {
 			zIndex: 20
 		});
 		var hitboxes = false;
-		debugButton.addEventListener('tap', function () {
+		function toggleDebug() {
 			hitboxes = !hitboxes;
 			gameView.debug = { hitbox: hitboxes, hud: 'topRight' };
+		}
+		debugButton.addEventListener('tap', toggleDebug);
+		require('/keyboard')(win, gameView, {
+			build: { keys: ['KeyB'], down: toggleBuild },
+			debug: { keys: ['KeyD'], down: toggleDebug }
 		});
+
 		gameView.add(debugButton);
 	}
 

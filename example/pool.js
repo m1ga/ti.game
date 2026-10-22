@@ -428,6 +428,10 @@ module.exports = function () {
 		// Direction is cue -> tap; power is how far out you tapped, capped.
 		// Nothing has to be still first — not the object balls, not the cue.
 
+		require('/keyboard')(win, gameView, {
+			reset: { keys: ['KeyR'], down: resetTable }
+		});
+
 		var MAX_REACH = W * 0.55;
 		var MAX_SPEED = 2600;
 

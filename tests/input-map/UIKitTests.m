@@ -42,6 +42,7 @@ PRODUCTION_METHODS
 @end
 @implementation TestEvent
 - (UIEventButtonMask)buttonMask {return self.mask;}
+- (UIEventType)type {return UIEventTypeTouches;}
 @end
 @interface UIKitTests : XCTestCase
 @end
@@ -84,6 +85,22 @@ PRODUCTION_METHODS
  TestEvent *event=[TestEvent new];event.mask=UIEventButtonMaskSecondary;
  [capture touchesBegan:[NSSet setWithObject:touch] withEvent:event];XCTAssertEqualObjects(events.lastObject,@YES);
  [capture touchesCancelled:[NSSet setWithObject:touch] withEvent:event];XCTAssertEqualObjects(events.lastObject,@NO);
+}
+- (void)testMiddleButtonRelease
+{
+ NSMutableArray *edges=[NSMutableArray array];
+ TGInputResolver *r=[[TGInputResolver alloc] initWithListener:^(NSString *a,NSString *c,BOOL down){[edges addObject:@(down)];}];
+ [r setMap:@{@"gameplay":@{@"test":@[@{@"device":@"mouse",@"button":@"middle"}]}}];
+ UIView *canvas=[UIView new];
+ TGCanvasInput *capture=[[TGCanvasInput alloc] initWithResolver:r];
+ [canvas addGestureRecognizer:capture];
+ TestTouch *touch=[TestTouch new];touch.target=canvas;
+ XCTAssertTrue([capture gestureRecognizer:capture shouldReceiveTouch:touch]);
+ TestEvent *event=[TestEvent new];event.mask=(1<<2);
+ [capture touchesBegan:[NSSet setWithObject:touch] withEvent:event];
+ XCTAssertEqualObjects(edges,(@[@YES]));
+ event.mask=0;[capture touchesEnded:[NSSet setWithObject:touch] withEvent:event];
+ XCTAssertEqualObjects(edges,(@[@YES,@NO]));
 }
 - (void)testKeyboardCancellationPreservesHeldGamepadAction
 {

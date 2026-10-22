@@ -364,6 +364,11 @@ module.exports = function () {
 			}
 		}
 
+		require('/keyboard')(win, gameView, {
+			drop: { keys: ['Space', 'Digit1'], down: function () { dropRandom(1); } },
+			ten: { keys: ['Digit0'], down: function () { dropRandom(10); } }
+		});
+
 		function hitsControl(e, control) {
 			return Math.abs(e.x - control.x) <= CONTROL_HALF_W
 				&& Math.abs(e.y - CONTROL_Y) <= CONTROL_HALF_H;

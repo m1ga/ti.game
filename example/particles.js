@@ -90,11 +90,16 @@ module.exports = function () {
 		});
 		gameView.add(firework);
 
-		gameView.addEventListener('tap', function (e) {
+		function burst(e) {
 			firework.x = e.x;
 			firework.y = e.y;
 			firework.tint = COLORS[colorIndex++ % COLORS.length];
 			firework.emit(45);
+		}
+		gameView.addEventListener('tap', burst);
+
+		require('/keyboard')(win, gameView, {
+			burst: { keys: ['Space'], down: function () { burst({ x: W / 2, y: H / 2 }); } }
 		});
 
 		// --- Following: a draggable ball with a smoke trail --------------

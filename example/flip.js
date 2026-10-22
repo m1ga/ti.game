@@ -141,9 +141,14 @@ module.exports = function () {
 		player.play('walk');
 		gameView.add(player);
 
-		gameView.addEventListener('tap', function () {
+		function flipGravity() {
 			player.gravity = -player.gravity;
 			player.flipY = player.gravity < 0;   // upside down on the ceiling
+		}
+		gameView.addEventListener('tap', flipGravity);
+
+		require('/keyboard')(win, gameView, {
+			flip: { keys: ['Space', 'ArrowUp', 'KeyW'], down: flipGravity }
 		});
 
 		// Movement runs natively; JS only glances at positions a few times a

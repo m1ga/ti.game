@@ -180,6 +180,12 @@ module.exports = function () {
 			return button;
 		}
 
+		require('/keyboard')(win, gameView, {
+			fire: { keys: ['Space'], down: function () { lanes.forEach(fire); } },
+			slower: { keys: ['ArrowLeft', 'KeyA'], down: function () { speedIndex = Math.max(0, speedIndex - 1); updateSpeed(); } },
+			faster: { keys: ['ArrowRight', 'KeyD'], down: function () { speedIndex = Math.min(SPEEDS.length - 1, speedIndex + 1); updateSpeed(); } }
+		});
+
 		gameView.add([
 			speedText,
 			makeSpeedButton('[ < SLOWER ]', W * 0.25, -1),

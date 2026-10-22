@@ -183,6 +183,12 @@ module.exports = function () {
 			windSound.volume = Math.abs(wind) / 900 * 0.16;
 		}
 
+		require('/keyboard')(win, gameView, {
+			drop: { keys: ['Space'], down: drop },
+			left: { keys: ['ArrowLeft', 'KeyA'], down: function () { windIndex = Math.max(0, windIndex - 1); applyWind(); } },
+			right: { keys: ['ArrowRight', 'KeyD'], down: function () { windIndex = Math.min(WINDS.length - 1, windIndex + 1); applyWind(); } }
+		});
+
 		function makeWindButton(label, x, step) {
 			var button = Game.createSprite({
 				sheet: sparkSheet, frame: 0,

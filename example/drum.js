@@ -366,12 +366,13 @@ module.exports = function () {
 			});
 		}
 
-		shakeButton.addEventListener('tap', function () {
+		function shakeDrum() {
 			shakeButton.flash('#fff', 150);
 			shakeSound.play();
 			gameView.shake({ strength: BALL * 0.5, duration: 400 });
 			kick(700, 900);
-		});
+		}
+		shakeButton.addEventListener('tap', shakeDrum);
 		gameView.add(shakeButton);
 
 		// --- TUMBLE: contact-driven air jet ---------------------------------
@@ -384,7 +385,7 @@ module.exports = function () {
 			tintColor: '#69f0ae',
 			zIndex: 20
 		});
-		tumbleButton.addEventListener('tap', function () {
+		function toggleTumble() {
 			tumbleButton.flash('#fff', 150);
 			tumbling = !tumbling;
 			launcherContacts.forEach(function (resetContact) {
@@ -402,8 +403,14 @@ module.exports = function () {
 			tumbleSound.play();
 			tumbleButton.text = '[ TUMBLE ON ]';
 			tumbleButton.tintColor = '#69f0ae';
-		});
+		}
+		tumbleButton.addEventListener('tap', toggleTumble);
 		gameView.add(tumbleButton);
+		require('/keyboard')(win, gameView, {
+			shake: { keys: ['Space'], down: shakeDrum },
+			tumble: { keys: ['KeyT'], down: toggleTumble }
+		});
+
 		tumbleSound.play();   // TUMBLE starts on, so the bed starts with it
 
 		gameView.add(Game.createText({

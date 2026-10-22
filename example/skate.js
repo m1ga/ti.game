@@ -520,6 +520,10 @@ module.exports = function () {
 		win.add(scoreLabel);
 		win.add(statusLabel);
 
+		require('/keyboard')(win, gameView, {
+			jump: { keys: ['Space', 'ArrowUp', 'KeyW'], down: function () { if (over) { start(); } else { jump(); } } }
+		});
+
 		start();
 	}
 

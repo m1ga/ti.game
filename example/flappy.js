@@ -265,7 +265,7 @@ module.exports = function () {
 		});
 
 		// Tap anywhere: flap (view-level press, fires wherever the touch lands)
-		gameView.addEventListener('press', function () {
+		function flap() {
 			if (over) {
 				reset();
 				return;
@@ -277,6 +277,11 @@ module.exports = function () {
 			pig.clearTweens();
 			pig.rotation = -15;
 			pig.animate({ rotation: 25, duration: 900, easing: Game.EASE_IN });
+		}
+		gameView.addEventListener('press', flap);
+
+		require('/keyboard')(win, gameView, {
+			flap: { keys: ['Space', 'ArrowUp', 'KeyW'], down: flap }
 		});
 
 		reset();

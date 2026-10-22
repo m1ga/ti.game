@@ -33,7 +33,6 @@
 //   Circular world: seamless world, camera, TileLayer and collisions at both edges
 
 var demos = [
-	{ title: 'Configurable input', start: require('/inputmap') },
 	{ title: 'Asteroids', start: require('/asteroids') },
 	{ title: 'Basic demo', start: require('/basic') },
 	{ title: 'Bingo drum', start: require('/drum') },
@@ -69,6 +68,11 @@ var demos = [
 	{ title: 'Wind (gravityX)', start: require('/wind') },
 	{ title: 'World wrap X', start: require('/worldwrap') }
 ];
+
+// External-input demo has no touch controls; keep the mobile launcher touch-friendly.
+if (Ti.Platform.osname === 'macos') {
+	demos.unshift({ title: 'Configurable input', start: require('/inputmap') });
+}
 
 var win = Ti.UI.createWindow({
 	backgroundColor: '#202030',

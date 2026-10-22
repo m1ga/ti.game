@@ -156,6 +156,7 @@ module.exports = function () {
 			{ title: '⅒×', value: 0.1 },
 			{ title: '⏸', value: 0 }
 		];
+		var speedActions = [];
 		var buttons = SPEEDS.map(function (speed, index) {
 			var button = Ti.UI.createLabel({
 				text: speed.title,
@@ -169,15 +170,23 @@ module.exports = function () {
 				bottom: '24dp',
 				left: (12 + index * 25) + '%'
 			});
-			button.addEventListener('click', function () {
+			function chooseSpeed() {
 				gameView.timeScale = speed.value; // the whole scene obeys
 				buttons.forEach(function (other) {
 					other.backgroundColor = '#59000000';
 				});
 				button.backgroundColor = '#8c2a6df4';
-			});
+			}
+			button.addEventListener('click', chooseSpeed);
+			speedActions.push(chooseSpeed);
 			win.add(button);
 			return button;
+		});
+		require('/keyboard')(win, gameView, {
+			speed0: { keys: ['Digit1'], down: speedActions[0] },
+			speed1: { keys: ['Digit2'], down: speedActions[1] },
+			speed2: { keys: ['Digit3'], down: speedActions[2] },
+			speed3: { keys: ['Digit4'], down: speedActions[3] }
 		});
 		buttons[0].backgroundColor = '#8c2a6df4'; // 1× active at start
 

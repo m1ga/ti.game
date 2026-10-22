@@ -96,6 +96,12 @@ module.exports = function () {
 			return pad;
 		});
 
+		require('/keyboard')(win, gameView, {
+			lane0: { keys: ['KeyA', 'ArrowLeft'], down: function () { hitLane(0, pads[0]); } },
+			lane1: { keys: ['KeyS', 'ArrowDown'], down: function () { hitLane(1, pads[1]); } },
+			lane2: { keys: ['KeyD', 'ArrowRight'], down: function () { hitLane(2, pads[2]); } }
+		});
+
 		// --- Falling notes (pooled) --------------------------------------
 
 		var notes = [];

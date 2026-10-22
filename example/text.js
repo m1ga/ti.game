@@ -101,10 +101,11 @@ module.exports = function () {
 			tintColor: '#9ad1a5',
 			zIndex: 3
 		});
-		dialog.addEventListener('tap', function () {
+		function nextWisdom() {
 			dialog.text = WISDOM[wisdomIndex++ % WISDOM.length];
 			dialog.flash('#fff', 150);
-		});
+		}
+		dialog.addEventListener('tap', nextWisdom);
 		gameView.add(dialog);
 
 		// --- the ball: drag it, camera follows, tap it to score ---
@@ -173,7 +174,7 @@ module.exports = function () {
 		});
 		gameView.add(scoreText);
 
-		ball.addEventListener('tap', function () {
+		function scoreBall() {
 			score += 10;
 			scoreText.text = 'SCORE ' + score;
 			scoreText.flash('#4dff88', 250);
@@ -181,7 +182,8 @@ module.exports = function () {
 			scoreText.animate({ scale: UNIT * 1.3, duration: 90, easing: Game.EASE_OUT });
 			scoreText.addEventListener('complete', popBack);
 			ball.flash('#fff', 120);
-		});
+		}
+		ball.addEventListener('tap', scoreBall);
 		function popBack() {
 			scoreText.removeEventListener('complete', popBack);
 			scoreText.animate({ scale: UNIT, duration: 140, easing: Game.EASE_IN });
@@ -197,13 +199,20 @@ module.exports = function () {
 			tintColor: '#ff8a80',
 			zIndex: 20
 		});
-		reset.addEventListener('tap', function () {
+		function resetText() {
 			score = 0;
 			scoreText.text = 'SCORE 0';
 			reset.flash('#fff', 200);
 			ball.x = WORLD_W / 2;
 			ball.y = WORLD_H / 2;
+		}
+		reset.addEventListener('tap', resetText);
+		require('/keyboard')(win, gameView, {
+			score: { keys: ['Space'], down: scoreBall },
+			reset: { keys: ['KeyR'], down: resetText },
+			wisdom: { keys: ['KeyN'], down: nextWisdom }
 		});
+
 		gameView.add(reset);
 	}
 
