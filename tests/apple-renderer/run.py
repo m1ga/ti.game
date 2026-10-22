@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the XCTest project outside the checkout and run native GPU tests.
 Requires Xcode, xcodegen and an installed simulator. Override --destination as needed.
-The test deployment target is separate from the module's declared iOS 12 minimum.
+The test deployment target must meet the module's iOS 15 minimum.
 """
 import argparse
 from pathlib import Path

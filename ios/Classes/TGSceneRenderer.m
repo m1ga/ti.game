@@ -117,7 +117,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	pass.colorAttachments[0].storeAction = MTLStoreActionStore;
 	pass.colorAttachments[0].clearColor = MTLClearColorMake(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
 	id<MTLRenderCommandEncoder> encoder = [command renderCommandEncoderWithDescriptor:pass];
-	if (!encoder) { [self resetClock]; return NO; }
+	if (!encoder) return NO;
 	[_batch beginFrameWithEncoder:encoder slot:slot];
 	float dt = (_lastFrameTime == 0) ? 0.0f : (float)(frameTime - _lastFrameTime);
 	_lastFrameTime = frameTime;

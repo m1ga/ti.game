@@ -31,6 +31,22 @@
 }
 @end
 
+// A blocked decoder lets lifecycle/query calls race a real in-flight load.
+@interface BlockingImageLoader : ImageLoader
+@property dispatch_semaphore_t entered, proceed;
+@end
+@implementation BlockingImageLoader
+- (UIImage *)loadSpriteSheet:(TGSpriteSheet *)sheet
+{
+ UIImage *image = [super loadSpriteSheet:sheet];
+ if (self.loads == 1) {
+  dispatch_semaphore_signal(self.entered);
+  dispatch_semaphore_wait(self.proceed, DISPATCH_TIME_FOREVER);
+ }
+ return image;
+}
+@end
+
 @interface CountingRenderer : TGSceneRenderer
 {
   @public
@@ -611,6 +627,68 @@ static void *NativeIvar(id object, const char *name)
 	tick.duration = 1.0 / 60;
 	return tick;
 }
+- (void)testBackpressurePreservesClockAndClampedRecovery
+{
+ for (NSNumber *busy in @[@NO, @YES]) {
+  TGScene *scene = [TGScene new];
+  TGSceneRenderer *renderer = [[TGSceneRenderer alloc] initWithScene:scene viewProxy:nil];
+  [renderer surfaceCreated];
+  EmptyDrawableView *view = [self scheduledView:renderer];
+  id<MTLCommandBuffer> first = [_queue commandBuffer];
+  XCTAssertTrue([renderer drawFrame:1 commandBuffer:first target:_target slot:0]);
+  [first commit]; [first waitUntilCompleted];
+  dispatch_semaphore_t __unsafe_unretained *slots =
+   (dispatch_semaphore_t __unsafe_unretained *)NativeIvar(view, "_slots");
+  if (busy.boolValue) dispatch_semaphore_wait(slots[0], DISPATCH_TIME_NOW);
+  [view tick:(CADisplayLink *)[self tickAt:1.05]];
+  if (busy.boolValue) dispatch_semaphore_signal(slots[0]);
+  XCTAssertFalse(*(BOOL *)NativeIvar(view, "_clockStale"), @"GPU/drawable pressure is not suspension");
+  XCTAssertEqual(*(CFTimeInterval *)NativeIvar(renderer, "_lastFrameTime"), 1);
+  // Resume through the production renderer; elapsed time is retained and capped.
+  id<MTLCommandBuffer> recovered = [_queue commandBuffer];
+  XCTAssertTrue([renderer drawFrame:1.25 commandBuffer:recovered target:_target slot:1]);
+  [recovered commit]; [recovered waitUntilCompleted];
+  XCTAssertEqualWithAccuracy(*(float *)NativeIvar(renderer, "_effectTime"), .1, .0001);
+  [view pauseRendering];
+  [view tick:(CADisplayLink *)[self tickAt:2]];
+  XCTAssertTrue(*(BOOL *)NativeIvar(view, "_clockStale"), @"explicit pause must still reset on resume");
+  [view stopRendering];
+ }
+}
+
+- (void)testDecodeDoesNotBlockQueriesDisposeOrInvalidation
+{
+ for (NSNumber *dispose in @[@NO, @YES]) {
+  BlockingImageLoader *loader = [BlockingImageLoader new];
+  loader.image = [self loader].image;
+  loader.entered = dispatch_semaphore_create(0);
+  loader.proceed = dispatch_semaphore_create(0);
+  TGSpriteSheet *sheet = [[TGSpriteSheet alloc] initWithLoader:loader gridFrameWidth:2 gridFrameHeight:2];
+  dispatch_semaphore_t finished = dispatch_semaphore_create(0), accessed = dispatch_semaphore_create(0);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+   [sheet ensureLoaded:self->_textures];
+   dispatch_semaphore_signal(finished);
+  });
+  XCTAssertEqual(dispatch_semaphore_wait(loader.entered, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC)), 0);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+   (void)[sheet textureResource]; (void)[sheet frameCount];
+   // Another view must not run a duplicate decoder or wait for this load.
+   [sheet ensureLoaded:self->_textures];
+   if (dispose.boolValue) [sheet dispose]; else [sheet invalidateTexture];
+   dispatch_semaphore_signal(accessed);
+  });
+  long accessResult = dispatch_semaphore_wait(accessed, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC));
+  dispatch_semaphore_signal(loader.proceed); // Always release the worker, including failed assertions.
+  XCTAssertEqual(accessResult, 0, @"metadata/lifecycle access must not wait for decode");
+  XCTAssertEqual(dispatch_semaphore_wait(finished, dispatch_time(DISPATCH_TIME_NOW, 2*NSEC_PER_SEC)), 0);
+  if (accessResult != 0) dispatch_semaphore_wait(accessed, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC));
+  XCTAssertNil([sheet textureResource], @"an invalidated or disposed load must not publish");
+  XCTAssertEqual(loader.loads, 1);
+  XCTAssertEqual([sheet ensureLoaded:_textures], !dispose.boolValue);
+  XCTAssertEqual(loader.loads, dispose.boolValue ? 1 : 2);
+ }
+}
+
 - (void)testGpuSlotPressureRemainsVisibleInDroppedFrameCount
 {
 	TGScene *scene = [TGScene new];

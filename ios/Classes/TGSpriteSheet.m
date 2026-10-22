@@ -12,6 +12,8 @@
 	atomic_uintptr_t _publishedFrames;
 	atomic_size_t _publishedFrameCount;
 	TGMetalTexture *_textureResource;
+	BOOL _loading;
+	NSUInteger _loadGeneration;
 	atomic_bool _loadFailed;
 	atomic_bool _disposed;
 }
@@ -93,26 +95,48 @@
 
 - (BOOL)ensureLoaded:(TGTextureManager *)textures
 {
+	NSUInteger generation;
+	id<TGSpriteSheetLoader> loader;
+	BOOL smoothing, repeat;
 	@synchronized (self) {
-		if (_textureResource != nil || atomic_load(&_loadFailed) || atomic_load(&_disposed)) return NO;
-		id<TGSpriteSheetLoader> loader = _loader;
+		if (_loading || _textureResource != nil || atomic_load(&_loadFailed) || atomic_load(&_disposed)) return NO;
+		_loading = YES;
+		generation = _loadGeneration;
+		loader = _loader;
+		smoothing = self.smoothing;
+		repeat = self.repeat;
+	}
+	@try {
+		// Decode/upload can be expensive. Never hold the metadata/lifecycle lock here.
 		UIImage *image = loader ? [loader loadSpriteSheet:self] : nil;
-		if (!image.CGImage) { atomic_store(&_loadFailed, true); return NO; }
-		if ([self frameCount] == 0 && _gridFrameWidth > 0 && _gridFrameHeight > 0) {
-			[self setFrameData:[TGSpriteSheet buildGridFramesWithImageWidth:(int)CGImageGetWidth(image.CGImage)
-				imageHeight:(int)CGImageGetHeight(image.CGImage) frameWidth:_gridFrameWidth frameHeight:_gridFrameHeight inset:self.smoothing]];
+		if (!image.CGImage) {
+			@synchronized (self) {
+				if (generation == _loadGeneration && !atomic_load(&_disposed)) atomic_store(&_loadFailed, true);
+			}
+			return NO;
 		}
-		TGMetalTexture *resource = [textures upload:image smoothing:self.smoothing repeat:self.repeat];
-		// A reentrant loader may have unloaded the sheet while decoding.
-		if (atomic_load(&_disposed)) return NO;
-		_textureResource = resource;
-		return resource != nil;
+		NSData *frames = nil;
+		if ([self frameCount] == 0 && _gridFrameWidth > 0 && _gridFrameHeight > 0) {
+			frames = [TGSpriteSheet buildGridFramesWithImageWidth:(int)CGImageGetWidth(image.CGImage)
+				imageHeight:(int)CGImageGetHeight(image.CGImage) frameWidth:_gridFrameWidth frameHeight:_gridFrameHeight inset:smoothing];
+		}
+		TGMetalTexture *resource = [textures upload:image smoothing:smoothing repeat:repeat];
+		@synchronized (self) {
+			// Unload/invalidation wins over an in-flight load, including reentrant loaders.
+			if (atomic_load(&_disposed) || generation != _loadGeneration) return NO;
+			if (frames && [self frameCount] == 0) [self setFrameData:frames];
+			_textureResource = resource;
+			return resource != nil;
+		}
+	}
+	@finally {
+		@synchronized (self) { _loading = NO; }
 	}
 }
 
 - (void)invalidateTexture
 {
-	@synchronized (self) { _textureResource = nil; atomic_store(&_loadFailed, false); }
+	@synchronized (self) { _loadGeneration++; _textureResource = nil; atomic_store(&_loadFailed, false); }
 }
 
 - (void)dispose

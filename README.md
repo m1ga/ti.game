@@ -1479,6 +1479,6 @@ ti build -p ios --build-only       # package iOS, simulator and Catalyst variant
 ```
 
 
-The Apple backend preserves the JavaScript API, premultiplied colors, filtering, native scene update and draw order. It compiles its embedded Metal shaders once per device, so consuming applications do not need a `default.metallib`. No Apple OpenGL ES backend or public backend selector is included. `ios/README.md` documents builds, native GPU tests and the distinction between the declared iOS 12 minimum and the current toolchain’s validation limits.
+The Apple backend preserves the JavaScript API, premultiplied colors, filtering, native scene update and draw order. It compiles its embedded Metal shaders once per device, so consuming applications do not need a `default.metallib`. No Apple OpenGL ES backend or public backend selector is included. `ios/README.md` documents builds, native GPU tests and the iOS 15 minimum required by Titanium 13.4.
 
 On Metal, `averagePresentMs` is CPU time spent acquiring a drawable and submitting presentation, not GPU execution time. `presentFailures` counts missing drawables and reported command errors; command submission alone does not confirm that a frame reached the display.

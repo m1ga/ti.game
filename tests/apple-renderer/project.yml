@@ -1,7 +1,7 @@
 name: RendererTests
 options:
   deploymentTarget:
-    iOS: '12.0'
+    iOS: '15.0'
 settings:
   base:
     CLANG_ENABLE_OBJC_ARC: YES

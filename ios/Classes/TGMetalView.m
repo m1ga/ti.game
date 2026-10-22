@@ -233,9 +233,8 @@
 	dispatch_semaphore_t slot = _slots[_nextSlot];
 	if (dispatch_semaphore_wait(slot, DISPATCH_TIME_NOW) != 0)
 	{
-		// Freeze simulation, but keep the last measured timestamp so the next
-		// sample includes display intervals missed under GPU backpressure.
-		_clockStale = YES;
+		// Drop this render opportunity, retaining simulation and telemetry clocks.
+		// The next successful frame includes the elapsed interval (capped at 0.1s).
 		return;
 	}
 	@autoreleasepool
@@ -288,8 +287,9 @@
 		else
 		{
 			dispatch_semaphore_signal(slot);
-			_clockStale = YES;
-			[_renderer resetClock];
+			// Missing drawables are frame drops, not application suspension.
+			if (!atomic_load(&_running) || atomic_load(&_paused) || !atomic_load(&_appActive))
+				_clockStale = YES;
 		}
 		unsigned failures = atomic_exchange(&_completion->failures, 0);
 		if (measuring)
