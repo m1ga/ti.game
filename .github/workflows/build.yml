@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
 
       - uses: actions/setup-java@v5
         with:
@@ -34,7 +34,7 @@ jobs:
         working-directory: android
         run: ti build -p android --build-only --sdk ${{ env.TITANIUM_SDK }}
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: ti.game-android
           path: android/dist/*.zip
@@ -48,7 +48,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install Titanium CLI and SDK
         run: |
@@ -63,7 +63,7 @@ jobs:
           CONFIG
           XCODE_XCCONFIG_FILE="$RUNNER_TEMP/ti-game-sdk.xcconfig" ti build -p ios --build-only --sdk ${{ env.TITANIUM_SDK }}
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: ti.game-ios
           path: ios/dist/*.zip
