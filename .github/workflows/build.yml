@@ -1,0 +1,70 @@
+name: Build modules
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  TITANIUM_SDK: 13.4.1.GA
+
+jobs:
+  android:
+    name: Android module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Titanium CLI and SDK
+        run: |
+          npm install -g titanium
+          ti sdk install ${{ env.TITANIUM_SDK }} --force
+          ti config android.sdkPath "$ANDROID_SDK_ROOT"
+
+      - name: Build Android module
+        working-directory: android
+        run: ti build -p android --build-only --sdk ${{ env.TITANIUM_SDK }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ti.game-android
+          path: android/dist/*.zip
+          if-no-files-found: error
+
+  ios:
+    name: iOS module
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Titanium CLI and SDK
+        run: |
+          npm install -g titanium
+          ti sdk install ${{ env.TITANIUM_SDK }} --force
+
+      - name: Build iOS module
+        working-directory: ios
+        run: |
+          cat > "$RUNNER_TEMP/ti-game-sdk.xcconfig" <<CONFIG
+          TITANIUM_SDK_VERSION = ${{ env.TITANIUM_SDK }}
+          CONFIG
+          XCODE_XCCONFIG_FILE="$RUNNER_TEMP/ti-game-sdk.xcconfig" ti build -p ios --build-only --sdk ${{ env.TITANIUM_SDK }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ti.game-ios
+          path: ios/dist/*.zip
+          if-no-files-found: error
