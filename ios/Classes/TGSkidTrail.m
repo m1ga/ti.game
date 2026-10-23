@@ -49,7 +49,7 @@ static const float kMinAlpha = 0.02f;
 	}
 }
 
-- (void)draw:(TGSpriteBatch *)batch whiteTexture:(GLuint)whiteTexture
+- (void)draw:(TGSpriteBatch *)batch whiteTexture:(TGMetalTexture *)whiteTexture
 {
 	int start = (_head - _count + kMaxSegments) % kMaxSegments;
 	for (int k = 0; k < _count; k++) {

@@ -3,7 +3,7 @@
 //
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import <OpenGLES/ES2/gl.h>
+#import "TGMetalContext.h"
 
 @class TGSpriteSheet;
 @class TGTextureManager;
@@ -22,16 +22,15 @@ typedef struct {
 /**
  * Native sprite sheet: one texture plus a frame table of UV rects. Built
  * either from a simple grid (frameWidth/frameHeight) or a TexturePacker-style
- * JSON atlas. The image is decoded lazily and uploaded to GL on first use
+ * JSON atlas. The image is decoded lazily and uploaded to Metal on first use
  * by the render loop.
  */
 @interface TGSpriteSheet : NSObject
 
-/** NO = GL_NEAREST filtering — crisp pixels for pixel-art sheets. */
+/** NO = nearest filtering — crisp pixels for pixel-art sheets. */
 @property (atomic, assign) BOOL smoothing;
 
-/** YES = GL_REPEAT wrap so sprites with tileRepeat tile the texture.
- *  ES 2.0 requires power-of-two texture dimensions for this. */
+/** YES = repeat addressing so sprites with tileRepeat tile the texture. */
 @property (atomic, assign) BOOL repeat;
 
 // Grid parameters; 0 means "atlas sheet", frames come from JSON
@@ -49,7 +48,7 @@ typedef struct {
 - (float)frameWidth:(NSInteger)index;
 - (float)frameHeight:(NSInteger)index;
 
-- (GLint)textureId;
+- (TGMetalTexture *)textureResource;
 - (BOOL)isReady;
 
 /**
@@ -59,13 +58,13 @@ typedef struct {
 /** Returns YES when this call uploaded a texture (the caller tracks it). */
 - (BOOL)ensureLoaded:(TGTextureManager *)textures;
 
-/** Drops the GL texture reference after context loss so it reloads. */
+/** Drops the native texture reference; disposed sheets cannot reload. */
 - (void)invalidateTexture;
 
 /**
- * Marks the sheet for texture deletion on the next rendered frame
- * (TGTextureManager deleteDisposed) and blocks any re-upload. Sprites
- * still referencing the sheet simply stop drawing.
+ * Drops the sheet’s strong texture reference immediately and blocks re-upload.
+ * Encoded commands retain their GPU resources until completion; sprites
+ * still referencing the disposed sheet stop drawing.
  */
 - (void)dispose;
 - (BOOL)isDisposed;

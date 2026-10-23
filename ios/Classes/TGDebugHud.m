@@ -83,7 +83,7 @@ static const float kMargin = 8.0f;
 }
 
 - (void)draw:(TGSpriteBatch *)batch
-	 texture:(GLuint)whiteTexture
+	 texture:(TGMetalTexture *)whiteTexture
 		font:(TGBitmapFont *)hudFont
 surfaceWidth:(float)surfaceWidth
 surfaceHeight:(float)surfaceHeight
@@ -187,7 +187,7 @@ static void drawText(TGSpriteBatch *batch, TGBitmapFont *font, NSString *text,
 					 float x, float y, int scale,
 					 float r, float g, float b, float a)
 {
-	GLuint texture = (GLuint)[font.sheet textureId];
+	TGMetalTexture *texture = [font.sheet textureResource];
 	float pen = x;
 	for (NSUInteger i = 0; i < text.length; i++) {
 		unichar c = [text characterAtIndex:i];

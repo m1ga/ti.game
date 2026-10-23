@@ -1,6 +1,2 @@
-// Place any custom compiler settings for your module here
-
-// The engine renders with OpenGL ES 2.0 (deprecated but supported on iOS);
-// silence the deprecation wall and link the required frameworks.
-GCC_PREPROCESSOR_DEFINITIONS = $(inherited) GLES_SILENCE_DEPRECATION=1
-OTHER_LDFLAGS = $(inherited) -framework OpenGLES -framework QuartzCore -framework AVFoundation -framework GameController
+// Native Apple renderer; Android continues to use OpenGL ES.
+OTHER_LDFLAGS = $(inherited) -framework Metal -framework QuartzCore -framework AVFoundation -framework GameController

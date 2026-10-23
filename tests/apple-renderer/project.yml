@@ -1,0 +1,71 @@
+name: RendererTests
+options:
+  deploymentTarget:
+    iOS: '15.0'
+settings:
+  base:
+    CLANG_ENABLE_OBJC_ARC: YES
+    SUPPORTS_MACCATALYST: YES
+    CODE_SIGNING_ALLOWED: NO
+    GENERATE_INFOPLIST_FILE: YES
+    HEADER_SEARCH_PATHS: "$(SRCROOT)/../../ios/Classes $(SRCROOT)/include"
+    PRODUCT_BUNDLE_IDENTIFIER: mx.codigomovil.tigame.renderertests
+    TARGETED_DEVICE_FAMILY: '1,2'
+targets:
+  RendererHost:
+    type: application
+    platform: iOS
+    sources:
+      - path: Host.m
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: mx.codigomovil.tigame.rendererhost
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: $(SRCROOT)/Host-Info.plist
+    dependencies:
+      - sdk: UIKit.framework
+  RendererTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: RendererTests.m
+      - path: ../../ios/Classes
+        includes:
+          - TGScene.m
+          - TGSceneRenderer.m
+          - TGDefaultFont.m
+          - TGFrameStats.m
+          - TGDebugHud.m
+          - TGMetalView.m
+          - TGTouchController.m
+          - TGParticleEmitter.m
+          - TGRope.m
+          - TGTileLayer.m
+          - TGPathfinder.m
+          - TGMetalContext.m
+          - TGSpriteBatch.m
+          - TGSpriteSheet.m
+          - TGTextureManager.m
+          - TGSprite.m
+          - TGTextSprite.m
+          - TGBitmapFont.m
+          - TGAnimation.m
+          - TGPath.m
+          - TGTween.m
+          - TGEasing.m
+          - TGSkidTrail.m
+          - TGScreenOverlay.m
+          - TGPostEffect.m
+    dependencies:
+      - target: RendererHost
+      - sdk: UIKit.framework
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
+schemes:
+  RendererTests:
+    build:
+      targets:
+        RendererTests: all
+    test:
+      targets:
+        - RendererTests

@@ -13,7 +13,7 @@
 #import "TGSpriteSheet.h"
 #import "TGTextureManager.h"
 #import "TGTileLayer.h"
-#import <OpenGLES/ES2/gl.h>
+
 #import <QuartzCore/QuartzCore.h>
 #import <TitaniumKit/TitaniumKit.h>
 #import <math.h>
@@ -56,9 +56,11 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	if (self = [super init]) {
 		_scene = scene;
 		_viewProxy = viewProxy;
-		_batch = [[TGSpriteBatch alloc] init];
-		_textures = [[TGTextureManager alloc] init];
-		_postEffect = [[TGPostEffect alloc] init];
+		TGMetalContext *context = [TGMetalContext sharedContext];
+		if (!context) return nil;
+		_batch = [[TGSpriteBatch alloc] initWithContext:context];
+		_textures = [[TGTextureManager alloc] initWithContext:context];
+		_postEffect = [[TGPostEffect alloc] initWithContext:context];
 		_overlay = [[TGScreenOverlay alloc] init];
 		_stats = scene.stats;
 		_preparedSheets = [NSMutableSet set];
@@ -74,10 +76,6 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 
 - (void)surfaceCreated
 {
-	// A new context means every texture and shader is gone
-	[_textures invalidateAll];
-	[_batch createGLResources];
-	[_postEffect createGLResources];
 	_lastFrameTime = 0;
 	[_stats reset];
 }
@@ -88,7 +86,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	_surfaceHeight = height;
 	_scene.worldWidth = width;
 	_scene.worldHeight = height;
-	glViewport(0, 0, width, height);
+
 	orthoM(_projection, 0.0f, width, height, 0.0f, -1.0f, 1.0f);
 	[_overlay surfaceChangedWithWidth:width height:height];
 
@@ -108,8 +106,19 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	_lastFrameTime = 0;
 }
 
-- (void)drawFrame:(CFTimeInterval)frameTime
+- (BOOL)drawFrame:(CFTimeInterval)frameTime commandBuffer:(id<MTLCommandBuffer>)command
+           target:(id<MTLTexture>)target slot:(NSUInteger)slot
 {
+	int effectMode = _scene.cameraEffect;
+	BOOL effectActive = effectMode != TGPostEffectNone && [_postEffect beginWithWidth:_surfaceWidth height:_surfaceHeight];
+	MTLRenderPassDescriptor *pass = [MTLRenderPassDescriptor renderPassDescriptor];
+	pass.colorAttachments[0].texture = effectActive ? _postEffect.target : target;
+	pass.colorAttachments[0].loadAction = MTLLoadActionClear;
+	pass.colorAttachments[0].storeAction = MTLStoreActionStore;
+	pass.colorAttachments[0].clearColor = MTLClearColorMake(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
+	id<MTLRenderCommandEncoder> encoder = [command renderCommandEncoderWithDescriptor:pass];
+	if (!encoder) return NO;
+	[_batch beginFrameWithEncoder:encoder slot:slot];
 	float dt = (_lastFrameTime == 0) ? 0.0f : (float)(frameTime - _lastFrameTime);
 	_lastFrameTime = frameTime;
 	// Clamp so a paused/debugged app doesn't fast-forward animations
@@ -139,12 +148,6 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	// shader uses, so the wrap itself is invisible.
 	_effectTime = fmodf(_effectTime + dt, 60.0f);
 
-	// Camera effect: render the whole scene into an offscreen texture,
-	// then draw it to the screen through the effect shader at the end
-	int effectMode = _scene.cameraEffect;
-	BOOL effectActive = (effectMode != TGPostEffectNone)
-		&& [_postEffect beginWithWidth:_surfaceWidth height:_surfaceHeight];
-
 	// Projection follows the camera (position, zoom, shake) — sprites
 	// live in world coordinates
 	float scale = MAX(0.0001f, _scene.cameraScale);
@@ -157,8 +160,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	orthoM(_projection, left, right, bottom, top, -1.0f, 1.0f);
 	orthoM(_screenProjection, 0.0f, _surfaceWidth, _surfaceHeight, 0.0f, -1.0f, 1.0f);
 
-	glClearColor(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
-	glClear(GL_COLOR_BUFFER_BIT);
+
 
 	// Sheets unloaded from JS free their texture here, on the render thread
 	[_textures deleteDisposed];
@@ -268,9 +270,15 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	}
 
 	if (effectActive) {
+		[encoder endEncoding];
+		pass.colorAttachments[0].texture = target;
+		pass.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+		encoder = [command renderCommandEncoderWithDescriptor:pass];
+		if (!encoder) { [_batch setRenderEncoder:nil]; return NO; }
+		[_batch setRenderEncoder:encoder];
 		[_postEffect finish:effectMode
 					  tintR:_scene.effectTintR tintG:_scene.effectTintG tintB:_scene.effectTintB
-				  intensity:_scene.effectIntensity time:_effectTime];
+				  intensity:_scene.effectIntensity time:_effectTime encoder:encoder];
 	}
 
 	// Screen-space pass, last of all: drawn any earlier, the glitch shader
@@ -294,17 +302,22 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		screenScale:self.screenScale];
 		[_batch end];
 	}
+	[encoder endEncoding];
+	[_batch setRenderEncoder:nil];
+	return YES;
 }
 
 - (void)recordFrameCpuMs:(double)cpuMs
 			   presentMs:(double)presentMs
 			   presented:(BOOL)presented
+	 commandFailures:(NSUInteger)commandFailures
 				interval:(CFTimeInterval)interval
 				  target:(CFTimeInterval)target
 {
 	CFTimeInterval now = CACurrentMediaTime();
 	[_stats addFrameCpuMs:cpuMs presentMs:presentMs presented:presented
 					  now:now interval:interval target:target];
+	[_stats addCommandFailures:commandFailures];
 	if ([_stats windowClosed:now]) {
 		TGFrameStatsSnapshot snapshot = [_stats closeWindow:now];
 		[_scene.hud update:snapshot];
@@ -349,8 +362,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	[_preparedSheets addObject:sheet];
 	if (![sheet isReady]) {
 		// Tracked as soon as a texture exists — a sheet that uploaded but
-		// ended with zero frames (broken atlas) must still be deleted on
-		// unload and invalidated on context loss
+		// ended with zero frames (broken atlas) must still be tracked for
+		// manager cleanup
 		if ([sheet ensureLoaded:_textures]) {
 			[_textures track:sheet];
 		}
@@ -374,7 +387,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 - (void)drawDebugOverlay:(TGSprite *)s
 {
 	[_batch setScreenSpace:s.screenFixed]; // overlay in the sprite's own space
-	GLuint white = [_textures whiteTexture];
+	TGMetalTexture *white = [_textures whiteTexture];
 	float t = 1.5f; // half line thickness
 	// Parallax sprites render shifted — shift the overlay with the art
 	float ox = [_batch parallaxX:s] - s.x;
