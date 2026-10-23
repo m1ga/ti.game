@@ -2,7 +2,12 @@ package ti.game;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.opengl.GLSurfaceView;
+import android.os.Bundle;
+import android.view.Display;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 
@@ -10,6 +15,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import org.appcelerator.kroll.KrollDict;
+import org.appcelerator.kroll.KrollProxy;
 import org.appcelerator.kroll.common.TiMessenger;
 import org.appcelerator.titanium.TiApplication;
 import org.appcelerator.titanium.TiBaseActivity;
@@ -19,9 +25,12 @@ import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.TiConvert;
 import org.appcelerator.titanium.view.TiUIView;
 
+import ti.game.engine.CanvasInput;
 import ti.game.engine.GamepadController;
+import ti.game.engine.InputResolver;
 import ti.game.engine.Scene;
 import ti.game.engine.SceneRenderer;
+import ti.game.engine.SoundEngine;
 import ti.game.engine.TouchController;
 
 /**
@@ -36,8 +45,8 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	private static final ArrayList<WeakReference<TiGameView>> activeViews = new ArrayList<>();
 
 	private final GLSurfaceView glView;
-	private final ti.game.engine.InputResolver input;
-	private final ti.game.engine.CanvasInput canvasInput;
+	private final InputResolver input;
+	private final CanvasInput canvasInput;
 	private final SceneRenderer renderer;
 	private final Scene scene;
 	private final TouchController touchController;
@@ -98,28 +107,48 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		this.scene = scene;
 
 		Activity activity = proxy.getActivity();
-		input = ((GameViewProxy)proxy).getInputResolver();
-		canvasInput = new ti.game.engine.CanvasInput(input,proxy);
+		input = ((GameViewProxy) proxy).getInputResolver();
+		canvasInput = new CanvasInput(input, proxy);
 		glView = new GLSurfaceView(activity) {
-			@Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
-				if (canvasInput.mouse(event)) return true;
+			// Mouse buttons bound in the active context are consumed here,
+			// before the TouchController (set as OnTouchListener) sees them
+			@Override
+			public boolean dispatchTouchEvent(MotionEvent event)
+			{
+				if (canvasInput.mouse(event)) {
+					return true;
+				}
 				return super.dispatchTouchEvent(event);
 			}
-			@Override public boolean onGenericMotionEvent(android.view.MotionEvent event) {
+
+			@Override
+			public boolean onGenericMotionEvent(MotionEvent event)
+			{
 				return canvasInput.mouse(event) || super.onGenericMotionEvent(event);
 			}
-			@Override protected void onFocusChanged(boolean focused, int direction, android.graphics.Rect rect) {
-				super.onFocusChanged(focused,direction,rect);
-				if (!focused) input.releaseAll();
+
+			// key-up events are lost once focus moves — release held actions
+			@Override
+			protected void onFocusChanged(boolean focused, int direction, Rect previouslyFocusedRect)
+			{
+				super.onFocusChanged(focused, direction, previouslyFocusedRect);
+				if (!focused) {
+					input.releaseAll();
+				}
 			}
-			@Override public void onWindowFocusChanged(boolean focused) {
+
+			@Override
+			public void onWindowFocusChanged(boolean focused)
+			{
 				super.onWindowFocusChanged(focused);
-				if (!focused) input.releaseAll();
+				if (!focused) {
+					input.releaseAll();
+				}
 			}
 		};
 		glView.setFocusable(true);
 		glView.setFocusableInTouchMode(true);
-		glView.setOnKeyListener((view,code,event) -> canvasInput.key(event));
+		glView.setOnKeyListener((view, code, event) -> canvasInput.key(event));
 		glView.setEGLContextClientVersion(2);
 		glView.setEGLConfigChooser(8, 8, 8, 8, 0, 0);
 		glView.setPreserveEGLContextOnPause(true);
@@ -145,7 +174,13 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		registerActiveView(this);
 	}
 
-	public void focusInput() { if (!renderingShutdown) glView.requestFocus(); }
+	/** UI thread. Gives the canvas keyboard focus so key events reach it. */
+	public void focusInput()
+	{
+		if (!renderingShutdown) {
+			glView.requestFocus();
+		}
+	}
 
 	public SceneRenderer getRenderer()
 	{
@@ -223,7 +258,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	// standard Titanium touch/click events are not supported on this view —
 	// use the sprite events (press/tap/drag.../pinch/rotate) instead.
 	@Override
-	protected void registerForTouch(final android.view.View touchable)
+	protected void registerForTouch(final View touchable)
 	{
 		if (touchable != null) {
 			touchable.setOnTouchListener(touchController);
@@ -231,7 +266,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	}
 
 	@Override
-	protected void registerTouchEvents(final android.view.View touchable)
+	protected void registerTouchEvents(final View touchable)
 	{
 		if (touchable != null) {
 			touchable.setOnTouchListener(touchController);
@@ -251,7 +286,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	}
 
 	@Override
-	public void propertyChanged(String key, Object oldValue, Object newValue, org.appcelerator.kroll.KrollProxy proxy)
+	public void propertyChanged(String key, Object oldValue, Object newValue, KrollProxy proxy)
 	{
 		if (TiC.PROPERTY_BACKGROUND_COLOR.equals(key)) {
 			applyBackgroundColor(TiConvert.toString(newValue));
@@ -293,7 +328,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	// --- TiLifecycle.OnLifecycleEvent ------------------------------------
 
 	@Override
-	public void onCreate(Activity activity, android.os.Bundle savedInstanceState)
+	public void onCreate(Activity activity, Bundle savedInstanceState)
 	{
 	}
 
@@ -303,7 +338,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		if (!renderingShutdown) {
 			glView.onResume();
 			updateDisplayRefreshRate();
-			ti.game.engine.SoundEngine.notifyActivityResumed();
+			SoundEngine.notifyActivityResumed();
 		}
 	}
 
@@ -312,7 +347,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	 *  pushed into the renderer instead of pulled from the GL thread. */
 	private void updateDisplayRefreshRate()
 	{
-		android.view.Display display = glView.getDisplay();
+		Display display = glView.getDisplay();
 		if (display != null) {
 			renderer.setDisplayRefreshRate(display.getRefreshRate());
 		}
@@ -323,7 +358,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	{
 		if (!renderingShutdown) {
 			glView.onPause();
-			ti.game.engine.SoundEngine.notifyActivityPaused();
+			SoundEngine.notifyActivityPaused();
 			// key-up events are lost while in the background — don't leave
 			// a direction held down in JS
 			input.releaseAll();

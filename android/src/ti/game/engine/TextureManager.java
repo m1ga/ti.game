@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.opengl.GLES20;
 import android.opengl.GLUtils;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +27,7 @@ public class TextureManager
 			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ids[0]);
 			GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
 			GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
-			java.nio.ByteBuffer pixel = java.nio.ByteBuffer.allocateDirect(4);
+			ByteBuffer pixel = ByteBuffer.allocateDirect(4);
 			pixel.put(new byte[] { (byte) 255, (byte) 255, (byte) 255, (byte) 255 }).position(0);
 			GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, 1, 1, 0,
 				GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, pixel);

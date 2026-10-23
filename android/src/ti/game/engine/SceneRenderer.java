@@ -9,6 +9,9 @@ import java.util.List;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
+import org.appcelerator.kroll.KrollDict;
+import org.appcelerator.kroll.KrollProxy;
+
 /**
  * The native game loop. Runs on the GLSurfaceView's render thread in
  * continuous mode: computes delta time, ticks the scene (animations,
@@ -20,7 +23,7 @@ import javax.microedition.khronos.opengles.GL10;
 public class SceneRenderer implements GLSurfaceView.Renderer
 {
 	private final Scene scene;
-	private final org.appcelerator.kroll.KrollProxy viewProxy; // fires 'resize', 'performance'
+	private final KrollProxy viewProxy; // fires 'resize', 'performance'
 	private final SpriteBatch batch = new SpriteBatch();
 	private final TextureManager textures = new TextureManager();
 	private final PostEffect postEffect = new PostEffect();
@@ -38,7 +41,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	private volatile float displayRefreshRate = 0f; // 0 = unknown, assume 60
 	private volatile float screenScale = 1f; // display density: HUD sizing
 
-	public SceneRenderer(Scene scene, org.appcelerator.kroll.KrollProxy viewProxy)
+	public SceneRenderer(Scene scene, KrollProxy viewProxy)
 	{
 		this.scene = scene;
 		this.viewProxy = viewProxy;
@@ -102,7 +105,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		// The real scene coordinate space — build/relayout levels on this,
 		// not on the display size (which includes system bars)
 		if (viewProxy != null && viewProxy.hasListeners("resize")) {
-			org.appcelerator.kroll.KrollDict data = new org.appcelerator.kroll.KrollDict();
+			KrollDict data = new KrollDict();
 			data.put("width", width);
 			data.put("height", height);
 			viewProxy.fireEvent("resize", data);
@@ -343,7 +346,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		if (viewProxy == null || !viewProxy.hasListeners("performance")) {
 			return;
 		}
-		org.appcelerator.kroll.KrollDict data = new org.appcelerator.kroll.KrollDict();
+		KrollDict data = new KrollDict();
 		data.put("fps", s.fps);
 		data.put("averageCpuMs", s.averageCpuMs);
 		data.put("p95CpuMs", s.p95CpuMs);

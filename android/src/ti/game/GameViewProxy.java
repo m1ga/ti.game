@@ -5,12 +5,15 @@ import android.app.Activity;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.KrollFunction;
+import org.appcelerator.kroll.KrollProxy;
 import org.appcelerator.kroll.annotations.Kroll;
+import org.appcelerator.kroll.common.TiMessenger;
 import org.appcelerator.titanium.proxy.TiViewProxy;
 import org.appcelerator.titanium.util.TiConvert;
 import org.appcelerator.titanium.view.TiUIView;
@@ -37,10 +40,14 @@ import ti.game.engine.Sprite;
 public class GameViewProxy extends TiViewProxy
 	implements Scene.TimerListener
 {
+	// Named actions resolved from keyboard/mouse/gamepad bindings (see
+	// InputResolver). Owned by the proxy so the map survives view recreation.
 	private final InputResolver input = new InputResolver((action, context, down) -> {
 		String event = down ? "actiondown" : "actionup";
 		if (hasListeners(event)) {
-			KrollDict data = new KrollDict(); data.put("action", action); data.put("context", context);
+			KrollDict data = new KrollDict();
+			data.put("action", action);
+			data.put("context", context);
 			fireEvent(event, data);
 		}
 	});
@@ -94,8 +101,12 @@ public class GameViewProxy extends TiViewProxy
 	public void handleCreationDict(KrollDict options)
 	{
 		super.handleCreationDict(options);
-		if (options.containsKey("inputMap")) setInputMap(options.get("inputMap"));
-		if (options.containsKey("inputContext")) setInputContext(options.get("inputContext"));
+		if (options.containsKey("inputMap")) {
+			setInputMap(options.get("inputMap"));
+		}
+		if (options.containsKey("inputContext")) {
+			setInputContext(options.get("inputContext"));
+		}
 		if (options.containsKey("debug")) {
 			applyDebug(options.get("debug"));
 		}
@@ -142,23 +153,47 @@ public class GameViewProxy extends TiViewProxy
 		}
 	}
 
-	public InputResolver getInputResolver() { return input; }
+	// --- Input map (keyboard / mouse / gamepad -> actions) ----------------
+
+	public InputResolver getInputResolver()
+	{
+		return input;
+	}
+
+	/** { context: { action: [ { device, code | button }, ... ] } } */
 	@Kroll.setProperty
-	public void setInputMap(Object value) { input.setMap(value); }
+	public void setInputMap(Object value)
+	{
+		input.setMap(value);
+	}
+
 	@Kroll.getProperty
-	public Object getInputMap() { return input.getMap(); }
+	public Object getInputMap()
+	{
+		return input.getMap();
+	}
+
+	/** Active context name; null disables all actions. */
 	@Kroll.setProperty
 	public void setInputContext(Object value)
 	{
-		if (value != null && !(value instanceof String)) throw new IllegalArgumentException("inputContext must be a string or null");
-		input.setContext((String)value);
+		if (value != null && !(value instanceof String)) {
+			throw new IllegalArgumentException("inputContext must be a string or null");
+		}
+		input.setContext((String) value);
 	}
+
 	@Kroll.getProperty
-	public String getInputContext() { return input.getContext(); }
+	public String getInputContext()
+	{
+		return input.getContext();
+	}
+
+	/** Requests keyboard focus for the canvas (UI thread). */
 	@Kroll.method
 	public void focusInput()
 	{
-		org.appcelerator.kroll.common.TiMessenger.postOnMain(() -> ((TiGameView)getOrCreateView()).focusInput());
+		TiMessenger.postOnMain(() -> ((TiGameView) getOrCreateView()).focusInput());
 	}
 
 	// --- Game controllers -------------------------------------------------
@@ -349,7 +384,7 @@ public class GameViewProxy extends TiViewProxy
 	@Kroll.getProperty
 	public Object getDebug()
 	{
-		org.appcelerator.kroll.KrollDict value = new org.appcelerator.kroll.KrollDict();
+		KrollDict value = new KrollDict();
 		value.put(KEY_HITBOX, scene.debugAll);
 		value.put(KEY_HUD, scene.hud.enabled ? ScreenOverlay.cornerName(scene.hud.corner) : Boolean.FALSE);
 		return value;
@@ -363,8 +398,8 @@ public class GameViewProxy extends TiViewProxy
 
 	private void applyDebug(Object value)
 	{
-		if (value instanceof java.util.Map) {
-			java.util.Map<?, ?> options = (java.util.Map<?, ?>) value;
+		if (value instanceof Map) {
+			Map<?, ?> options = (Map<?, ?>) value;
 			scene.debugAll = TiConvert.toBoolean(options.get(KEY_HITBOX), false);
 			applyHud(options.get(KEY_HUD));
 			Object fontValue = options.get(KEY_HUD_FONT);
@@ -407,7 +442,7 @@ public class GameViewProxy extends TiViewProxy
 	}
 
 	@Override
-	public void eventListenerAdded(String event, int count, org.appcelerator.kroll.KrollProxy proxy)
+	public void eventListenerAdded(String event, int count, KrollProxy proxy)
 	{
 		super.eventListenerAdded(event, count, proxy);
 		if ("performance".equals(event)) {
@@ -417,7 +452,7 @@ public class GameViewProxy extends TiViewProxy
 	}
 
 	@Override
-	public void eventListenerRemoved(String event, int count, org.appcelerator.kroll.KrollProxy proxy)
+	public void eventListenerRemoved(String event, int count, KrollProxy proxy)
 	{
 		super.eventListenerRemoved(event, count, proxy);
 		if ("performance".equals(event)) {

@@ -6,6 +6,7 @@ import android.hardware.input.InputManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.SparseArray;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -237,7 +238,7 @@ public final class GamepadController implements InputManager.InputDeviceListener
 			}
 			pendingX = nx;
 			pendingY = ny;
-			long now = android.os.SystemClock.uptimeMillis();
+			long now = SystemClock.uptimeMillis();
 			long wait = lastEventMs + AXIS_EVENT_INTERVAL_MS - now;
 			// Transitions skip the throttle: leaving rest, returning to rest
 			// and crossing zero are what a game reacts to, and a 50 ms wait
@@ -261,7 +262,7 @@ public final class GamepadController implements InputManager.InputDeviceListener
 			{
 				if (pending) {
 					pending = false;
-					flush(android.os.SystemClock.uptimeMillis());
+					flush(SystemClock.uptimeMillis());
 				}
 			}
 		};
@@ -277,7 +278,7 @@ public final class GamepadController implements InputManager.InputDeviceListener
 			}
 			pendingX = pendingY = 0f;
 			if (x != 0f || y != 0f) {
-				flush(android.os.SystemClock.uptimeMillis());
+				flush(SystemClock.uptimeMillis());
 			}
 		}
 
@@ -514,9 +515,10 @@ public final class GamepadController implements InputManager.InputDeviceListener
 	@Override
 	public void onInputDeviceRemoved(int deviceId)
 	{
+		// a keyboard or mouse can go away too — drop whatever it held
 		if (inputResolver != null) {
-			inputResolver.releaseDevice("keyboard",Integer.toString(deviceId));
-			inputResolver.releaseDevice("mouse",Integer.toString(deviceId));
+			inputResolver.releaseDevice("keyboard", Integer.toString(deviceId));
+			inputResolver.releaseDevice("mouse", Integer.toString(deviceId));
 		}
 		DeviceState state;
 		synchronized (devices) {
@@ -744,11 +746,16 @@ public final class GamepadController implements InputManager.InputDeviceListener
 		}
 	}
 
+	/** Action map fed with every button edge (set by TiGameView). */
+	private InputResolver inputResolver;
+
+	public void setInputResolver(InputResolver resolver)
+	{
+		inputResolver = resolver;
+	}
+
 	/** Central edge detector: a name is reported down once, no matter how
 	 *  many physical controls map onto it (d-pad hat + key + stick). */
-	private InputResolver inputResolver;
-	public void setInputResolver(InputResolver resolver) { inputResolver = resolver; }
-
 	private void setButton(DeviceState state, String name, boolean down, String source, int keyCode)
 	{
 		synchronized (state.pressed) {
@@ -762,7 +769,9 @@ public final class GamepadController implements InputManager.InputDeviceListener
 				state.pressed.remove(name);
 			}
 		}
-		if (inputResolver != null) inputResolver.transition("gamepad", Integer.toString(state.id), name, down);
+		if (inputResolver != null) {
+			inputResolver.transition("gamepad", Integer.toString(state.id), name, down);
+		}
 		String event = down ? "buttondown" : "buttonup";
 		if (viewProxy != null && viewProxy.hasListeners(event)) {
 			KrollDict data = new KrollDict();

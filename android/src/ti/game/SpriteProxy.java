@@ -8,6 +8,7 @@ import org.appcelerator.kroll.annotations.Kroll;
 import org.appcelerator.kroll.common.Log;
 import org.appcelerator.titanium.util.TiConvert;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -1608,8 +1609,8 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 			rotate = TiConvert.toBoolean(options.get("rotate"), false);
 			smoothing = TiConvert.toFloat(options.get("smoothing"), 0f);
 		}
-		sprite.path = Path.build(java.util.Arrays.copyOf(xs, count),
-			java.util.Arrays.copyOf(ys, count), smoothing, loop, rotate, speed);
+		sprite.path = Path.build(Arrays.copyOf(xs, count),
+			Arrays.copyOf(ys, count), smoothing, loop, rotate, speed);
 	}
 
 	// --- Attachment -------------------------------------------------------

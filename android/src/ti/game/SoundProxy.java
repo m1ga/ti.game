@@ -4,6 +4,8 @@ import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 
+import java.io.File;
+
 import org.appcelerator.kroll.KrollDict;
 import org.appcelerator.kroll.KrollProxy;
 import org.appcelerator.kroll.annotations.Kroll;
@@ -93,7 +95,7 @@ public class SoundProxy extends KrollProxy
 				.openFd("Resources/" + resolved.substring("app://".length()));
 		} else {
 			String candidate = stripFileScheme(resolved);
-			if (new java.io.File(candidate).exists()) {
+			if (new File(candidate).exists()) {
 				path = candidate;
 			} else {
 				afd = TiApplication.getInstance().getAssets().openFd("Resources/" + url);

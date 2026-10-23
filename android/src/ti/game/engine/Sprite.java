@@ -1,5 +1,6 @@
 package ti.game.engine;
 
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -7,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appcelerator.kroll.KrollProxy;
@@ -350,8 +352,8 @@ public class Sprite
 	public volatile float idleRotation = 3f;   // degrees of wobble
 	public volatile float idleMovement = 4f;   // px of drift
 	public volatile float idleSpeed = 1f;      // frequency multiplier
-	private static final java.util.concurrent.atomic.AtomicInteger IDLE_SEQ =
-		new java.util.concurrent.atomic.AtomicInteger();
+	private static final AtomicInteger IDLE_SEQ =
+		new AtomicInteger();
 	private final float idlePhase = IDLE_SEQ.getAndIncrement() * 1.7f;
 	private float idleTime = 0f;
 	private float idleAppliedRot = 0f;
@@ -376,7 +378,7 @@ public class Sprite
 	private boolean playing = false;
 	// Chained follow-ups (play(name, { then: ... })): each queued name
 	// auto-plays as the previous non-looping animation finishes.
-	private final java.util.ArrayDeque<String> animationQueue = new java.util.ArrayDeque<>();
+	private final ArrayDeque<String> animationQueue = new ArrayDeque<>();
 
 	// Path following (followPath): a precomputed polyline walked at
 	// constant speed each frame; null = not following. The walk happens in
