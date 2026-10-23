@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Prepare an isolated Classic app that opens/renders/closes all launcher demos.
+"""Prepare an isolated Classic app that opens/renders/closes launcher demos.
+Defaults to mobile demos; --include-input adds the external-input demo for Mac.
 This is a smoke test; it does not certify human interaction or visual equivalence.
 Build/run it with the Titanium CLI from the generated directory.
 """
@@ -14,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output', default='/tmp/asteroids-metal-port/demos')
 p.add_argument('--icon', type=Path, required=True, help='Existing DefaultIcon.png for the diagnostic app')
+p.add_argument('--include-input', action='store_true', help='Include the Mac-only Configurable Input demo')
+p.add_argument('--sdk', default='13.4.1.GA', help='Titanium SDK for the generated app (default: 13.4.1.GA)')
 args = p.parse_args()
 out = Path(args.output).resolve()
 if out == ROOT or ROOT in out.parents:
@@ -27,7 +30,10 @@ with zipfile.ZipFile(ROOT / f'ios/dist/ti.game-iphone-{version}.zip') as archive
     archive.extractall(out)
 launcher = (ROOT / 'example/app.js').read_text()
 names = re.findall(r"title: '[^']+', start: require\('/([^']+)'\)", launcher)
-assert len(names) == 34, 'Review launcher changes before extending the smoke matrix'
+if not args.include_input:
+    names = [name for name in names if name != 'inputmap']
+if not names or len(names) != len(set(names)):
+    p.error('Expected a nonempty launcher with unique demo modules')
 for name in names:
     source = resources / (name + '.js')
     code = source.read_text()
@@ -65,9 +71,12 @@ exports.track=function(win,view,name){
  <guid>79cf594d-7894-458d-8d6b-3a79d060fe76</guid><icon>appicon.png</icon>
  <property name="ti.ui.defaultunit" type="string">dp</property>
  <property name="run-on-main-thread" type="bool">true</property>
- <ios><enable-launch-screen-storyboard>true</enable-launch-screen-storyboard></ios>
+ <ios>
+  <enable-launch-screen-storyboard>true</enable-launch-screen-storyboard>
+  <plist><dict><key>UIApplicationSupportsIndirectInputEvents</key><true/></dict></plist>
+ </ios>
  <modules><module platform="iphone" version="{version}">ti.game</module></modules>
  <deployment-targets><target device="iphone">true</target><target device="ipad">true</target></deployment-targets>
- <sdk-version>14.0.0.fixes</sdk-version>
+ <sdk-version>{args.sdk}</sdk-version>
 </ti:app>''')
 print(out)

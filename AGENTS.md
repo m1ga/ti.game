@@ -13,12 +13,12 @@ docs in the README.
 
 ```bash
 cd android
-ti build -p android --build-only --sdk 13.3.1.GA   # compiles Java + packages android/dist/ti.game-android-<version>.zip
-ti build -p android --sdk 13.3.1.GA                # runs example/app.js as a test app (needs device/emulator)
+ti build -p android --build-only --sdk 13.4.1.GA   # compiles Java + packages android/dist/ti.game-android-<version>.zip
+ti build -p android --sdk 13.4.1.GA                # runs example/app.js as a test app (needs device/emulator)
 ```
 
-Always pass `--sdk 13.3.1.GA` when building the Android module 
-to make it compatible with older Titanium versions.
+Build both modules with Titanium SDK `13.4.1.GA`. The package manifests declare
+`minsdk: 13.4.0`; compiling with an older SDK does not lower that requirement.
 
 There are no unit tests; a successful `--build-only` build is the minimum
 verification for any Java change. `android/build/` and `android/dist/` are

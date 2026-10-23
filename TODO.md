@@ -2,6 +2,7 @@
 
 Planned engine features, in priority order. The same rule applies throughout:
 JS describes and reacts; the engine runs each frame without bridge traffic.
+The current implemented API is documented in [README.md](README.md).
 
 ## 1. Camera completion
 
@@ -29,14 +30,19 @@ JS describes and reacts; the engine runs each frame without bridge traffic.
 
 ## 4. Font rendering
 
-- [ ] The built-in font and `tools/genfont.py` are both hardcoded to
-      ASCII 32..126, so no accents and no `ñ` — a missing glyph advances
-      the pen and draws nothing. Spanish needs 18 more characters
-      (~+0.5 KB in the embedded atlas); a `--charset` flag on the
-      generator covers everyone else.
+- [x] The built-in pixel font includes accented Spanish, German, Dutch and
+      selected French characters. `tools/build_default_font.py` rebuilds the
+      embedded atlas; [Font](README.md#font) lists the exact character set.
+- [ ] Add configurable character sets to `tools/genfont.py`, whose custom
+      font output still defaults to ASCII 32..126. Broader scripts and
+      combining-mark layout remain outside the built-in font's coverage.
 
 ## 5. Input
 
+- [x] Configurable native digital actions for keyboard, mouse buttons and
+      gamepads, with contexts, aggregate press/release, raw keyboard events
+      and canvas focus. See [Configurable digital input](README.md#configurable-digital-input)
+      for the current Mac right/middle mouse limitation.
 - [ ] Native virtual joystick/d-pad that writes directly into a sprite's
       `velocity`/`steering`/`throttle` (`joystick.bind(sprite, ...)`) —
       no bridge in the loop; replaces the hand-rolled button overlays in

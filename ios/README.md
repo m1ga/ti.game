@@ -2,6 +2,11 @@
 
 The Apple implementation uses Objective-C, Metal and `CAMetalLayer` for iPhone, iPad and Mac Catalyst. Android retains OpenGL ES. The JavaScript API, native scene simulation, top-left surface-pixel coordinates, filtering, premultiplied colors and draw order stay shared across platforms.
 
+The shared feature overview, installation instructions and API reference are
+in [the root README](../README.md). Keyboard/mouse/gamepad actions, focus rules
+and the consuming app's indirect-input plist setting are documented in
+[Configurable digital input](../README.md#configurable-digital-input).
+
 `TGMetalView` owns the display link, render thread, command queue and three frame slots. `TGMetalContext` shares the device, embedded shader library, pipelines and samplers. Sprite geometry remains six vertices per quad, eight floats per vertex and at most 1,000 quads per flush. Each slot has reusable vertex arenas; flushes use distinct aligned regions, including the later HUD pass. A slot cannot be reused until its command completes.
 
 `TGSpriteSheet` publishes a strong `TGMetalTexture` reference containing the texture and sampler. Metadata and texture publication use a short lock; image decode and GPU upload run outside it. Concurrent loads share one in-flight attempt, and invalidation or disposal prevents that attempt from publishing a stale texture. `dispose()` prevents reloading, and already encoded commands retain their resources until completion. Closing one view does not invalidate another view’s sheet.
@@ -17,7 +22,11 @@ ti build -p ios --build-only --sdk 13.4.1.GA
 
 The CLI builds the XCFramework with iOS arm64, simulator arm64/x86_64 and Catalyst arm64/x86_64. The manifest enables `mac: true`; Xcode keeps `SDKROOT=iphoneos`, `SUPPORTED_PLATFORMS="iphoneos iphonesimulator"` and `SUPPORTS_MACCATALYST=YES`. The consuming app does not need a `default.metallib`: Metal Shading Language source is embedded and compiled once during device initialization. Initialization failures log a native diagnostic and stop the view.
 
-The module targets iOS 15, matching the minimum of Titanium 13.4's TitaniumKit. No deployment-target override is needed. If the installed Titanium SDK differs from the default in `titanium.xcconfig`, select its version in that file or use an external SDK-path override:
+The module targets iOS 15, matching the minimum of Titanium 13.4's TitaniumKit.
+The build command and `titanium.xcconfig` both select SDK `13.4.1.GA`; no
+SDK-path or deployment-target override is needed for that version. To use a
+different installed SDK, select its version in `titanium.xcconfig` or supply
+an external SDK-path override. An external override takes this form:
 
 ```sh
 cat > /tmp/ti-game-sdk.xcconfig <<'CONFIG'
@@ -44,7 +53,38 @@ The default simulator is iPhone 16e/iOS 18.6; override `--destination` and `--de
 
 The tests execute production batching, texture upload, scene rendering and display-loop methods. Coverage includes blend modes, texture orientation/flips, silhouettes, text, particles, ropes, tile layers, effects/HUD composition, vertex memory/flush lifetime, shared textures, disposal before GPU submission, multi-view pause/resume, touch scale changes and telemetry. OpenGL reference fixtures run against the preserved Git baseline `127a08c`, without keeping a second renderer in production.
 
-`tests/apple-renderer/prepare_demos.py --icon /path/to/DefaultIcon.png` prepares a separate Classic application that opens, renders and closes all 34 launcher demos. It writes `metal-demos.json` in its own application data directory. This is an integration smoke test; it does not replace an interactive visual/gameplay review or imply that every example mechanic was exercised.
+After building `ios/dist/ti.game-iphone-<version>.zip`, generate an isolated
+Classic app for smoke testing from the repository root:
+
+```sh
+# Mobile: the 34 touch-ready demos currently in the launcher.
+python3 tests/apple-renderer/prepare_demos.py --icon /path/to/DefaultIcon.png
+
+# Mac: include Configurable Input, for 35 demos in the current launcher.
+python3 tests/apple-renderer/prepare_demos.py --icon /path/to/DefaultIcon.png --include-input --output /tmp/ti-game-mac-demos
+
+# Test app generation without compiling or running the diagnostic app.
+python3 tests/apple-renderer/test_prepare_demos.py
+```
+
+The helper discovers demos from the launcher instead of requiring a fixed
+count. It uses Titanium SDK `13.4.1.GA` in the generated app; `--sdk` selects a
+different installed SDK. It also enables indirect pointer events in the app's
+plist. Build and run that app for your device, Simulator or Mac Catalyst target.
+Results go to `metal-demos.json` in the diagnostic application's data directory.
+This smoke test does not replace an interactive visual/gameplay review.
+
+Input regression commands, separate from the renderer fixtures:
+
+```sh
+python3 tests/input-map/run.py
+python3 tests/input-map/uikit.py
+python3 tests/gamepad-fixture/check.py
+```
+
+These cover native input resolution, UIKit responder behavior and controller
+fanout fixtures. They do not certify physical keyboard/mouse/controller
+combinations or resolve the known Mac right/middle mouse limitation.
 
 `averagePresentMs` measures CPU drawable acquisition and presentation submission. It is not GPU duration. `presentFailures` counts drawable failures and each asynchronous command error consumed by the active telemetry window; terminal errors after close are logged. Submitting a command does not certify physical presentation. Instrumentation remains inactive without a HUD or `performance` listener.
 
