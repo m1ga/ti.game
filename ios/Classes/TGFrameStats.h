@@ -37,7 +37,8 @@ typedef struct {
  * field that crosses threads.
  *
  * Two metrics this platform can report and Android cannot: average present
- * time and present failures, both taken around presentRenderbuffer.
+ * CPU acquisition/submission time and drawable/command failures. These are
+ * not GPU duration or confirmation of physical display.
  * GLSurfaceView swaps buffers inside its own GLThread after onDrawFrame
  * returns, so the Android twin has no point at which to time them; it
  * omits both from the HUD and from the event payload rather than
@@ -72,6 +73,9 @@ typedef struct {
 				  now:(CFTimeInterval)now
 			 interval:(CFTimeInterval)interval
 			   target:(CFTimeInterval)target;
+
+/** Render thread: add each asynchronously reported Metal command error. */
+- (void)addCommandFailures:(NSUInteger)count;
 
 - (BOOL)windowClosed:(CFTimeInterval)now;
 

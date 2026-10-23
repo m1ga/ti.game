@@ -28,6 +28,9 @@
 					viewProxy:(TiProxy *)viewProxy
 				 contentScale:(CGFloat)contentScale;
 
+/** Main thread: keep hit testing aligned when the drawable moves to another display. */
+- (void)updateContentScale:(CGFloat)contentScale;
+
 // Forwarded by the game view (which does NOT call TiUIView's own touch
 // handling — the engine owns all touches, like the registerForTouch
 // override on Android).

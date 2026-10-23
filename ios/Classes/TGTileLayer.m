@@ -264,7 +264,7 @@
 	}
 	[batch setScreenSpace:NO];
 	[batch setBlendMode:TGBlendModeNormal];
-	GLuint texture = (GLuint)[sh textureId];
+	TGMetalTexture *texture = [sh textureResource];
 	NSInteger frameCount = (NSInteger)[sh frameCount];
 	float hw = tw / 2.0f;
 	float hh = th / 2.0f;
@@ -290,7 +290,7 @@
 	}
 }
 
-- (void)drawDebug:(TGSpriteBatch *)batch whiteTexture:(GLuint)whiteTexture
+- (void)drawDebug:(TGSpriteBatch *)batch whiteTexture:(TGMetalTexture *)whiteTexture
 		 viewLeft:(float)viewLeft viewTop:(float)viewTop
 		viewRight:(float)viewRight viewBottom:(float)viewBottom
 {

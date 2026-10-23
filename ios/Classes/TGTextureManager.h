@@ -3,32 +3,26 @@
 //
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import <OpenGLES/ES2/gl.h>
+#import "TGMetalContext.h"
 
 @class TGSpriteSheet;
 
-/**
- * Owns GL texture objects. All methods must be called from the render
- * thread. Tracks the sheets it has uploaded so they can be invalidated
- * together if the GL context is ever recreated (rare on iOS, but the code
- * path is kept identical to Android).
- */
+/** Render-thread texture upload and sheet tracking. Sheets publish strong native
+ * references shared by views on the same device. Closing one manager does not
+ * invalidate a sheet owned by another view; commands retain their GPU resources. */
 @interface TGTextureManager : NSObject
 
 /** Lazily-created 1x1 white texture for untextured shapes (debug overlays). */
-- (GLuint)whiteTexture;
+- (instancetype)initWithContext:(TGMetalContext *)context;
+- (TGMetalTexture *)whiteTexture;
 
-/** Uploads an image (premultiplied RGBA) and returns the GL texture id.
- *  smoothing=NO uses GL_NEAREST for crisp pixel-art scaling; repeat=YES
- *  uses GL_REPEAT wrap (power-of-two dimensions on ES 2.0). */
-- (GLuint)upload:(UIImage *)image smoothing:(BOOL)smoothing repeat:(BOOL)repeat;
+/** Uploads an image (premultiplied RGBA) and returns a texture/sampler reference.
+ *  smoothing=NO uses nearest filtering; repeat=YES uses repeat addressing. */
+- (TGMetalTexture *)upload:(UIImage *)image smoothing:(BOOL)smoothing repeat:(BOOL)repeat;
 
 - (void)track:(TGSpriteSheet *)sheet;
 
-/** Frees the GL textures of sheets disposed since the last frame. */
+/** Releases tracking for textures of sheets disposed since the last frame. */
 - (void)deleteDisposed;
-
-/** After context recreation: forget every texture so sheets re-upload lazily. */
-- (void)invalidateAll;
 
 @end

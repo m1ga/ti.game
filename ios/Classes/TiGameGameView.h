@@ -6,7 +6,7 @@
 @class TGSceneRenderer;
 
 /**
- * TiUIView wrapping the GL surface. The renderer runs continuously on the
+ * TiUIView wrapping the Metal surface. The renderer runs continuously on the
  * render thread (the native game loop); the TGTouchController handles all
  * interaction on the main thread. App lifecycle pauses/resumes the loop.
  */

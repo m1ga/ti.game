@@ -4,8 +4,8 @@
   <img src="assets/intro.jpg" width="100%" alt="intro image"/>
 </p>
 
-A 2D sprite game engine module for Titanium SDK (Android and iOS),
-rendered with OpenGL ES 2.0. You describe your scene and react to events
+A 2D sprite game engine module for Titanium SDK: OpenGL ES 2.0 on Android,
+Metal on iPhone, iPad and Mac Catalyst. You describe your scene and react to events
 from JavaScript; rendering, animation, physics, collision and gestures run
 natively every frame. The API reference below starts with the portable
 Android/iOS contract and calls out the few platform differences.
@@ -172,15 +172,14 @@ layers and call `gameView.add(objects)` once. The array crosses the bridge once 
 to the native scene under one lock. `gameView.add(object)` remains available for
 individual objects.
 
-**Rendering.** Sprites are drawn by an ES 2.0 batcher that accumulates
+**Rendering.** Sprites are drawn by a native batcher (OpenGL ES 2.0 on Android, Metal on Apple) that accumulates
 quads and issues one draw call per texture switch (up to 1000 quads per
 batch). Practical consequence: pack your art into as few sheets as
 possible — a scene whose sprites share one atlas renders in a single draw
 call regardless of sprite count. Per-sprite transform math is done on the
 CPU and is trivial at typical scene sizes; hundreds of animated, moving
 sprites are no problem. Textures upload to the GPU once, lazily, on first
-use; the EGL context is preserved across app pauses, and after a real
-context loss everything (textures, shaders) is re-created automatically.
+use. Android preserves the EGL context across app pauses and recreates resources after context loss. Apple retains encoded resources until GPU command completion and keeps mutable frame resources separate for each view.
 
 **Batching pitfalls.** Everything that changes GPU state mid-scene cuts
 the batch and costs one draw call — invisible on screen, so know the four
@@ -227,12 +226,7 @@ keep a single native game loop instead of accumulating GL/render threads. Your
 app should still clear its own JavaScript timers and close unrelated resources
 when appropriate; no special cleanup is required for the `GameView` renderer.
 
-**iOS Simulator.** The simulator renders at a 1x logical drawable, because its
-translated OpenGL path is disproportionately expensive at a 3x Retina backing
-size. Real iPhone and iPad builds keep the device's native screen scale. Even
-so, expect the simulator to render the game noticeably slower due to its
-OpenGL translation layer — on a real phone the game runs a lot smoother, so
-judge performance on device, not in the simulator.
+**iOS Simulator.** The Metal port preserves the previous 1x logical drawable policy for comparison. Real iPhone and iPad builds keep their native screen scale. Simulator performance does not establish physical-device performance; controlled comparisons remain pending.
 
 ## Building blocks
 
@@ -1468,8 +1462,8 @@ Contribution rules for the codebase live in `AGENTS.md`; planned features
 `ios/` contains the Obj-C twin of the module. It implements the portable API
 above, with the listed platform differences, and mirrors the engine class by
 class (`Classes/TG*` mirrors `engine/`, `Classes/TiGame*` mirrors the proxies).
-Rendering uses OpenGL ES 2.0 and a `CADisplayLink` on a dedicated render
-thread. Implementation notes (threading, pixel
+Rendering uses Metal with `CAMetalLayer` and a `CADisplayLink` on a dedicated render
+thread. Device pipelines are shared; command queues and three frame slots belong to each view. Implementation notes (threading, pixel
 coordinates, backgrounding) are in `ios/README.md`; when changing engine
 behavior, change both platforms (see `AGENTS.md`).
 
@@ -1477,9 +1471,14 @@ behavior, change both platforms (see `AGENTS.md`).
 
 ```bash
 cd android
-ti build -p android --build-only   # package android/dist/ti.game-android-<version>.zip
-ti build -p android                # run the example app on a device/emulator
+ti build -p android --build-only --sdk 13.3.1.GA   # package android/dist/ti.game-android-<version>.zip
+ti build -p android --sdk 13.3.1.GA                # run the example app on a device/emulator
 
 cd ios                             # macOS only
-ti build -p ios --build-only       # package the iOS module zip
+ti build -p ios --build-only       # package iOS, simulator and Catalyst variants
 ```
+
+
+The Apple backend preserves the JavaScript API, premultiplied colors, filtering, native scene update and draw order. It compiles its embedded Metal shaders once per device, so consuming applications do not need a `default.metallib`. No Apple OpenGL ES backend or public backend selector is included. `ios/README.md` documents builds, native GPU tests and the iOS 15 minimum required by Titanium 13.4.
+
+On Metal, `averagePresentMs` is CPU time spent acquiring a drawable and submitting presentation, not GPU execution time. `presentFailures` counts missing drawables and reported command errors; command submission alone does not confirm that a frame reached the display.

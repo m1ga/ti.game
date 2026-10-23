@@ -2,7 +2,7 @@
 //  ti.game — engine (iOS twin of android/src/ti/game/engine/SkidTrail.java)
 //
 #import <Foundation/Foundation.h>
-#import <OpenGLES/ES2/gl.h>
+#import "TGMetalContext.h"
 
 @class TGSpriteBatch;
 
@@ -22,7 +22,7 @@
 /** Ages all segments and drops fully faded ones from the tail. */
 - (void)update:(float)dt;
 
-- (void)draw:(TGSpriteBatch *)batch whiteTexture:(GLuint)whiteTexture;
+- (void)draw:(TGSpriteBatch *)batch whiteTexture:(TGMetalTexture *)whiteTexture;
 - (void)clear;
 
 @end

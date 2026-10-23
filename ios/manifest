@@ -16,3 +16,5 @@ moduleid: ti.game
 guid: 6dadd1f9-b40b-4f8d-807d-f433997953ab
 platform: iphone
 minsdk: 13.4.0
+
+mac: true

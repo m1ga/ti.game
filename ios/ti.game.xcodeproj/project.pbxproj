@@ -33,8 +33,10 @@
 		A1B2C3D40004000000000000 /* TGAnimation.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40002000000000000 /* TGAnimation.m */; };
 		A1B2C3D40103000000000000 /* TGEasing.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40101000000000000 /* TGEasing.h */; };
 		A1B2C3D40104000000000000 /* TGEasing.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40102000000000000 /* TGEasing.m */; };
-		A1B2C3D40203000000000000 /* TGGLView.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40201000000000000 /* TGGLView.h */; };
-		A1B2C3D40204000000000000 /* TGGLView.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40202000000000000 /* TGGLView.m */; };
+		A1B2C3D40203000000000000 /* TGMetalView.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40201000000000000 /* TGMetalView.h */; };
+		A1B2C3D42D03000000000000 /* TGMetalContext.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42D01000000000000 /* TGMetalContext.h */; };
+		A1B2C3D40204000000000000 /* TGMetalView.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40202000000000000 /* TGMetalView.m */; };
+		A1B2C3D42D04000000000000 /* TGMetalContext.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42D02000000000000 /* TGMetalContext.m */; };
 		A1B2C3D40303000000000000 /* TGScene.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40301000000000000 /* TGScene.h */; };
 		A1B2C3D40304000000000000 /* TGScene.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40302000000000000 /* TGScene.m */; };
 		A1B2C3D40403000000000000 /* TGSceneRenderer.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40401000000000000 /* TGSceneRenderer.h */; };
@@ -129,8 +131,10 @@
 		A1B2C3D40002000000000000 /* TGAnimation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGAnimation.m"; path = "Classes/TGAnimation.m"; sourceTree = "<group>"; };
 		A1B2C3D40101000000000000 /* TGEasing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGEasing.h"; path = "Classes/TGEasing.h"; sourceTree = "<group>"; };
 		A1B2C3D40102000000000000 /* TGEasing.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGEasing.m"; path = "Classes/TGEasing.m"; sourceTree = "<group>"; };
-		A1B2C3D40201000000000000 /* TGGLView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGGLView.h"; path = "Classes/TGGLView.h"; sourceTree = "<group>"; };
-		A1B2C3D40202000000000000 /* TGGLView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGGLView.m"; path = "Classes/TGGLView.m"; sourceTree = "<group>"; };
+		A1B2C3D40201000000000000 /* TGMetalView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGMetalView.h"; path = "Classes/TGMetalView.h"; sourceTree = "<group>"; };
+		A1B2C3D42D01000000000000 /* TGMetalContext.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGMetalContext.h"; path = "Classes/TGMetalContext.h"; sourceTree = "<group>"; };
+		A1B2C3D40202000000000000 /* TGMetalView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGMetalView.m"; path = "Classes/TGMetalView.m"; sourceTree = "<group>"; };
+		A1B2C3D42D02000000000000 /* TGMetalContext.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGMetalContext.m"; path = "Classes/TGMetalContext.m"; sourceTree = "<group>"; };
 		A1B2C3D40301000000000000 /* TGScene.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGScene.h"; path = "Classes/TGScene.h"; sourceTree = "<group>"; };
 		A1B2C3D40302000000000000 /* TGScene.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGScene.m"; path = "Classes/TGScene.m"; sourceTree = "<group>"; };
 		A1B2C3D40401000000000000 /* TGSceneRenderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGSceneRenderer.h"; path = "Classes/TGSceneRenderer.h"; sourceTree = "<group>"; };
@@ -249,8 +253,10 @@
 				A1B2C3D40002000000000000 /* TGAnimation.m */,
 				A1B2C3D40101000000000000 /* TGEasing.h */,
 				A1B2C3D40102000000000000 /* TGEasing.m */,
-				A1B2C3D40201000000000000 /* TGGLView.h */,
-				A1B2C3D40202000000000000 /* TGGLView.m */,
+				A1B2C3D40201000000000000 /* TGMetalView.h */,
+				A1B2C3D42D01000000000000 /* TGMetalContext.h */,
+				A1B2C3D40202000000000000 /* TGMetalView.m */,
+				A1B2C3D42D02000000000000 /* TGMetalContext.m */,
 				A1B2C3D40301000000000000 /* TGScene.h */,
 				A1B2C3D40302000000000000 /* TGScene.m */,
 				A1B2C3D40401000000000000 /* TGSceneRenderer.h */,
@@ -364,7 +370,8 @@
 				A1B2C3D42103000000000000 /* TiGameTextProxy.h in Headers */,
 				A1B2C3D40003000000000000 /* TGAnimation.h in Headers */,
 				A1B2C3D40103000000000000 /* TGEasing.h in Headers */,
-				A1B2C3D40203000000000000 /* TGGLView.h in Headers */,
+				A1B2C3D40203000000000000 /* TGMetalView.h in Headers */,
+				A1B2C3D42D03000000000000 /* TGMetalContext.h in Headers */,
 				A1B2C3D40303000000000000 /* TGScene.h in Headers */,
 				A1B2C3D40403000000000000 /* TGSceneRenderer.h in Headers */,
 				A1B2C3D40503000000000000 /* TGSkidTrail.h in Headers */,
@@ -474,7 +481,8 @@
 				A1B2C3D42104000000000000 /* TiGameTextProxy.m in Sources */,
 				A1B2C3D40004000000000000 /* TGAnimation.m in Sources */,
 				A1B2C3D40104000000000000 /* TGEasing.m in Sources */,
-				A1B2C3D40204000000000000 /* TGGLView.m in Sources */,
+				A1B2C3D40204000000000000 /* TGMetalView.m in Sources */,
+				A1B2C3D42D04000000000000 /* TGMetalContext.m in Sources */,
 				A1B2C3D40304000000000000 /* TGScene.m in Sources */,
 				A1B2C3D40404000000000000 /* TGSceneRenderer.m in Sources */,
 				A1B2C3D40504000000000000 /* TGSkidTrail.m in Sources */,
@@ -530,7 +538,7 @@
 				GCC_WARN_UNUSED_VALUE = NO;
 				GCC_WARN_UNUSED_VARIABLE = NO;
 				INSTALL_PATH = /usr/local/lib;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "";
 				OTHER_CFLAGS = (
 					"-DDEBUG",
@@ -543,7 +551,7 @@
 				RUN_CLANG_STATIC_ANALYZER = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				USER_HEADER_SEARCH_PATHS = "";
 				WARNING_CFLAGS = "-Wno-arc-performSelector-leaks";
 			};
@@ -575,7 +583,7 @@
 				GCC_WARN_UNUSED_VALUE = NO;
 				GCC_WARN_UNUSED_VARIABLE = NO;
 				INSTALL_PATH = /usr/local/lib;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LIBRARY_SEARCH_PATHS = "";
 				OTHER_CFLAGS = "-DTI_POST_1_2";
 				OTHER_LDFLAGS = "-ObjC";
@@ -583,7 +591,7 @@
 				RUN_CLANG_STATIC_ANALYZER = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				USER_HEADER_SEARCH_PATHS = "";
 				WARNING_CFLAGS = "-Wno-arc-performSelector-leaks";
 			};
@@ -647,7 +655,7 @@
 				GCC_WARN_UNUSED_VALUE = NO;
 				GCC_WARN_UNUSED_VARIABLE = NO;
 				INSTALL_PATH = /usr/local/lib;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = (
 					"-DDEBUG",
@@ -660,7 +668,7 @@
 				RUN_CLANG_STATIC_ANALYZER = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Debug;
@@ -721,14 +729,14 @@
 				GCC_WARN_UNUSED_VALUE = NO;
 				GCC_WARN_UNUSED_VARIABLE = NO;
 				INSTALL_PATH = /usr/local/lib;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				OTHER_CFLAGS = "-DTI_POST_1_2";
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = ti.game;
 				RUN_CLANG_STATIC_ANALYZER = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Release;
