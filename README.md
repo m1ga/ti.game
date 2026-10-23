@@ -4,8 +4,8 @@
   <img src="assets/intro.jpg" width="100%" alt="intro image"/>
 </p>
 
-A 2D sprite game engine module for Titanium SDK (Android and iOS),
-rendered with OpenGL ES 2.0. You describe your scene and react to events
+A 2D sprite game engine module for Titanium SDK: OpenGL ES 2.0 on Android,
+Metal on iPhone, iPad and Mac Catalyst. You describe your scene and react to events
 from JavaScript; rendering, animation, physics, collision and gestures run
 natively every frame. The API reference below starts with the portable
 Android/iOS contract and calls out the few platform differences.
@@ -172,15 +172,14 @@ layers and call `gameView.add(objects)` once. The array crosses the bridge once 
 to the native scene under one lock. `gameView.add(object)` remains available for
 individual objects.
 
-**Rendering.** Sprites are drawn by an ES 2.0 batcher that accumulates
+**Rendering.** Sprites are drawn by a native batcher (OpenGL ES 2.0 on Android, Metal on Apple) that accumulates
 quads and issues one draw call per texture switch (up to 1000 quads per
 batch). Practical consequence: pack your art into as few sheets as
 possible — a scene whose sprites share one atlas renders in a single draw
 call regardless of sprite count. Per-sprite transform math is done on the
 CPU and is trivial at typical scene sizes; hundreds of animated, moving
 sprites are no problem. Textures upload to the GPU once, lazily, on first
-use; the EGL context is preserved across app pauses, and after a real
-context loss everything (textures, shaders) is re-created automatically.
+use. Android preserves the EGL context across app pauses and recreates resources after context loss. Apple retains encoded resources until GPU command completion and keeps mutable frame resources separate for each view.
 
 **Batching pitfalls.** Everything that changes GPU state mid-scene cuts
 the batch and costs one draw call — invisible on screen, so know the four
@@ -227,12 +226,7 @@ keep a single native game loop instead of accumulating GL/render threads. Your
 app should still clear its own JavaScript timers and close unrelated resources
 when appropriate; no special cleanup is required for the `GameView` renderer.
 
-**iOS Simulator.** The simulator renders at a 1x logical drawable, because its
-translated OpenGL path is disproportionately expensive at a 3x Retina backing
-size. Real iPhone and iPad builds keep the device's native screen scale. Even
-so, expect the simulator to render the game noticeably slower due to its
-OpenGL translation layer — on a real phone the game runs a lot smoother, so
-judge performance on device, not in the simulator.
+**iOS Simulator.** The Metal port preserves the previous 1x logical drawable policy for comparison. Real iPhone and iPad builds keep their native screen scale. Simulator performance does not establish physical-device performance; controlled comparisons remain pending.
 
 ## Building blocks
 
@@ -340,7 +334,7 @@ For pointer capture on iOS/iPadOS 13.4–16, the consuming application must opt 
 
 See [Apple’s indirect input configuration](https://developer.apple.com/documentation/bundleresources/information-property-list/uiapplicationsupportsindirectinputevents). This application setting is required to distinguish a mouse pointer from a direct touch on older supported systems; the module does not modify the app’s global input configuration at runtime.
 
-Apple keyboard/pointer capture requires iOS/iPadOS 13.4 or later, including Catalyst after the renderer supports it. The source deployment minimum remains iOS 12; UIKit APIs are guarded. On iOS 14+, keyboard/mouse disconnect notifications also release input; earlier UIKit versions deliver cancellation/focus lifecycle events. The upstream Apple OpenGL renderer builds for iOS and Simulator and does not support Catalyst; this feature has no Metal dependency. Android retains its engine touch listener. All resolution runs natively on input transitions, with no per-frame bridge traffic.
+Apple keyboard/pointer capture requires iOS/iPadOS 13.4 or later, including Mac Catalyst. The module targets iOS 15 (see `ios/README.md`), and the UIKit input APIs are guarded. On iOS 14+, keyboard/mouse disconnect notifications also release input. Earlier UIKit versions deliver cancellation/focus lifecycle events. Input resolution is independent of the Metal renderer. Android retains its engine touch listener. All resolution runs natively on input transitions, with no per-frame bridge traffic.
 
 Run `python3 tests/input-map/uikit.py` for UIKit focus, raw-key repetition/cancellation and canvas/overlay pointer ownership, using production responder methods with renderer/event-sink fixtures. Run `python3 tests/input-map/run.py` for native resolver regressions and `python3 tests/gamepad-fixture/check.py` for real GameController fanout, disconnect and action delivery without individual listeners. The launcher shows Configurable input on Mac only; phones and tablets retain the touch-ready demos. The source remains available for mobile testing with external peripherals. `example/inputmap.js` moves an animated character with A/D, J/L, arrows or a gamepad. The last pressed direction wins while both are held, and releasing it resumes the other held direction. Space or gamepad A jumps. W/I/Up aims upward (combine with left/right for diagonals); S/K/Down crouches. A left mouse click on the canvas or gamepad X fires projectiles. Escape pauses/resumes through separate action contexts. Right/middle bindings are included for testing, but currently do not trigger actions on Mac; left click is verified. A separate input monitor shows raw key codes/modifiers and the existing gamepad button, stick and trigger events. Instructions stay visible above separate action feedback; an overlaid text field and focus button demonstrate native control ownership. Clicking the canvas after text entry restores game focus; that first click does not fire. The shared back control returns to the launcher. Physical keyboard/mouse/controller and overlay acceptance must be recorded separately from compilation and automated resolver tests.
 
@@ -1535,8 +1529,8 @@ Contribution rules for the codebase live in `AGENTS.md`; planned features
 `ios/` contains the Obj-C twin of the module. It implements the portable API
 above, with the listed platform differences, and mirrors the engine class by
 class (`Classes/TG*` mirrors `engine/`, `Classes/TiGame*` mirrors the proxies).
-Rendering uses OpenGL ES 2.0 and a `CADisplayLink` on a dedicated render
-thread. Implementation notes (threading, pixel
+Rendering uses Metal with `CAMetalLayer` and a `CADisplayLink` on a dedicated render
+thread. Device pipelines are shared; command queues and three frame slots belong to each view. Implementation notes (threading, pixel
 coordinates, backgrounding) are in `ios/README.md`; when changing engine
 behavior, change both platforms (see `AGENTS.md`).
 
@@ -1544,9 +1538,14 @@ behavior, change both platforms (see `AGENTS.md`).
 
 ```bash
 cd android
-ti build -p android --build-only   # package android/dist/ti.game-android-<version>.zip
-ti build -p android                # run the example app on a device/emulator
+ti build -p android --build-only --sdk 13.3.1.GA   # package android/dist/ti.game-android-<version>.zip
+ti build -p android --sdk 13.3.1.GA                # run the example app on a device/emulator
 
 cd ios                             # macOS only
-ti build -p ios --build-only       # package the iOS module zip
+ti build -p ios --build-only       # package iOS, simulator and Catalyst variants
 ```
+
+
+The Apple backend preserves the JavaScript API, premultiplied colors, filtering, native scene update and draw order. It compiles its embedded Metal shaders once per device, so consuming applications do not need a `default.metallib`. No Apple OpenGL ES backend or public backend selector is included. `ios/README.md` documents builds, native GPU tests and the iOS 15 minimum required by Titanium 13.4.
+
+On Metal, `averagePresentMs` is CPU time spent acquiring a drawable and submitting presentation, not GPU execution time. `presentFailures` counts missing drawables and reported command errors; command submission alone does not confirm that a frame reached the display.

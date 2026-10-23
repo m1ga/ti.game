@@ -37,44 +37,6 @@ static const int kMaxQuads = 1000;
 static const int kFloatsPerVertex = 8; // x, y, u, v, r, g, b, a
 static const int kVerticesPerQuad = 6; // two triangles
 
-static const char *kVertexShader =
-	"uniform mat4 uProj;\n"
-	"attribute vec2 aPos;\n"
-	"attribute vec2 aUV;\n"
-	"attribute vec4 aColor;\n"
-	"varying vec2 vUV;\n"
-	"varying vec4 vColor;\n"
-	"void main() {\n"
-	"  gl_Position = uProj * vec4(aPos, 0.0, 1.0);\n"
-	"  vUV = aUV;\n"
-	"  vColor = aColor;\n"
-	"}\n";
-
-static const char *kFragmentShader =
-	"precision mediump float;\n"
-	"uniform sampler2D uTex;\n"
-	"varying vec2 vUV;\n"
-	"varying vec4 vColor;\n"
-	"void main() {\n"
-	"  gl_FragColor = texture2D(uTex, vUV) * vColor;\n"
-	"}\n";
-
-// Silhouette shader for glows: the frame's alpha tinted with the
-// vertex color, ignoring the art's own colors — stamped in soft
-// rings behind the sprite it reads as a blurred halo.
-static const char *kGlowFragmentShader =
-	"precision mediump float;\n"
-	"uniform sampler2D uTex;\n"
-	"varying vec2 vUV;\n"
-	"varying vec4 vColor;\n"
-	"void main() {\n"
-	"  gl_FragColor = vColor * texture2D(uTex, vUV).a;\n"
-	"}\n";
-
-// Attribute locations are bound identically for both programs so
-// flush never cares which one is active.
-enum { kAttrPos = 0, kAttrUV = 1, kAttrColor = 2 };
-
 // Glow stamp pattern: unit (x, y, alpha) triples — an outer ring of 8
 // at the full blur radius and an inner ring of 8 at 0.55r, rotated
 // half a step. Overlaps build a solid core with soft edges.
@@ -95,30 +57,6 @@ static void buildGlowRing(void)
 	}
 }
 
-static GLuint compileShader(GLenum type, const char *source)
-{
-	GLuint shader = glCreateShader(type);
-	glShaderSource(shader, 1, &source, NULL);
-	glCompileShader(shader);
-	return shader;
-}
-
-static GLuint buildProgram(const char *fragmentSource)
-{
-	GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
-	GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragmentSource);
-	GLuint p = glCreateProgram();
-	glAttachShader(p, vs);
-	glAttachShader(p, fs);
-	glBindAttribLocation(p, kAttrPos, "aPos");
-	glBindAttribLocation(p, kAttrUV, "aUV");
-	glBindAttribLocation(p, kAttrColor, "aColor");
-	glLinkProgram(p);
-	glDeleteShader(vs);
-	glDeleteShader(fs);
-	return p;
-}
-
 static inline float snapToPixel(TGSprite *s, float value, float origin, float screenScale)
 {
 	if (s.screenFixed) {
@@ -131,15 +69,14 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 @implementation TGSpriteBatch {
 	float *_vertices;
 	int _quadCount;
-	GLint _currentTexture;
+	TGMetalTexture *_currentTexture;
 	TGBlendMode _blendMode;
 
-	GLuint _program;
-	GLuint _glowProgram;
-	GLuint _activeProgram;
-	GLuint _vbo; // vertex upload buffer; client-side arrays stall the driver
-	GLint _uProj, _uTex;         // main program
-	GLint _uProjGlow, _uTexGlow; // glow program
+	TGMetalContext *_context;
+	id<MTLRenderCommandEncoder> _encoder;
+	NSMutableArray<id<MTLBuffer>> *_buffers[3];
+	NSUInteger _slot, _bufferCursor, _bufferOffset;
+	BOOL _silhouette;
 	const float *_projection;       // world space (camera + zoom + shake)
 	const float *_screenProjection; // surface pixels (screenFixed sprites)
 	BOOL _screenSpace;
@@ -188,11 +125,15 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 		? x + floorf((_worldWrapReferenceX - x) / width + 0.5f) * width : x;
 }
 
-- (instancetype)init
+- (instancetype)initWithContext:(TGMetalContext *)context
 {
 	if (self = [super init]) {
 		_vertices = malloc(sizeof(float) * kMaxQuads * kVerticesPerQuad * kFloatsPerVertex);
-		_currentTexture = -1;
+		_context = context;
+		for (int i = 0; i < 3; i++) _buffers[i] = [NSMutableArray array];
+		static dispatch_once_t once;
+		dispatch_once(&once, ^{ buildGlowRing(); });
+		_currentTexture = nil;
 		_pixelScale = 1.0f;
 	}
 	return self;
@@ -203,17 +144,18 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	free(_vertices);
 }
 
-- (void)createGLResources
+- (void)beginFrameWithEncoder:(id<MTLRenderCommandEncoder>)encoder slot:(NSUInteger)slot
 {
-	static dispatch_once_t once;
-	dispatch_once(&once, ^{ buildGlowRing(); });
-	_program = buildProgram(kFragmentShader);
-	_uProj = glGetUniformLocation(_program, "uProj");
-	_uTex = glGetUniformLocation(_program, "uTex");
-	_glowProgram = buildProgram(kGlowFragmentShader);
-	_uProjGlow = glGetUniformLocation(_glowProgram, "uProj");
-	_uTexGlow = glGetUniformLocation(_glowProgram, "uTex");
-	glGenBuffers(1, &_vbo);
+	NSParameterAssert(slot < 3);
+	_slot = slot;
+	_bufferCursor = 0;
+	_bufferOffset = 0;
+	_encoder = encoder;
+}
+
+- (void)setRenderEncoder:(id<MTLRenderCommandEncoder>)encoder
+{
+	_encoder = encoder;
 }
 
 - (void)begin:(const float *)projectionMatrix
@@ -233,15 +175,11 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	_cameraTravelX = travelX;
 	_cameraTravelY = travelY;
 	_quadCount = 0;
-	_currentTexture = -1;
-	_activeProgram = 0;
+	_currentTexture = nil;
+	_silhouette = NO;
 	_blendMode = TGBlendModeNormal;
 	_drawCalls = 0;
 	_textureSwitches = 0;
-	[self useProgram:_program];
-	glActiveTexture(GL_TEXTURE0);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 - (void)setBlendMode:(TGBlendMode)mode
@@ -250,24 +188,6 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 		return;
 	}
 	[self flush];
-	switch (mode) {
-		case TGBlendModeAdd:
-			glBlendFunc(GL_ONE, GL_ONE);
-			break;
-		case TGBlendModeMultiply:
-			// dst * (src + 1 - srcA): multiplies where the sprite is
-			// opaque, leaves the backdrop alone where it's transparent
-			glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA);
-			break;
-		case TGBlendModeScreen:
-			// src + dst * (1 - src): inverse-multiply, converges on
-			// white instead of overshooting like add does
-			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
-			break;
-		default:
-			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-			break;
-	}
 	_blendMode = mode;
 }
 
@@ -278,26 +198,12 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	}
 	[self flush];
 	_screenSpace = fixed;
-	[self uploadProjection:_activeProgram];
+
 }
 
-- (void)uploadProjection:(GLuint)p
+- (void)useSilhouette:(BOOL)value
 {
-	glUniformMatrix4fv((p == _program) ? _uProj : _uProjGlow, 1, GL_FALSE,
-		_screenSpace ? _screenProjection : _projection);
-}
-
-/** Flush and switch programs; both share attribute locations. */
-- (void)useProgram:(GLuint)p
-{
-	if (p == _activeProgram) {
-		return;
-	}
-	[self flush];
-	glUseProgram(p);
-	[self uploadProjection:p];
-	glUniform1i((p == _program) ? _uTex : _uTexGlow, 0);
-	_activeProgram = p;
+	if (_silhouette != value) { [self flush]; _silhouette = value; }
 }
 
 - (float)parallaxX:(TGSprite *)s
@@ -324,7 +230,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	return (scrollFactor != 1.0f) ? (1.0f - scrollFactor) * _cameraTravelY : 0.0f;
 }
 
-- (void)ensureCapacity:(GLint)texture
+- (void)ensureCapacity:(TGMetalTexture *)texture
 {
 	if (texture != _currentTexture) {
 		[self flush];
@@ -352,7 +258,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	}
 	[self setScreenSpace:s.screenFixed];
 	[self setBlendMode:s.blendMode];
-	[self ensureCapacity:[sheet textureId]];
+	[self ensureCapacity:[sheet textureResource]];
 
 	float w = [s drawWidth];
 	float h = [s drawHeight];
@@ -410,11 +316,11 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float blur = s.glowBlur;
 	float glow = MAX(0.0f, MIN(1.0f, s.glowOpacity)) * alpha;
 	if (blur > 0.0f && glow > 0.0f) {
-		[self useProgram:_glowProgram];
+		[self useSilhouette:YES];
 		float gr = s.glowR;
 		float gg = s.glowG;
 		float gb = s.glowB;
-		GLint texture = [sheet textureId];
+		TGMetalTexture *texture = [sheet textureResource];
 		for (int k = 0; k < 16 * 3; k += 3) {
 			float ox = kGlowRing[k] * blur;
 			float oy = kGlowRing[k + 1] * blur;
@@ -426,7 +332,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 						 x3:x3 + ox y3:y3 + oy u3:u1 v3:v1
 						  r:gr * ga g:gg * ga b:gb * ga a:ga];
 		}
-		[self useProgram:_program];
+		[self useSilhouette:NO];
 		[self ensureCapacity:texture];
 	}
 
@@ -444,14 +350,14 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float flashDuration = s.flashDuration;
 	if (flashLeft > 0.0f && flashDuration > 0.0f) {
 		float fa = MIN(1.0f, flashLeft / flashDuration) * alpha;
-		[self useProgram:_glowProgram];
-		[self ensureCapacity:[sheet textureId]];
+		[self useSilhouette:YES];
+		[self ensureCapacity:[sheet textureResource]];
 		[self putQuadX0:x0 y0:y0 u0:u0 v0:v0
 					 x1:x1 y1:y1 u1:u1 v1:v0
 					 x2:x2 y2:y2 u2:u0 v2:v1
 					 x3:x3 y3:y3 u3:u1 v3:v1
 					  r:s.flashR * fa g:s.flashG * fa b:s.flashB * fa a:fa];
-		[self useProgram:_program];
+		[self useSilhouette:NO];
 	}
 }
 
@@ -477,7 +383,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	}
 	[self setScreenSpace:s.screenFixed];
 	[self setBlendMode:s.blendMode];
-	GLint texture = [sheet textureId];
+	TGMetalTexture *texture = [sheet textureResource];
 
 	float ax = s.anchorX * layout.width;
 	float ay = s.anchorY * layout.height;
@@ -497,7 +403,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float blur = s.glowBlur;
 	float glow = MAX(0.0f, MIN(1.0f, s.glowOpacity)) * alpha;
 	if (blur > 0.0f && glow > 0.0f) {
-		[self useProgram:_glowProgram];
+		[self useSilhouette:YES];
 		for (int k = 0; k < 16 * 3; k += 3) {
 			float ox = kGlowRing[k] * blur;
 			float oy = kGlowRing[k + 1] * blur;
@@ -507,7 +413,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 							cos:cosr sin:sinr sx:sx sy:sy
 							  r:s.glowR * ga g:s.glowG * ga b:s.glowB * ga a:ga];
 		}
-		[self useProgram:_program];
+		[self useSilhouette:NO];
 	}
 
 	[self putGlyphQuads:sheet layout:layout texture:texture
@@ -518,16 +424,16 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float flashDuration = s.flashDuration;
 	if (flashLeft > 0.0f && flashDuration > 0.0f) {
 		float fa = MIN(1.0f, flashLeft / flashDuration) * alpha;
-		[self useProgram:_glowProgram];
+		[self useSilhouette:YES];
 		[self putGlyphQuads:sheet layout:layout texture:texture
 						  x:x y:y ax:ax ay:ay cos:cosr sin:sinr sx:sx sy:sy
 						  r:s.flashR * fa g:s.flashG * fa b:s.flashB * fa a:fa];
-		[self useProgram:_program];
+		[self useSilhouette:NO];
 	}
 }
 
 - (void)putGlyphQuads:(TGSpriteSheet *)sheet layout:(TGTextLayout *)layout
-			  texture:(GLint)texture
+			  texture:(TGMetalTexture *)texture
 					x:(float)x y:(float)y ax:(float)ax ay:(float)ay
 				  cos:(float)cosr sin:(float)sinr sx:(float)sx sy:(float)sy
 					r:(float)r g:(float)g b:(float)b a:(float)a
@@ -570,12 +476,12 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	}
 }
 
-- (void)drawFrame:(GLuint)texture frame:(TGFrame)f
+- (void)drawFrame:(TGMetalTexture *)texture frame:(TGFrame)f
 			   cx:(float)cx cy:(float)cy
 			halfW:(float)halfW halfH:(float)halfH
 				r:(float)r g:(float)g b:(float)b a:(float)a
 {
-	[self ensureCapacity:(GLint)texture];
+	[self ensureCapacity:texture];
 	[self putQuadX0:cx - halfW y0:cy - halfH u0:f.u0 v0:f.v0
 				 x1:cx + halfW y1:cy - halfH u1:f.u1 v1:f.v0
 				 x2:cx - halfW y2:cy + halfH u2:f.u0 v2:f.v1
@@ -583,7 +489,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 				  r:r * a g:g * a b:b * a a:a];
 }
 
-- (void)drawSegment:(GLuint)texture frame:(TGFrame)f
+- (void)drawSegment:(TGMetalTexture *)texture frame:(TGFrame)f
 			  fromX:(float)x0 y:(float)y0
 				toX:(float)x1 y:(float)y1
 		  halfWidth:(float)halfWidth alpha:(float)alpha
@@ -597,7 +503,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	}
 	float nx = -dy / len * halfWidth;
 	float ny = dx / len * halfWidth;
-	[self ensureCapacity:(GLint)texture];
+	[self ensureCapacity:texture];
 	[self putQuadX0:x0 - nx y0:y0 - ny u0:f.u0 v0:f.v0
 				 x1:x0 + nx y1:y0 + ny u1:f.u1 v1:f.v0
 				 x2:x1 - nx y2:y1 - ny u2:f.u0 v2:f.v1
@@ -605,7 +511,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 				  r:alpha g:alpha b:alpha a:alpha];
 }
 
-- (void)drawLine:(GLuint)texture
+- (void)drawLine:(TGMetalTexture *)texture
 		   fromX:(float)x0 y:(float)y0
 			 toX:(float)x1 y:(float)y1
    halfThickness:(float)halfThickness
@@ -623,7 +529,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float nx = -dy / len * halfThickness;
 	float ny = dx / len * halfThickness;
 
-	[self ensureCapacity:(GLint)texture];
+	[self ensureCapacity:texture];
 	[self putQuadX0:x0 + nx y0:y0 + ny u0:0.5f v0:0.5f
 				 x1:x1 + nx y1:y1 + ny u1:0.5f v1:0.5f
 				 x2:x0 - nx y2:y0 - ny u2:0.5f v2:0.5f
@@ -669,30 +575,36 @@ static inline float *putVertex(float *v, float x, float y, float u, float uv,
 
 - (void)flush
 {
-	if (_quadCount == 0 || _currentTexture < 0) {
+	if (_quadCount == 0 || _currentTexture == nil || _encoder == nil) {
 		_quadCount = 0;
 		return;
 	}
 	int vertexCount = _quadCount * kVerticesPerQuad;
 
-	glBindTexture(GL_TEXTURE_2D, (GLuint)_currentTexture);
-
-	GLsizei stride = kFloatsPerVertex * sizeof(float);
-	// Fresh glBufferData each flush orphans the old storage, so the GPU can
-	// keep reading the previous frame while we upload the next one
-	glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-	glBufferData(GL_ARRAY_BUFFER, vertexCount * stride, _vertices, GL_STREAM_DRAW);
-	glVertexAttribPointer(kAttrPos, 2, GL_FLOAT, GL_FALSE, stride, (const void *)0);
-	glEnableVertexAttribArray(kAttrPos);
-	glVertexAttribPointer(kAttrUV, 2, GL_FLOAT, GL_FALSE, stride, (const void *)(2 * sizeof(float)));
-	glEnableVertexAttribArray(kAttrUV);
-	glVertexAttribPointer(kAttrColor, 4, GL_FLOAT, GL_FALSE, stride, (const void *)(4 * sizeof(float)));
-	glEnableVertexAttribArray(kAttrColor);
-
-	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+	// Each flush uses separate storage, including the HUD/effect passes.
+	// Pools are reused only when this view's slot is no longer in flight.
+	const NSUInteger arenaSize = 256 * 1024;
+	NSUInteger byteCount = vertexCount * kFloatsPerVertex * sizeof(float);
+	if (_bufferOffset + byteCount > arenaSize) {
+		_bufferCursor++;
+		_bufferOffset = 0;
+	}
+	id<MTLBuffer> buffer;
+	if (_bufferCursor == _buffers[_slot].count) {
+		buffer = [_context.device newBufferWithLength:arenaSize options:MTLResourceStorageModeShared];
+		if (!buffer) { NSLog(@"[ERROR] ti.game: Metal vertex buffer allocation failed"); _quadCount = 0; return; }
+		[_buffers[_slot] addObject:buffer];
+	} else { buffer = _buffers[_slot][_bufferCursor]; }
+	NSUInteger offset = _bufferOffset;
+	_bufferOffset += (byteCount + 255) & ~(NSUInteger)255;
+	memcpy((uint8_t *)buffer.contents + offset, _vertices, byteCount);
+	[_encoder setRenderPipelineState:[_context spritePipelineWithBlend:_blendMode silhouette:_silhouette]];
+	[_encoder setVertexBuffer:buffer offset:offset atIndex:0];
+	[_encoder setVertexBytes:_screenSpace ? _screenProjection : _projection length:16 * sizeof(float) atIndex:1];
+	[_encoder setFragmentTexture:_currentTexture.texture atIndex:0];
+	[_encoder setFragmentSamplerState:_currentTexture.sampler atIndex:0];
+	[_encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:vertexCount];
 	_drawCalls++;
-	// TGPostEffect draws with client-side pointers — leave no buffer bound
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	_quadCount = 0;
 }
 

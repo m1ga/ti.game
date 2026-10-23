@@ -2,7 +2,7 @@
 //  ti.game — engine (iOS twin of android/src/ti/game/engine/SpriteBatch.java)
 //
 #import <Foundation/Foundation.h>
-#import <OpenGLES/ES2/gl.h>
+#import "TGMetalContext.h"
 #import "TGSpriteSheet.h"
 
 @class TGSprite;
@@ -23,7 +23,7 @@ TGBlendMode TGBlendModeFromString(NSString *value);
 NSString *TGBlendModeName(TGBlendMode mode);
 
 /**
- * ES 2.0 sprite batcher: accumulates quads and issues one draw call per
+ * Metal sprite batcher: accumulates quads and issues one draw call per
  * texture change (or when full). Vertices are (x, y, u, v, r, g, b, a) with
  * the color premultiplied; textures are uploaded premultiplied, so blending
  * is (ONE, ONE_MINUS_SRC_ALPHA) and the fragment color is
@@ -38,8 +38,11 @@ NSString *TGBlendModeName(TGBlendMode mode);
 @property (nonatomic, readonly) int drawCalls;
 @property (nonatomic, readonly) int textureSwitches;
 
-/** (Re)creates shaders; call once the GL context is current. */
-- (void)createGLResources;
+/** Borrow immutable pipelines from the shared device context. */
+- (instancetype)initWithContext:(TGMetalContext *)context;
+/** Reset one slot only after its previous command buffer completed. */
+- (void)beginFrameWithEncoder:(id<MTLRenderCommandEncoder>)encoder slot:(NSUInteger)slot;
+- (void)setRenderEncoder:(id<MTLRenderCommandEncoder>)encoder;
 
 - (void)begin:(const float *)projectionMatrix
 	screenProjection:(const float *)screenProjectionMatrix
@@ -71,7 +74,7 @@ NSString *TGBlendModeName(TGBlendMode mode);
  *  pending batch on change, like a texture or blend switch. */
 - (void)setScreenSpace:(BOOL)fixed;
 
-/** Switches the glBlendFunc for a TGBlendMode (all assume premultiplied
+/** Switches the pipeline for a TGBlendMode (all assume premultiplied
  *  colors): add brightens the backdrop (glows, fire, lasers), multiply
  *  darkens it (shadows, stains), screen lightens it softly without
  *  blowing out to white (fog, soft light). Flushes the pending batch on
@@ -80,14 +83,14 @@ NSString *TGBlendModeName(TGBlendMode mode);
 
 /** Axis-aligned textured quad with a straight-alpha tint color —
  *  the particle path (premultiplied internally, like drawLine). */
-- (void)drawFrame:(GLuint)texture frame:(TGFrame)f
+- (void)drawFrame:(TGMetalTexture *)texture frame:(TGFrame)f
 			   cx:(float)cx cy:(float)cy
 			halfW:(float)halfW halfH:(float)halfH
 				r:(float)r g:(float)g b:(float)b a:(float)a;
 
 /** Textured quad oriented along a segment (rope links): u runs across
  *  the width, v along the segment. */
-- (void)drawSegment:(GLuint)texture frame:(TGFrame)f
+- (void)drawSegment:(TGMetalTexture *)texture frame:(TGFrame)f
 			  fromX:(float)x0 y:(float)y0
 				toX:(float)x1 y:(float)y1
 		  halfWidth:(float)halfWidth alpha:(float)alpha;
@@ -95,7 +98,7 @@ NSString *TGBlendModeName(TGBlendMode mode);
 /** Debug/shape helper: a solid line segment of the given half-thickness,
  *  drawn with `texture` (normally the white texture). Color is
  *  straight-alpha; premultiplied internally. */
-- (void)drawLine:(GLuint)texture
+- (void)drawLine:(TGMetalTexture *)texture
 		   fromX:(float)x0 y:(float)y0
 			 toX:(float)x1 y:(float)y1
    halfThickness:(float)halfThickness

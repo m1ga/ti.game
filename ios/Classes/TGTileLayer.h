@@ -2,7 +2,7 @@
 //  ti.game — engine (iOS twin of android/src/ti/game/engine/TileLayer.java)
 //
 #import <Foundation/Foundation.h>
-#import <OpenGLES/ES2/gl.h>
+#import "TGMetalContext.h"
 
 @class TGSpriteBatch;
 @class TGSpriteSheet;
@@ -86,7 +86,7 @@ enum {
 	viewLeft:(float)viewLeft viewTop:(float)viewTop
    viewRight:(float)viewRight viewBottom:(float)viewBottom;
 /** Debug overlay: green outline on solid cells, yellow on one-way ones. */
-- (void)drawDebug:(TGSpriteBatch *)batch whiteTexture:(GLuint)whiteTexture
+- (void)drawDebug:(TGSpriteBatch *)batch whiteTexture:(TGMetalTexture *)whiteTexture
 		 viewLeft:(float)viewLeft viewTop:(float)viewTop
 		viewRight:(float)viewRight viewBottom:(float)viewBottom;
 

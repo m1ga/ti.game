@@ -185,7 +185,7 @@ static const int kMaxSegments = 200;
 	}
 	float half = self.thickness * 0.5f;
 	float overlap = half * 0.6f; // extend ends so bent joints don't gap
-	GLint texture = [sh textureId];
+	TGMetalTexture *texture = [sh textureResource];
 	for (int i = 0; i < _pointCount - 1; i++) {
 		float dx = _px[i + 1] - _px[i];
 		float dy = _py[i + 1] - _py[i];
@@ -195,7 +195,7 @@ static const int kMaxSegments = 200;
 		}
 		float ux = dx / d * overlap;
 		float uy = dy / d * overlap;
-		[batch drawSegment:(GLuint)texture frame:f
+		[batch drawSegment:texture frame:f
 					 fromX:_px[i] - ux y:_py[i] - uy
 					   toX:_px[i + 1] + ux y:_py[i + 1] + uy
 				 halfWidth:half alpha:1.0f];

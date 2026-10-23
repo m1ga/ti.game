@@ -1,5 +1,5 @@
 #import "TiGameGameView.h"
-#import "TGGLView.h"
+#import "TGMetalView.h"
 #import "TGScene.h"
 #import "TGSceneRenderer.h"
 #import "TGGamepadController.h"
@@ -28,7 +28,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 @end
 
 @implementation TiGameGameView {
-	TGGLView *_glView;
+	TGMetalView *_metalView;
 	TGTouchController *_touchController;
 	__weak id<TiEvaluator> _runtimeContext;
 	float _gamepadDeadzone; // held until the controller exists (0 is a valid value)
@@ -136,9 +136,9 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 	}
 }
 
-- (TGGLView *)glView
+- (TGMetalView *)metalView
 {
-	if (_glView == nil) {
+	if (_metalView == nil) {
 		@synchronized(self) {
 			if (_renderingShutdown) {
 				return nil;
@@ -154,16 +154,27 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 		}
 		TGScene *scene = ((TiGameGameViewProxy *)self.proxy).scene;
 		_renderer = [[TGSceneRenderer alloc] initWithScene:scene viewProxy:self.proxy];
-		_glView = [[TGGLView alloc] initWithFrame:self.bounds renderer:_renderer];
+		_metalView = [[TGMetalView alloc] initWithFrame:self.bounds renderer:_renderer];
+		if (!_metalView) {
+			@synchronized(self) { _renderingShutdown = YES; }
+			[TiGameGameView unregisterActiveView:self];
+			_renderer = nil;
+			return nil;
+		}
 		// The surface is in drawable pixels; the HUD sizes itself in points
 		// so it reads the same at 1x and on a 3x Retina drawable
-		_renderer.screenScale = (float)_glView.contentScaleFactor;
+		_renderer.screenScale = (float)_metalView.contentScaleFactor;
 		// Touches must be scaled by the drawable's actual scale, not the
-		// screen's — the GL view renders at 1x in the simulator
+		// screen's — the Metal view renders at 1x in the simulator
 		_touchController = [[TGTouchController alloc]
 			initWithScene:scene
 				viewProxy:self.proxy
-			 contentScale:_glView.contentScaleFactor];
+			 contentScale:_metalView.contentScaleFactor];
+		__weak TiGameGameView *weakSelf = self;
+		_metalView.drawableScaleChanged = ^(CGFloat scale) {
+			TiGameGameView *view = weakSelf;
+			if (view) [view->_touchController updateContentScale:scale];
+		};
 		self.multipleTouchEnabled = YES;
 		// Bluetooth game controllers (GameController.framework) — like the
 		// Window hook on Android, independent of which view has focus
@@ -178,11 +189,11 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 		}
 		_gamepadController.deadzone = _gamepadDeadzoneSet ? _gamepadDeadzone : 0.2f;
 		[self applyStickThresholds];
-		[_glView setMaxFps:_maxFps];
-		[self addSubview:_glView];
-		[_glView startRendering];
+		[_metalView setMaxFps:_maxFps];
+		[self addSubview:_metalView];
+		[_metalView startRendering];
 	}
-	return _glView;
+	return _metalView;
 }
 
 - (void)dealloc
@@ -194,7 +205,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 - (void)frameSizeChanged:(CGRect)frame bounds:(CGRect)bounds
 {
 	[super frameSizeChanged:frame bounds:bounds];
-	[TiUtils setView:[self glView] positionRect:bounds];
+	[TiUtils setView:[self metalView] positionRect:bounds];
 }
 
 - (void)didMoveToWindow
@@ -213,7 +224,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 {
 	@synchronized(self) {
 		if (!_renderingShutdown) {
-			[_glView pauseRendering];
+			[_metalView pauseRendering];
 		}
 	}
 }
@@ -222,32 +233,32 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 {
 	@synchronized(self) {
 		if (!_renderingShutdown) {
-			[_glView resumeRendering];
+			[_metalView resumeRendering];
 		}
 	}
 }
 
 - (void)shutdownRendering
 {
-	TGGLView *glView;
+	TGMetalView *metalView;
 	@synchronized(self) {
 		if (_renderingShutdown) {
 			return;
 		}
 		_renderingShutdown = YES;
-		glView = _glView;
+		metalView = _metalView;
 	}
 
 	[TiGameGameView unregisterActiveView:self];
 	[self releaseInput];
-	[glView stopRendering];
+	[metalView stopRendering];
 	[_gamepadController shutdown];
 
 	void (^releaseViewResources)(void) = ^{
-		[glView removeFromSuperview];
+		[metalView removeFromSuperview];
 		@synchronized(self) {
-			if (_glView == glView) {
-				_glView = nil;
+			if (_metalView == metalView) {
+				_metalView = nil;
 				_touchController = nil;
 				_gamepadController = nil;
 				_renderer = nil;
@@ -353,7 +364,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 - (void)setMaxFps_:(id)value
 {
 	_maxFps = [TiUtils intValue:value def:0];
-	[_glView setMaxFps:_maxFps];
+	[_metalView setMaxFps:_maxFps];
 }
 
 #pragma mark Touch handling
@@ -366,7 +377,7 @@ static void TGRebootAppWithGameViewShutdown(id app, SEL command)
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
 	if (@available(iOS 13.4,*)) { if (touches.anyObject.type == UITouchTypeIndirectPointer && [((TiGameGameViewProxy *)self.proxy).inputResolver hasBindings:@"mouse"]) return; }
-	[self glView]; // make sure the controller exists
+	[self metalView]; // make sure the controller exists
 	[_touchController touchesBegan:touches inView:self];
 }
 
