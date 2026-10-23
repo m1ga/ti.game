@@ -69,7 +69,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var UNIT = Math.max(1, Math.round(W / 380));
+		var UNIT = Math.max(1, Math.min(W / 380, H / 680));
 		var POST = Math.max(40, Math.round(W * 0.13));
 		var BALL = Math.max(12, Math.round(W * 0.04));
 		var POST_Y = H * 0.34;

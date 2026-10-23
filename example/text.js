@@ -47,7 +47,8 @@ module.exports = function () {
 
 		var WORLD_W = W * 2;
 		var WORLD_H = H * 2;
-		var UNIT = Math.max(1, Math.round(W / 200)); // pixel-font scale
+		var ART = Math.min(W, H);
+		var UNIT = Math.max(1, Math.round(Math.min(W / 200, H / 360))); // pixel-font scale
 
 		// --- world-space text: scrolls with the camera like any sprite ---
 
@@ -71,9 +72,10 @@ module.exports = function () {
 		gameView.add(Game.createText({
 			text: 'DRAG THE BALL AROUND\nTHE CAMERA FOLLOWS\nTAP IT TO SCORE',
 			align: 'center',
+			maxWidth: W * 0.6 / (UNIT * 0.7),
 			x: WORLD_W / 2,
 			y: WORLD_H / 2 - H * 0.2,
-			scale: UNIT,
+			scale: UNIT * 0.7,
 			lineSpacing: 1.4,
 			tintColor: '#5c6b8a',
 			zIndex: 2
@@ -113,8 +115,8 @@ module.exports = function () {
 			sheet: ballSheet,
 			x: WORLD_W / 2,
 			y: WORLD_H / 2,
-			width: W * 0.14,
-			height: W * 0.14,
+			width: ART * 0.14,
+			height: ART * 0.14,
 			hitboxShape: 'circle',
 			draggable: true,
 			zIndex: 5
@@ -129,7 +131,7 @@ module.exports = function () {
 			tintColor: '#7fd4ff',
 			zIndex: 6
 		});
-		tag.attachTo(ball, { offsetY: -(W * 0.09) });
+		tag.attachTo(ball, { offsetY: -(ART * 0.09) });
 		gameView.add(tag);
 
 		gameView.cameraBounds = { minX: 0, minY: 0, maxX: WORLD_W, maxY: WORLD_H };

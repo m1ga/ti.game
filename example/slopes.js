@@ -61,7 +61,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var UNIT = Math.max(1, Math.round(W / 380));
+		var UNIT = Math.max(1, Math.min(W / 380, H / 680));
 		var RIDER = Math.max(18, Math.round(W * 0.06));
 		var SHADOW_X = UNIT * 3;
 		var SHADOW_Y = UNIT * 5;

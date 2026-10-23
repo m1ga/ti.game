@@ -53,12 +53,12 @@ module.exports = function () {
 	function init(W, H) {
 
 		var WALK_SPEED = W * 0.35;         // px/s
-		var PLAYER_W = Math.round(W * 0.15);
+		var PLAYER_W = Math.round(Math.min(W * 0.15, H * 0.15));
 		var PLAYER_H = Math.round(PLAYER_W * 1.5);
-		var TREE_W = Math.round(W * 0.45);
+		var TREE_W = Math.round(Math.min(W * 0.45, H * 0.45));
 		var TREE_H = Math.round(TREE_W * 1.25);
-		var BIRD = Math.round(W * 0.10);
-		var ICON = Math.round(W * 0.17);
+		var BIRD = Math.round(Math.min(W * 0.10, H * 0.10));
+		var ICON = Math.round(Math.min(W * 0.17, H * 0.12));
 
 		// The meadow starts below the painted horizon; the player can only
 		// walk there (classic adventure-game walkable floor)

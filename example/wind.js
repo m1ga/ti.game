@@ -58,7 +58,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var UNIT = Math.max(1, Math.round(W / 380));
+		var UNIT = Math.max(1, Math.min(W / 380, H / 680));
 		var LEAF = Math.max(10, Math.round(W * 0.03));
 		var FLOOR_Y = H * 0.57;
 		var STRIP_Y = H * 0.88;

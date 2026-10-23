@@ -51,10 +51,10 @@ module.exports = function () {
 
 		var MARGIN = W * 0.12;         // turn-around distance from the edges
 		var FLOOR_H = Math.round(H * 0.05);
-		var PLAYER_W = Math.round(W * 0.13);
+		var PLAYER_W = Math.round(Math.min(W, H) * 0.13);
 		var PLAYER_H = Math.round(PLAYER_W * 1.5);
-		var DOG = Math.round(W * 0.12);
-		var BIRD = Math.round(W * 0.12);
+		var DOG = Math.round(Math.min(W, H) * 0.12);
+		var BIRD = Math.round(Math.min(W, H) * 0.12);
 
 		// Floor and ceiling the player can stand on (and under)
 		function makeSolid(y) {

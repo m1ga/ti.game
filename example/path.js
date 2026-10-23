@@ -42,12 +42,14 @@ module.exports = function () {
 
 	function init(W, H) {
 
+		var ART = Math.min(W, H);
+
 		// --- Ship: looping smoothed circuit, nose along the path ----------
 
 		var ship = Game.createSprite({
 			sheet: shipSheet,
-			width: Math.round(W * 0.12),
-			height: Math.round(W * 0.12),
+			width: Math.round(ART * 0.12),
+			height: Math.round(ART * 0.12),
 			zIndex: 10
 		});
 		gameView.add(ship);
@@ -67,8 +69,8 @@ module.exports = function () {
 
 		var guard = Game.createSprite({
 			sheet: playerSheet,
-			width: Math.round(W * 0.12),
-			height: Math.round(W * 0.18),
+			width: Math.round(ART * 0.12),
+			height: Math.round(ART * 0.18),
 			zIndex: 10,
 			animations: {
 				walk: { frames: [1, 2], fps: 6, loop: true },
@@ -96,8 +98,8 @@ module.exports = function () {
 			sheet: birdSheet,
 			x: W * 0.85,
 			y: H * 0.72,
-			width: Math.round(W * 0.14),
-			height: Math.round(W * 0.14),
+			width: Math.round(ART * 0.14),
+			height: Math.round(ART * 0.14),
 			zIndex: 10,
 			animations: {
 				idle: { frames: [0, 0, 0, 1, 0, 0, 0, 2], fps: 3, loop: true },
@@ -117,8 +119,8 @@ module.exports = function () {
 			sheet: dogSheet,
 			x: W * 0.15,
 			y: H * 0.85,
-			width: Math.round(W * 0.10),
-			height: Math.round(W * 0.10),
+			width: Math.round(ART * 0.10),
+			height: Math.round(ART * 0.10),
 			zIndex: 10,
 			animations: {
 				walk: { frames: [0, 1], fps: 7, loop: true }

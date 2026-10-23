@@ -41,6 +41,7 @@ module.exports = function () {
 		title: 'Pool',
 		theme: 'Theme.Titanium.DayNight'
 	});
+	var stage = require('/pool-viewport')(win);
 	var gameView = Game.createGameView({
 		backgroundColor: '#071a12',
 		maxFps: 60
@@ -463,12 +464,12 @@ module.exports = function () {
 		});
 	}
 
-	win.add(gameView);
+	stage.add(gameView);
 	// Back — action bar Up on Android, overlay pill on iOS (see backnav.js)
 	require('/backnav')(win, { text: '#e5eee9', background: '#172a21', border: '#456555', pressed: '#274538' });
 	var resetButton = Ti.UI.createLabel({
 		text: 'RESET',
-		top: Ti.Platform.osname === 'android' ? 10 : 40,
+		top: 8,
 		right: 12,
 		width: 82,
 		height: 38,
@@ -487,7 +488,7 @@ module.exports = function () {
 	resetButton.addEventListener('click', function () {
 		resetTable();
 	});
-	win.add(resetButton);
+	stage.add(resetButton);
 	win.addEventListener('close', function () {
 		strikeSound.stop();
 		impactSound.stop();

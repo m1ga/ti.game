@@ -52,7 +52,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var TEXT_SCALE = Math.max(1, Math.round(W / 240));
+		var TEXT_SCALE = Math.max(1, Math.round(Math.min(W / 240, H / 360)));
 		scoreLabel.scale = TEXT_SCALE;
 		scoreLabel.x = W / 2;
 		scoreLabel.y = H * 0.08;

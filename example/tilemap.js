@@ -41,11 +41,13 @@ module.exports = function () {
 	var ROWS = 90;
 
 	var initialized = false;
+	var layoutHUD = function () {};
 	gameView.addEventListener('resize', function (e) {
 		if (!initialized) {
 			initialized = true;
 			init(e.width, e.height);
 		}
+		layoutHUD(e.width, e.height);
 	});
 
 	// Deterministic random, so the island is the same on every run
@@ -122,11 +124,13 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var density = Ti.Platform.osname === 'android'
-			? Ti.Platform.displayCaps.logicalDensityFactor
-			: H / Ti.Platform.displayCaps.platformHeight;
-		var TILE = Math.round(16 * density);   // world px per cell
-		var UNIT = Math.max(1, Math.round(TILE / 14));
+		// Surface pixels per view point, independent of the monitor/window size.
+		var density = W / gameView.rect.width;
+		if (!(density > 0 && isFinite(density))) {
+			density = Ti.Platform.displayCaps.logicalDensityFactor || 1;
+		}
+		var TILE = Math.round(32 * density);
+		var UNIT = 1.5 * density;
 
 		// --- The map: one layer, one texture, only visible cells drawn --
 
@@ -242,21 +246,22 @@ module.exports = function () {
 
 		// --- HUD (screenFixed text, tap buttons) -------------------------
 
-		var margin = Math.round(H * 0.06);
-		gameView.add(Game.createText({
+		var margin = 44 * density;
+		var title = Game.createText({
 			text: COLS + ' x ' + ROWS + ' TILES - ONE LAYER',
 			screenFixed: true,
 			x: W / 2,
-			y: margin,
+			y: 90 * density,
 			scale: UNIT,
 			tintColor: '#ffd54a',
 			zIndex: 20
-		}));
+		});
+		gameView.add(title);
 		var hint = Game.createText({
 			text: 'TAP TO WALK',
 			screenFixed: true,
 			x: W / 2,
-			y: margin + 18 * UNIT,
+			y: 90 * density + 18 * UNIT,
 			scale: UNIT,
 			tintColor: '#dfe6ee',
 			zIndex: 20
@@ -294,6 +299,12 @@ module.exports = function () {
 			gameView.debug = { hitbox: hitboxes, hud: 'topRight' };
 		});
 		gameView.add(debugButton);
+		layoutHUD = function (width, height) {
+			title.x = hint.x = width / 2;
+			buildButton.x = width * 0.3;
+			debugButton.x = width * 0.72;
+			buildButton.y = debugButton.y = height - margin;
+		};
 	}
 
 	win.add(gameView);

@@ -97,7 +97,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var UNIT = Math.max(1, Math.round(W / 200)); // pixel-font scale
+		var UNIT = Math.max(1, Math.round(Math.min(W / 200, H / 360))); // pixel-font scale
 
 		// --- parallax starfield: scroll one texture period, snap back --
 

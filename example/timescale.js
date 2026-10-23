@@ -49,8 +49,8 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var DOG = Math.round(W * 0.16);
-		var BALL = Math.round(W * 0.14);
+		var DOG = Math.round(Math.min(W, H) * 0.16);
+		var BALL = Math.round(Math.min(W, H) * 0.14);
 		var floorY = H * 0.62;
 
 		// Invisible floor for the ball (and the dog's track reference)
@@ -114,7 +114,7 @@ module.exports = function () {
 
 		// --- Game clock vs wall clock ------------------------------------
 
-		var UNIT = Math.max(1, Math.round(W / 200));
+		var UNIT = Math.max(1, Math.min(W / 200, H / 360));
 		var gameSeconds = 0;
 		var realSeconds = 0;
 		var gameClock = Game.createText({
