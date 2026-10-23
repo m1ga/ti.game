@@ -113,6 +113,10 @@ module.exports = function () {
 			return ship;
 		});
 
+		require('/keyboard')(win, gameView, {
+			flash: { keys: ['Space'], down: function () { ships.forEach(function (ship, index) { ship.flash(FLASHES[index].color, FLASHES[index].duration); }); } }
+		});
+
 		// Invincibility-style auto-blink on the right ship; the fade
 		// itself runs in the engine, JS just retriggers it
 		blinkTimer = setInterval(function () {

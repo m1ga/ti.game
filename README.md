@@ -47,7 +47,7 @@ Android/iOS contract and calls out the few platform differences.
   for camera-proof HUDs
 - Sprite attachment (`attachTo`) — pin any sprite to another with an
   offset, tracked natively every frame (name tags, health bars, turrets)
-- 34 example demos in `example/`, each focused on a runnable feature set
+- 35 example demos in `example/`, each focused on a runnable feature set
 
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
@@ -291,6 +291,52 @@ The GameView also fires `press` / `tap` / `release` for *every* touch
 not available on the game view — but ordinary Titanium buttons/views
 overlaid on top work normally, and separate views receive simultaneous
 pointers, which is how the demos do multitouch d-pads (hold ▶ + jump).
+
+### Configurable digital input
+
+`GameView.inputMap` is optional and defaults to `{}`. Each context contains named actions with arrays of bindings. `inputContext` defaults to `'gameplay'`; `null` disables actions. Replace the map to rebind controls; there is no new settings UI or persistence.
+
+```js
+var gameView = Game.createGameView({
+    inputMap: {
+        gameplay: {
+            thrust: [{ device: 'keyboard', code: 'KeyW' }, { device: 'keyboard', code: 'ArrowUp' }],
+            fire: [{ device: 'keyboard', code: 'Space' }, { device: 'mouse', button: 'left' }, { device: 'gamepad', button: 'a' }],
+            pause: [{ device: 'keyboard', code: 'Escape' }]
+        },
+        paused: { pause: [{ device: 'keyboard', code: 'Escape' }] }
+    }
+});
+gameView.addEventListener('actiondown', function (e) { /* e.action, e.context */ });
+gameView.addEventListener('actionup', function (e) { /* e.action, e.context */ });
+// After the window opens, or after returning from a native text field:
+gameView.focusInput();
+```
+
+An action goes down on its first active binding and up after its last source releases, including across controllers. Auto-repeat is ignored. A context or valid map change releases previous actions and requires a fresh press; keys already held cannot activate the new context. Invalid maps throw and preserve the previous map and active state. Context names and action names must be nonempty strings; each binding has exactly `device` and either `code` (keyboard) or `button` (mouse/gamepad). Empty contexts and empty action arrays are allowed.
+
+Keyboard codes are `KeyA`…`KeyZ`, `Digit0`…`Digit9`, `ArrowUp/Down/Left/Right`, `Space`, `Escape`, `Enter`, `Tab`, `Backspace`, `Delete`, `Home`, `End`, `PageUp`, `PageDown`, `F1`…`F12`, and `Shift`, `Control`, `Alt`, `Meta` with `Left`/`Right` suffixes. Mouse buttons are `left`, `middle`, `right`; gamepad bindings use the named buttons below. Analog sticks and existing gamepad properties/events are unchanged. Use either action events or individual button events for each gamepad action to avoid dispatching twice. An app retaining its gamepad adapter can omit gamepad bindings from its map.
+
+`keydown` and `keyup` carry `{ code, character, modifiers: { shift, control, alt, meta } }`. The character can be empty for non-text keys; `code` identifies the physical key independently of its character. Keyboard events reach only the focused GameView. `focusInput()` requests focus on the UI thread; it does not capture a keyboard globally or open a software keyboard. Native text fields retain their focus. When the active context defines mouse bindings, canvas pointer gestures feed actions. Empty maps, keyboard-only contexts and disabled actions preserve existing sprite pointer interaction. Mouse input is accepted only when delivered to the canvas; overlaid Titanium controls keep their clicks. Held actions release on cancellation, focus loss, suspension, input-device disconnection or view shutdown. Focus loss can end an action without a physical `keyup`; applications should drive gameplay from action transitions.
+
+For pointer capture on iOS/iPadOS 13.4–16, the consuming application must opt into indirect input in `tiapp.xml` (iOS 17+ defaults this key to true):
+
+```xml
+<ios>
+  <plist>
+    <dict>
+      <key>UIApplicationSupportsIndirectInputEvents</key>
+      <true/>
+    </dict>
+  </plist>
+</ios>
+```
+
+See [Apple’s indirect input configuration](https://developer.apple.com/documentation/bundleresources/information-property-list/uiapplicationsupportsindirectinputevents). This application setting is required to distinguish a mouse pointer from a direct touch on older supported systems; the module does not modify the app’s global input configuration at runtime.
+
+Apple keyboard/pointer capture requires iOS/iPadOS 13.4 or later, including Catalyst after the renderer supports it. The source deployment minimum remains iOS 12; UIKit APIs are guarded. On iOS 14+, keyboard/mouse disconnect notifications also release input; earlier UIKit versions deliver cancellation/focus lifecycle events. The upstream Apple OpenGL renderer builds for iOS and Simulator and does not support Catalyst; this feature has no Metal dependency. Android retains its engine touch listener. All resolution runs natively on input transitions, with no per-frame bridge traffic.
+
+Run `python3 tests/input-map/uikit.py` for UIKit focus, raw-key repetition/cancellation and canvas/overlay pointer ownership, using production responder methods with renderer/event-sink fixtures. Run `python3 tests/input-map/run.py` for native resolver regressions and `python3 tests/gamepad-fixture/check.py` for real GameController fanout, disconnect and action delivery without individual listeners. The launcher shows Configurable input on Mac only; phones and tablets retain the touch-ready demos. The source remains available for mobile testing with external peripherals. `example/inputmap.js` moves an animated character with A/D, J/L, arrows or a gamepad. The last pressed direction wins while both are held, and releasing it resumes the other held direction. Space or gamepad A jumps. W/I/Up aims upward (combine with left/right for diagonals); S/K/Down crouches. A left mouse click on the canvas or gamepad X fires projectiles. Escape pauses/resumes through separate action contexts. Right/middle bindings are included for testing, but currently do not trigger actions on Mac; left click is verified. A separate input monitor shows raw key codes/modifiers and the existing gamepad button, stick and trigger events. Instructions stay visible above separate action feedback; an overlaid text field and focus button demonstrate native control ownership. Clicking the canvas after text entry restores game focus; that first click does not fire. The shared back control returns to the launcher. Physical keyboard/mouse/controller and overlay acceptance must be recorded separately from compilation and automated resolver tests.
 
 ### Gamepads
 
@@ -883,12 +929,11 @@ HUD costs nothing. `particles.js` and `camera.js` have it switched on.
 ## Learn from the examples
 
 `example/app.js` is a launcher; each demo is a self-contained file showing
-a feature set — find the one closest to your game and start there. The only
-shared piece is `example/backnav.js`, the "back to the launcher" control
-(action bar Up arrow on Android, an overlay button on iOS):
+a feature set — find the one closest to your game and start there. Shared helpers provide the back control (`example/backnav.js`) and optional native action shortcuts (`example/keyboard.js`). Back uses the action bar Up arrow on Android and an overlay button on iOS:
 
 | Demo | Shows |
 |---|---|
+| `inputmap.js` | Playable keyboard/mouse/gamepad actions, persistent instructions and native text-field focus |
 | `basic.js` | Sheets, frame animations, drag/pinch/rotate and tween completion |
 | `puzzle.js` | Multi-touch drag, snapping and tween-back |
 | `flappy.js` | Gravity impulse, invisible trigger zones and wrapping parallax |
@@ -923,6 +968,28 @@ shared piece is `example/backnav.js`, the "back to the launcher" control
 | `wind.js` | `gravityX` as wind and as top-down acceleration |
 | `tilemap.js` | A 120x90 TileLayer, visible-cell rendering, cell collision, live edits, A* and HUD telemetry |
 | `worldwrap.js` | `worldWrapX` camera, touch, collision, swept movement and a full-width TileLayer |
+
+Keyboard shortcuts work while the game canvas has focus (Apple keyboard APIs require iOS/iPadOS 13.4 or later). They call the same functions as the existing controls. Native actions aggregate bindings and ignore key repeat; there is no keyboard polling or global capture. Window blur/close disables actions. Text fields and overlaid native controls retain their input. Platformer and Volley route their mapped gamepad buttons through the same actions; avoid adding a second button listener for those actions.
+
+| Demos | Keys |
+|---|---|
+| Platformer, Volley | Left/Right, A/D or J/L move; Space, Up, W or I jump; gamepad d-pad/left stick and A/up |
+| Flappy, Flip | Space, Up or W flap/restart or invert gravity |
+| Skate | Space, Up or W jump/restart |
+| Plinko | Space or 1 drops one; 0 drops ten |
+| Pool | R resets the table; mouse/touch still aims shots |
+| Bingo Drum | Space shakes; T toggles tumble |
+| Circle solids | Space shoots; D toggles debug shapes |
+| Slopes | R resets; D toggles debug shapes |
+| Trigger zones | Space or R removes/respawns the ball |
+| Text | Space scores; R resets; N changes the dialog |
+| Tile map | B toggles building; D toggles debug; mouse/touch chooses a destination or tile |
+| Wind | Space drops a leaf; Left/Right or A/D changes wind |
+| Particles, Blend | Space creates a centered burst or flashes the ships |
+| Rhythm | A/S/D or Left/Down/Right hits the three lanes |
+| Swept collision | Space shoots both lanes; Left/Right or A/D changes speed |
+| Camera | Minus/Equal zoom out/in; Space shakes |
+| Time scale | 1/2/3/4 select normal, half, tenth or paused speed |
 
 These demos do not cover every public member. In particular, there is no
 dedicated demo for `wallhit`/`wallSlideSpeed`, resource `unload()`, every

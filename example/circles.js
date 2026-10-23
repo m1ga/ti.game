@@ -366,10 +366,11 @@ module.exports = function () {
 				row.target.velocityY = 0;
 			});
 		}
-		shootButton.addEventListener('tap', function () {
+		function shootAll() {
 			shootButton.flash('#fff', 150);
 			shootRows(true);
-		});
+		}
+		shootButton.addEventListener('tap', shootAll);
 		gameView.add(shootButton);
 		gameView.after(450, function () {
 			shootRows(false);
@@ -391,11 +392,17 @@ module.exports = function () {
 			shapesButton.text = shapesOn ? '[ DEBUG SHAPES ON ]' : '[ DEBUG SHAPES OFF ]';
 			gameView.debug = shapesOn;
 		}
-		shapesButton.addEventListener('tap', function () {
+		function toggleShapes() {
 			shapesOn = !shapesOn;
 			shapesButton.flash('#fff', 150);
 			updateShapes();
+		}
+		shapesButton.addEventListener('tap', toggleShapes);
+		require('/keyboard')(win, gameView, {
+			shoot: { keys: ['Space'], down: shootAll },
+			shapes: { keys: ['KeyD'], down: toggleShapes }
 		});
+
 		updateShapes();
 		gameView.add(shapesButton);
 	}

@@ -36,6 +36,8 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 	private static final ArrayList<WeakReference<TiGameView>> activeViews = new ArrayList<>();
 
 	private final GLSurfaceView glView;
+	private final ti.game.engine.InputResolver input;
+	private final ti.game.engine.CanvasInput canvasInput;
 	private final SceneRenderer renderer;
 	private final Scene scene;
 	private final TouchController touchController;
@@ -96,7 +98,28 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		this.scene = scene;
 
 		Activity activity = proxy.getActivity();
-		glView = new GLSurfaceView(activity);
+		input = ((GameViewProxy)proxy).getInputResolver();
+		canvasInput = new ti.game.engine.CanvasInput(input,proxy);
+		glView = new GLSurfaceView(activity) {
+			@Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+				if (canvasInput.mouse(event)) return true;
+				return super.dispatchTouchEvent(event);
+			}
+			@Override public boolean onGenericMotionEvent(android.view.MotionEvent event) {
+				return canvasInput.mouse(event) || super.onGenericMotionEvent(event);
+			}
+			@Override protected void onFocusChanged(boolean focused, int direction, android.graphics.Rect rect) {
+				super.onFocusChanged(focused,direction,rect);
+				if (!focused) input.releaseAll();
+			}
+			@Override public void onWindowFocusChanged(boolean focused) {
+				super.onWindowFocusChanged(focused);
+				if (!focused) input.releaseAll();
+			}
+		};
+		glView.setFocusable(true);
+		glView.setFocusableInTouchMode(true);
+		glView.setOnKeyListener((view,code,event) -> canvasInput.key(event));
 		glView.setEGLContextClientVersion(2);
 		glView.setEGLConfigChooser(8, 8, 8, 8, 0, 0);
 		glView.setPreserveEGLContextOnPause(true);
@@ -110,6 +133,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		// Bluetooth/USB game controllers — captured at the activity window so
 		// they work no matter which view holds focus
 		gamepadController = new GamepadController(activity, proxy);
+		gamepadController.setInputResolver(input);
 		setNativeView(glView);
 
 		if (activity instanceof TiBaseActivity) {
@@ -120,6 +144,8 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		}
 		registerActiveView(this);
 	}
+
+	public void focusInput() { if (!renderingShutdown) glView.requestFocus(); }
 
 	public SceneRenderer getRenderer()
 	{
@@ -159,6 +185,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 		if (lifecycleActivity != null) {
 			lifecycleActivity.removeOnLifecycleEventListener(this);
 		}
+		input.releaseAll();
 		gamepadController.release();
 
 		Runnable detachSurface = new Runnable() {
@@ -299,6 +326,7 @@ public final class TiGameView extends TiUIView implements TiLifecycle.OnLifecycl
 			ti.game.engine.SoundEngine.notifyActivityPaused();
 			// key-up events are lost while in the background — don't leave
 			// a direction held down in JS
+			input.releaseAll();
 			gamepadController.releaseAll();
 		}
 	}

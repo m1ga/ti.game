@@ -240,6 +240,13 @@ module.exports = function () {
 		// --- Your controls (same as the platformer) ----------------------
 
 		var moveDir = 0;
+		var directions = {};
+		function move(source, direction, down) {
+			directions[source] = down ? direction : 0;
+			var values = Object.keys(directions).map(function (key) { return directions[key]; });
+			moveDir = Number(values.indexOf(1) !== -1) - Number(values.indexOf(-1) !== -1);
+			applyMovement();
+		}
 
 		function applyMovement() {
 			player.velocityX = moveDir * RUN_SPEED;
@@ -291,15 +298,11 @@ module.exports = function () {
 
 		function bindHold(button, dir) {
 			button.addEventListener('touchstart', function () {
-				moveDir = dir;
-				applyMovement();
+				move('touch' + dir, dir, true);
 			});
 			['touchend', 'touchcancel'].forEach(function (event) {
 				button.addEventListener(event, function () {
-					if (moveDir === dir) {
-						moveDir = 0;
-						applyMovement();
-					}
+					move('touch' + dir, dir, false);
 				});
 			});
 		}
@@ -315,6 +318,14 @@ module.exports = function () {
 		win.add(leftButton);
 		win.add(jumpButton);
 		win.add(rightButton);
+
+		require('/keyboard')(win, gameView, {
+			left: { keys: ['KeyA', 'KeyJ', 'ArrowLeft'], buttons: ['left'],
+				down: function () { move('left', -1, true); }, up: function () { move('left', -1, false); } },
+			right: { keys: ['KeyD', 'KeyL', 'ArrowRight'], buttons: ['right'],
+				down: function () { move('right', 1, true); }, up: function () { move('right', 1, false); } },
+			jump: { keys: ['Space', 'KeyW', 'KeyI', 'ArrowUp'], buttons: ['a', 'up'], down: jump }
+		});
 
 		// first serve: random side
 		serve(Math.random() < 0.5 ? -1 : 1);

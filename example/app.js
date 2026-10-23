@@ -69,6 +69,11 @@ var demos = [
 	{ title: 'World wrap X', start: require('/worldwrap') }
 ];
 
+// External-input demo has no touch controls; keep the mobile launcher touch-friendly.
+if (Ti.Platform.osname === 'macos') {
+	demos.unshift({ title: 'Configurable input', start: require('/inputmap') });
+}
+
 var win = Ti.UI.createWindow({
 	backgroundColor: '#202030',
 	extendSafeArea: false,   // keep content clear of the notch and home bar

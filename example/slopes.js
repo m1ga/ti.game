@@ -243,7 +243,7 @@ module.exports = function () {
 			tintColor: '#8ab4ff',
 			zIndex: 20
 		});
-		resetButton.addEventListener('tap', function () {
+		function resetBodies() {
 			resetButton.flash('#fff', 150);
 			crate.x = START.crateX;
 			crate.y = START.y;
@@ -253,7 +253,8 @@ module.exports = function () {
 			ball.y = START.y;
 			ball.velocityX = 0;
 			ball.velocityY = 0;
-		});
+		}
+		resetButton.addEventListener('tap', resetBodies);
 		// The overlay is the argument in this demo, but it also makes the
 		// screen read like a tool rather than a game, so it is a toggle
 		// rather than a fixture. Green is the collision shape, blue the
@@ -274,11 +275,17 @@ module.exports = function () {
 				sprite.debug = shapesOn;
 			});
 		}
-		shapesButton.addEventListener('tap', function () {
+		function toggleShapes() {
 			shapesOn = !shapesOn;
 			shapesButton.flash('#fff', 150);
 			updateShapes();
+		}
+		shapesButton.addEventListener('tap', toggleShapes);
+		require('/keyboard')(win, gameView, {
+			reset: { keys: ['KeyR'], down: resetBodies },
+			shapes: { keys: ['KeyD'], down: toggleShapes }
 		});
+
 		updateShapes();
 		scene.push(resetButton, shapesButton);
 		gameView.add(scene);

@@ -2,6 +2,7 @@
 #import <GameController/GameController.h>
 #import <TitaniumKit/TitaniumKit.h>
 #import "TGGamepadController.h"
+#import "TGInputResolver.h"
 @interface TGGamepadController (Testing)
 - (void)attachController:(GCController *)controller announce:(BOOL)announce;
 - (void)gamepad:(GCExtendedGamepad *)pad changed:(GCControllerElement *)element device:(id)device;
@@ -15,9 +16,10 @@
     [super gamepad:pad changed:element device:device];
 }
 @end
+static BOOL suppressButtons = NO;
 @implementation TiProxy
 - (instancetype)init { if (self = [super init]) _events = [NSMutableArray array]; return self; }
-- (BOOL)_hasListeners:(NSString *)event { return YES; }
+- (BOOL)_hasListeners:(NSString *)event { return !(suppressButtons && ([event isEqual:@"buttondown"] || [event isEqual:@"buttonup"])); }
 - (void)fireEvent:(NSString *)event withObject:(NSDictionary *)data { [_events addObject:@{ @"event": event, @"data": data }]; }
 @end
 static NSUInteger downs(TiProxy *proxy) {
@@ -97,6 +99,19 @@ int main(void) { @autoreleasepool {
     for (CountingReceiver *view in views) if(view.dispatchCount!=3){NSLog(@"FAIL reconnect fanout");return 1;}
     for (TGGamepadController *view in views) [view shutdown];
     if(controller.extendedGamepad.valueChangedHandler || other.extendedGamepad.valueChangedHandler){NSLog(@"FAIL multi-controller cleanup");return 1;}
+    // Action resolution must run even with no individual button listeners.
+    suppressButtons=YES;
+    NSMutableArray *edges=[NSMutableArray array];
+    TGInputResolver *resolver=[[TGInputResolver alloc] initWithListener:^(NSString *action,NSString *context,BOOL down){[edges addObject:@(down)];}];
+    [resolver setMap:@{@"gameplay":@{@"fire":@[@{@"device":@"gamepad",@"button":@"a"}]}}];
+    TiProxy *quiet=[TiProxy new];
+    TGGamepadController *native=[[TGGamepadController alloc] initWithViewProxy:quiet];native.inputResolver=resolver;
+    [native attachController:controller announce:NO];
+    [controller.extendedGamepad.buttonA setValue:0];press(controller,1);
+    if(edges.count!=1 || downs(quiet)!=0){NSLog(@"FAIL actions without button listeners");return 1;}
+    [[NSNotificationCenter defaultCenter] postNotificationName:GCControllerDidDisconnectNotification object:controller];
+    if(edges.count!=2 || [edges.lastObject boolValue]){NSLog(@"FAIL action disconnect release");return 1;}
+    [native shutdown];suppressButtons=NO;
     NSLog(@"PASS: fanout, both close orders, recreate, last cleanup, shut-down attach, held release, delayed-input cleanup, three views, two pads and reconnect");
     return 0;
 } }

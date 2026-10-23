@@ -514,6 +514,10 @@ public final class GamepadController implements InputManager.InputDeviceListener
 	@Override
 	public void onInputDeviceRemoved(int deviceId)
 	{
+		if (inputResolver != null) {
+			inputResolver.releaseDevice("keyboard",Integer.toString(deviceId));
+			inputResolver.releaseDevice("mouse",Integer.toString(deviceId));
+		}
 		DeviceState state;
 		synchronized (devices) {
 			state = devices.get(deviceId);
@@ -742,6 +746,9 @@ public final class GamepadController implements InputManager.InputDeviceListener
 
 	/** Central edge detector: a name is reported down once, no matter how
 	 *  many physical controls map onto it (d-pad hat + key + stick). */
+	private InputResolver inputResolver;
+	public void setInputResolver(InputResolver resolver) { inputResolver = resolver; }
+
 	private void setButton(DeviceState state, String name, boolean down, String source, int keyCode)
 	{
 		synchronized (state.pressed) {
@@ -755,6 +762,7 @@ public final class GamepadController implements InputManager.InputDeviceListener
 				state.pressed.remove(name);
 			}
 		}
+		if (inputResolver != null) inputResolver.transition("gamepad", Integer.toString(state.id), name, down);
 		String event = down ? "buttondown" : "buttonup";
 		if (viewProxy != null && viewProxy.hasListeners(event)) {
 			KrollDict data = new KrollDict();

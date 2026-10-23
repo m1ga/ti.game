@@ -175,7 +175,7 @@ module.exports = function () {
 			tintColor: '#8ab4ff',
 			zIndex: 20
 		});
-		removeButton.addEventListener('tap', function () {
+		function toggleBall() {
 			removeButton.flash('#fff', 150);
 			if (ballInScene) {
 				// if the ball sits on the plate, the plate hears
@@ -189,7 +189,12 @@ module.exports = function () {
 				removeButton.text = '[ REMOVE BALL ]';
 			}
 			ballInScene = !ballInScene;
+		}
+		removeButton.addEventListener('tap', toggleBall);
+		require('/keyboard')(win, gameView, {
+			ball: { keys: ['Space', 'KeyR'], down: toggleBall }
 		});
+
 		gameView.add(removeButton);
 	}
 
