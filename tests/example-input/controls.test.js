@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 const vm = require('node:vm');
 const { test } = require('node:test');
 const root = path.resolve(__dirname, '../../example');
@@ -27,6 +29,7 @@ function fixture(name, density = 2, width = 1920, height = 1048) {
  const Game = new Proxy({}, {get(target,key) {
   return props => {
    const value=object({...props, kind:key});
+   if(key==='createGameView') value.cameraScale=props.cameraScale ?? 1;
    if(key==='createTileLayer') {
     value.width=props.data[0].length*props.tileWidth; value.height=props.data.length*props.tileHeight;
     value.isBlocked=()=>false; value.cellAt=(col,row)=>({x:col*props.tileWidth,y:row*props.tileHeight});
@@ -51,6 +54,32 @@ function fixture(name, density = 2, width = 1920, height = 1048) {
  view.emit('resize',surface);
  return {objects,view,host,stage,surface,windows,timers};
 }
+
+test('Camera keyboard map is accepted by the native resolver and zoom actions change scale', () => {
+ const f=fixture('camera');
+ const codes=Object.values(f.view.inputMap.gameplay).flat().filter(binding=>binding.device==='keyboard').map(binding=>binding.code);
+ const folder=fs.mkdtempSync(path.join(os.tmpdir(),'ti-game-camera-keys-'));
+ try {
+  const source=path.join(folder,'CameraKeys.java');
+  fs.writeFileSync(source, `import ti.game.engine.InputResolver;
+import java.util.*;
+public class CameraKeys {
+ public static void main(String[] codes) {
+  InputResolver resolver=new InputResolver((action,context,down)->{});
+  Map<String,Object> actions=new LinkedHashMap<>();
+  for(int i=0;i<codes.length;i++) actions.put("action"+i,new Object[]{Map.of("device","keyboard","code",codes[i])});
+  resolver.setMap(Map.of("gameplay",actions));
+ }
+}
+`);
+  execFileSync('javac',['-d',folder,path.resolve(root,'../android/src/ti/game/engine/InputResolver.java'),source]);
+  execFileSync('java',['-cp',folder,'CameraKeys',...codes]);
+ } finally { fs.rmSync(folder,{recursive:true,force:true}); }
+ f.view.emit('actiondown',{action:'in'});
+ assert.equal(f.view.cameraScale,1.25);
+ f.view.emit('actiondown',{action:'out'});
+ assert.equal(f.view.cameraScale,1);
+});
 
 test('keyboard shortcuts invoke existing demo actions and release listeners on close', () => {
  const names=['flappy','flip','skate','plinko','pool','drum','circles','slopes','zones','text','tilemap','wind','particles','blend','rhythm','swept','camera','timescale','platformer','volley'];

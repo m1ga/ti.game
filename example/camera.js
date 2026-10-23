@@ -254,8 +254,8 @@ module.exports = function () {
 		});
 
 		require('/keyboard')(win, gameView, {
-			out: { keys: ['Minus'], down: function () { setZoom(1 / 1.25); } },
-			in: { keys: ['Equal'], down: function () { setZoom(1.25); } },
+			out: { keys: ['KeyZ'], down: function () { setZoom(1 / 1.25); } },
+			in: { keys: ['KeyX'], down: function () { setZoom(1.25); } },
 			shake: { keys: ['Space'], down: function () { gameView.shake({ strength: W * 0.02, duration: 500 }); } }
 		});
 
