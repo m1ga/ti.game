@@ -36,8 +36,8 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var HERO = Math.round(W * 0.35);
-		var GHOST = Math.round(W * 0.28);
+		var HERO = Math.round(Math.min(W, H) * 0.35);
+		var GHOST = Math.round(Math.min(W, H) * 0.28);
 
 		var hero = Game.createSprite({
 			sheet: sheet,

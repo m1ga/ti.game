@@ -54,9 +54,9 @@ module.exports = function () {
 
 		var MARGIN = W * 0.1;          // turn-around distance from the edges
 		var FLOOR_H = Math.round(H * 0.05);
-		var PLAYER_W = Math.round(W * 0.16);
+		var PLAYER_W = Math.round(Math.min(W, H) * 0.16);
 		var PLAYER_H = Math.round(PLAYER_W * 1.5);
-		var TEXT = Math.max(1, Math.round(W / 480));
+		var TEXT = Math.max(1, Math.min(W / 480, H / 680));
 
 		// Floor and a center wall, both solid
 		gameView.add(Game.createSprite({

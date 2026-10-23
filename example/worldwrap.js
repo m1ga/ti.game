@@ -33,9 +33,9 @@ module.exports = function () {
 		var WORLD_W = COLS * TILE;
 		var BACKDROP_W = WORLD_W / 6;
 		var FLOOR_Y = Math.round(H * 0.78);
-		var PLAYER = Math.max(96, Math.round(W * 0.22));
-		var TARGET = Math.max(52, Math.round(W * 0.11));
-		var LAUNCHER = Math.max(52, Math.round(W * 0.09));
+		var PLAYER = Math.max(96, Math.round(Math.min(W, H) * 0.22));
+		var TARGET = Math.max(52, Math.round(Math.min(W, H) * 0.11));
+		var LAUNCHER = Math.max(52, Math.round(Math.min(W, H) * 0.09));
 		var BOLT = 24;
 		var TARGET_HIT_SCALE = 0.9;
 		var BOLT_HIT_SCALE = 0.875;
@@ -125,7 +125,7 @@ module.exports = function () {
 			swept: true, solidWith: ['seam-target'], wrapWorldX: true,
 			touchEnabled: false, zIndex: 7
 		});
-		var UNIT = Math.max(1, Math.round(W / 380));
+		var UNIT = Math.max(1, Math.min(W / 380, H / 680));
 		// minX and maxX are the same point in a circular world. Opposite
 		// anchors place each label on its own side of that shared seam.
 		var SEAM_Y = FLOOR_Y - PLAYER * 1.35;

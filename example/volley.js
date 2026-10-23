@@ -73,12 +73,11 @@ module.exports = function () {
 		var SERVE_PUSH = W * 0.22;
 
 		// Keep the court above the on-screen controls (80dp buttons + margins)
-		// Scene units per dp: measure the real surface scale instead of
-		// trusting logicalDensityFactor — the iOS simulator renders at 1x
-		// while the density factor still reports the device scale
-		var density = Ti.Platform.osname === 'android'
-			? Ti.Platform.displayCaps.logicalDensityFactor
-			: H / Ti.Platform.displayCaps.platformHeight;
+		// Measure the canvas scale, independently of the Mac window size.
+		var density = W / gameView.rect.width;
+		if (!(density > 0 && isFinite(density))) {
+			density = Ti.Platform.displayCaps.logicalDensityFactor || 1;
+		}
 		var buttonZone = Math.round(130 * density);
 		var groundTop = H - buttonZone;
 

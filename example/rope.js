@@ -43,9 +43,9 @@ module.exports = function () {
 	function init(W, H) {
 
 		var SEGMENTS = 14;             // number of rope links — change me
-		var BALL = Math.round(W * 0.16);
+		var BALL = Math.round(Math.min(W, H) * 0.16);
 		var SEG_LEN = H * 0.04;
-		var THICKNESS = W * 0.03;
+		var THICKNESS = Math.min(W, H) * 0.03;
 
 		// --- Rope 1: hangs from a draggable ball -------------------------
 

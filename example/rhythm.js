@@ -62,8 +62,8 @@ module.exports = function () {
 
 		var LANES = [W * 0.22, W * 0.5, W * 0.78];
 		var LANE_TINTS = ['#e04848', '#48c060', '#4890e0'];
-		var NOTE = Math.round(W * 0.16);
-		var PAD = Math.round(W * 0.22);
+		var PAD = Math.round(Math.min(W * 0.22, H * 0.22));
+		var NOTE = Math.round(PAD * 0.16 / 0.22);
 		var PAD_Y = H * 0.8;
 		var HIT_RANGE = H * 0.08;      // press counts while a gem is this close
 		var PERFECT = H * 0.03;

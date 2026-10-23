@@ -78,7 +78,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var UNIT = Math.max(1, Math.round(W / 380));
+		var UNIT = Math.max(1, Math.min(W / 380, H / 680));
 		var PAYOUTS = [100, 500, 1000, 0, 10000, 0, 1000, 500, 100];
 		var SLOTS = PAYOUTS.length;
 
@@ -90,10 +90,21 @@ module.exports = function () {
 		var SLOT_TOP = H * 0.80;
 		var SLOT_BOTTOM = H * 0.90;
 
-		var PEG = Math.max(5, Math.round(SLOT_W * 0.28));   // peg diameter
-		var BALL = Math.max(9, Math.round(SLOT_W * 0.46));
 		var ROWS = 9;
 		var ROW_GAP = (SLOT_TOP - TOP) / (ROWS + 1);
+		var density = W / gameView.rect.width;
+		if (!(density > 0 && isFinite(density))) {
+			density = Ti.Platform.displayCaps.logicalDensityFactor || 1;
+		}
+		// Keep pins modest on desktop; wider windows add space, not larger art.
+		// Fit horizontal, diagonal and two-row vertical passages in short views.
+		var PEG_DISTANCE = Math.min(SLOT_W, Math.hypot(SLOT_W / 2, ROW_GAP), ROW_GAP * 2);
+		var AUTHORED_PEG = Math.max(5, Math.round(SLOT_W * 0.28));
+		var AUTHORED_BALL = Math.max(9, Math.round(SLOT_W * 0.46));
+		var sizeScale = Math.min(1, 20 * density / AUTHORED_PEG,
+			PEG_DISTANCE * 0.32 / AUTHORED_PEG);
+		var PEG = AUTHORED_PEG * sizeScale;
+		var BALL = AUTHORED_BALL * sizeScale;
 
 		gameView.add(Game.createSprite({
 			sheet: sparkSheet, frame: 0,

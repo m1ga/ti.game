@@ -135,6 +135,18 @@ gameView.addEventListener('resize', function (e) {
 });
 ```
 
+### Example window layouts
+
+Examples use the available canvas area. Pool alone uses a centered vertical
+380 × 680 point stage, scaled uniformly with its native controls; resizing
+preserves the running table. Plinko keeps its full-size board and limits chip
+diameter to the clearance between pegs while preserving the mobile chip-to-pin
+size ratio. Foreground art and HUD text use height limits where width-only sizing
+would clip or overlap rows; native control margins use the canvas pixel density.
+Tile Map uses the whole canvas, keeps
+the walker readable, and repositions its HUD when the window changes size.
+`extendSafeArea` determines whether window children draw behind system bars.
+
 ## Performance: what runs where
 
 Three threads touch a running game:

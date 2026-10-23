@@ -65,7 +65,7 @@ module.exports = function () {
 		];
 		var COLS = MAP[0].length;
 		var ROWS = MAP.length;
-		var TILE = Math.floor(Math.min(W / COLS, H / ROWS));
+		var TILE = Math.floor(Math.min(W / COLS, H * 0.78 / ROWS));
 		var ox = (W - COLS * TILE) / 2;                  // center the maze
 		var oy = (H - ROWS * TILE) / 2;
 

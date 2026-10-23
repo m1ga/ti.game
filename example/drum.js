@@ -134,7 +134,7 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var UNIT = Math.max(1, Math.round(W / 380));
+		var UNIT = Math.max(1, Math.min(W / 380, H / 680));
 		var DRUM = Math.min(W * 0.90, H * 0.59);
 		var CX = W / 2;
 		var CY = H * 0.51;

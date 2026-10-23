@@ -49,8 +49,8 @@ module.exports = function () {
 
 	function init(W, H) {
 
-		var SPARK = Math.round(W * 0.24);
-		var SHIP = Math.round(W * 0.16);
+		var SPARK = Math.round(Math.min(W * 0.24, H * 0.14));
+		var SHIP = Math.round(Math.min(W * 0.16, H * 0.12));
 		var TINTS = ['#f44', '#4f4', '#48f'];
 
 		// Bright meadow strip behind the multiply/screen rows — multiply

@@ -53,6 +53,8 @@ module.exports = function () {
 
 	function init(W, H) {
 
+		var ART = Math.min(W, H);
+
 		// A thin spark stretched from (x, y) along the ray — beams are
 		// plain sprites; only the raycast result drives them
 		function makeBeam(color) {
@@ -82,20 +84,20 @@ module.exports = function () {
 		var guard = Game.createSprite({
 			sheet: playerSheet,
 			x: W * 0.10, y: H * 0.22,
-			width: Math.round(W * 0.11), height: Math.round(W * 0.165),
+			width: Math.round(ART * 0.11), height: Math.round(ART * 0.165),
 			zIndex: 10
 		});
 		var dog = Game.createSprite({
 			sheet: dogSheet,
 			x: W * 0.90, y: H * 0.24,
-			width: Math.round(W * 0.10), height: Math.round(W * 0.10),
+			width: Math.round(ART * 0.10), height: Math.round(ART * 0.10),
 			flipX: true, // face the guard
 			zIndex: 10
 		});
 		var crate = Game.createSprite({
 			sheet: wallSheet,
 			x: W * 0.5, y: H * 0.38,
-			width: Math.round(W * 0.16), height: Math.round(W * 0.16),
+			width: Math.round(ART * 0.16), height: Math.round(ART * 0.16),
 			draggable: true,
 			collisionGroup: 'blocker',
 			zIndex: 10
@@ -104,8 +106,8 @@ module.exports = function () {
 
 		var sight = makeBeam('#4f4');
 		timers.push(setInterval(function () {
-			var x0 = guard.x + W * 0.04;
-			var y0 = guard.y - W * 0.02; // eye height
+			var x0 = guard.x + ART * 0.04;
+			var y0 = guard.y - ART * 0.02; // eye height
 			var hit = gameView.raycast(x0, y0, dog.x, dog.y, ['blocker']);
 			if (hit) {
 				aimBeam(sight, x0, y0, hit.x, hit.y, hit.distance);
@@ -123,15 +125,15 @@ module.exports = function () {
 		var platform = Game.createSprite({
 			sheet: platformSheet,
 			x: W * 0.5, y: H * 0.55,
-			width: Math.round(W * 0.7), height: Math.round(W * 0.06),
+			width: Math.round(W * 0.7), height: Math.round(ART * 0.06),
 			collisionGroup: 'ground',
 			zIndex: 8
 		});
 		var walker = Game.createSprite({
 			sheet: walkerSheet,
-			x: W * 0.5, y: H * 0.55 - W * 0.075,
-			width: Math.round(W * 0.09), height: Math.round(W * 0.09),
-			velocityX: W * 0.15,
+			x: W * 0.5, y: H * 0.55 - ART * 0.075,
+			width: Math.round(ART * 0.09), height: Math.round(ART * 0.09),
+			velocityX: ART * 0.15,
 			animations: { walk: { frames: [0, 1], fps: 7, loop: true } },
 			zIndex: 10
 		});
@@ -142,8 +144,8 @@ module.exports = function () {
 			// probe a step ahead of the feet, straight down: no ground
 			// there means a ledge is coming — turn around
 			var dir = (walker.velocityX >= 0) ? 1 : -1;
-			var probeX = walker.x + dir * W * 0.07;
-			var floor = gameView.raycast(probeX, walker.y, probeX, walker.y + W * 0.12, ['ground']);
+			var probeX = walker.x + dir * ART * 0.07;
+			var floor = gameView.raycast(probeX, walker.y, probeX, walker.y + ART * 0.12, ['ground']);
 			if (!floor) {
 				walker.velocityX = -walker.velocityX;
 				walker.flipX = walker.velocityX < 0;
@@ -155,7 +157,7 @@ module.exports = function () {
 		var turret = Game.createSprite({
 			sheet: shipSheet,
 			x: W * 0.5, y: H * 0.85,
-			width: Math.round(W * 0.13), height: Math.round(W * 0.13),
+			width: Math.round(ART * 0.13), height: Math.round(ART * 0.13),
 			zIndex: 10
 		});
 		gameView.add(turret);
@@ -216,7 +218,7 @@ module.exports = function () {
 			}));
 		}
 		label('drag the crate into the line of sight', 8);
-		label('the walker probes for ground ahead', 46);
+		label('the walker probes for ground ahead', 60);
 		label('tap above to fire — hitscan raycast', 66);
 	}
 
