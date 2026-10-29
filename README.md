@@ -16,11 +16,13 @@ Android/iOS contract and calls out the few platform differences.
 - Touch: tap, press, drag & drop, pinch-to-scale, two-finger rotate
 - Gamepads: Bluetooth/USB controllers as named `buttondown`/`buttonup`
   and throttled `stick` events — d-pad and left stick unified
+- Keyboard and mouse input, focused canvas capture and configurable
+  `inputMap` actions shared across keys, mouse buttons and gamepads
 - Physics: velocity + gravity, platformer solids, bouncing (restitution),
   discrete `solidimpact` responses, arcade car model with drifting + skid
   marks, Newtonian flight (thrust)
-- Collision groups with events, invisible trigger zones, hitbox tuning,
-  swept AABB for fast bullets (`swept: true` — no tunneling)
+- Collision groups with events, invisible trigger zones, rect/circle/rotated-rect
+  hitboxes and continuous collision for fast movers (`swept: true`)
 - Parallax scroll looping, screen wrapping, idle wobble animation
 - Circular scrolling worlds (`worldWrapX`) with seam-aware camera, sprites,
   overlap and solid collision, swept movers, touch and full-width tile layers
@@ -42,7 +44,8 @@ Android/iOS contract and calls out the few platform differences.
   damage flashes (`flash()`) and blend modes (`blend:
   'add'`/`'multiply'`/`'screen'`)
 - Bitmap-font text sprites (`createText`) — HUD scores and labels inside
-  the GL scene with a built-in pixel font, BMFont/AngelCode or monospace
+  the native scene with a built-in pixel font including accented Latin
+  characters, BMFont/AngelCode or monospace
   grid fonts (`createFont`); `screenFixed` pins any sprite to the surface
   for camera-proof HUDs
 - Sprite attachment (`attachTo`) — pin any sprite to another with an
@@ -52,14 +55,30 @@ Android/iOS contract and calls out the few platform differences.
 New to the module? `tutorial.md` walks through your first scene
 step by step — sprite, animation, tap-to-move.
 
+## Platforms and requirements
+
+The current module version is `1.0.0`. Android uses OpenGL ES 2.0; iPhone,
+iPad and Mac Catalyst use Metal. The Apple package includes device arm64,
+Simulator arm64/x86_64 and Catalyst arm64/x86_64 libraries. Apple builds target
+iOS/iPadOS 15 or later. Both package manifests declare Titanium SDK 13.4.0
+as their minimum; both modules are built with Titanium SDK `13.4.1.GA`.
+
+Prebuilt Android and Apple ZIPs are available in [GitHub releases](https://github.com/m1ga/ti.game/releases).
+The [nightly release](https://github.com/m1ga/ti.game/releases/tag/nightly)
+is an automated build of `main`, not a stable release. Check its source commit
+when comparing packages that share the same module version.
+
 ## Quick start
 
-1. Build the module (or grab `android/dist/ti.game-android-<version>.zip`)
-   and add it to your app's `tiapp.xml`:
+1. Install the ZIP for your target platform from a release or [build it](#build)
+   (`android/dist/ti.game-android-<version>.zip` or
+   `ios/dist/ti.game-iphone-<version>.zip`). Register the module in your app's
+   `tiapp.xml`; include the entries for the platforms you use:
 
    ```xml
    <modules>
      <module platform="android">ti.game</module>
+     <module platform="iphone">ti.game</module>
    </modules>
    ```
 
@@ -103,7 +122,7 @@ properties and listen for events. The native engine owns the game loop.
 
 ### JS describes, native executes
 
-The Kroll bridge (JS ↔ Java) is far too slow for per-frame work. So the
+The Kroll bridge (JS ↔ Java/Objective-C) is far too slow for per-frame work. So the
 JS API is a *scene description*: setting `sprite.x`, `sprite.velocityY` or
 `sprite.throttle` writes into a native object that the render thread reads
 every frame. Events flow the other way — the engine fires discrete,
@@ -127,6 +146,7 @@ sprites computed from it can land below the visible surface. The GameView
 fires `resize` with the real surface size — build your level there:
 
 ```javascript
+var initialized = false;
 gameView.addEventListener('resize', function (e) {
     if (!initialized) {
         initialized = true;
@@ -153,21 +173,23 @@ Three threads touch a running game:
 
 | Thread | Runs | Bridge involved? |
 |---|---|---|
-| **GL render thread** | The entire game loop: delta time, physics (velocity/gravity, solids, `carMode`, `thrust`), collision checks, tween/animation/idle ticking, skid trail, wrapping, z-sorting, batching, drawing | No |
-| **Android UI thread** | Touch handling: hit-testing, drag movement, pinch/rotate gestures | No |
-| **JS/Kroll thread** | Your game code: creating sprites, setting properties, handling events | Yes — this is the only place the Titanium bridge exists |
+| **Native render thread** | The entire game loop: delta time, physics (velocity/gravity, solids, `carMode`, `thrust`), collision checks, tween/animation/idle ticking, skid trail, wrapping, z-sorting, batching, drawing; OpenGL ES on Android, Metal on Apple | No per-frame bridge traffic |
+| **UI/main thread** | Touch and device input: hit-testing, drag movement, pinch/rotate gestures, focus and action transitions | Only when delivering discrete or throttled events to JS |
+| **JS/Kroll thread** | Your game code: creating sprites, setting properties, handling events | Yes — properties and calls access native proxies |
 
 **A normal frame does not cross the bridge.** Every tick reads and writes only
 native `Sprite` objects in the scene graph. A drag moves the
 sprite on the UI thread; a tween, a falling bird, a drifting car, a
-bouncing ball all advance on the GL thread. Nothing in the frame loop
-waits for — or even talks to — JavaScript, so JS garbage collection or a
-busy app thread can't cause stutter.
+bouncing ball all advance on the render thread. Continuous simulation does
+not depend on a JavaScript update loop; event handlers and property changes
+still depend on the app's JS thread. GPU load and native synchronization can
+also affect frame time.
 
 **What crosses the bridge, and when:**
 
 - *Property writes* (`hero.x = 100`, `car.throttle = 1`) — one cheap
-  bridge hop per assignment, writing a volatile field the render thread
+  bridge hop per assignment, updating native state (volatile fields on
+  Android, atomic properties or synchronized state on Apple) the render thread
   picks up next frame. Setting a property once per user input is the
   intended pattern.
 - *Property reads* (`ball.x`) — synchronous snapshot of the live native
@@ -247,7 +269,8 @@ when appropriate; no special cleanup is required for the `GameView` renderer.
 - **Sheets**: `createSpriteSheet({ image, frameWidth, frameHeight })` for
   grids, or `{ image, atlas }` for TexturePacker JSON. `smoothing: false`
   switches to nearest-neighbor filtering for pixel art. Textures load
-  lazily on the GL thread and survive EGL context loss automatically.
+  lazily on the render thread. Android recreates textures after EGL context
+  loss; Apple retains textures until pending Metal commands finish using them.
 - **Pixel snapping**: `pixelSnap: true` rounds only the sprite's rendered
   anchor to the nearest framebuffer pixel after camera position and zoom are
   applied. Native physics, collisions and live `x`/`y` remain subpixel floats.
@@ -275,7 +298,8 @@ when appropriate; no special cleanup is required for the `GameView` renderer.
   duration, delay, easing, frame })` (ms; easing from the `EASE_*` constants)
   animates natively and fires `complete`; an optional `frame` is the sheet
   frame set once the tween finishes. Chain moves by re-calling `animate` from
-  the `complete` handler.
+  the `complete` handler. Unsupported properties, such as `width`, `height`
+  and `tintColor`, are ignored without a warning; set them directly instead.
 - **Idle wobble**: `idleAnimation: true` adds a gentle organic sway —
   up to `idleRotation` degrees and `idleMovement` px around the base
   transform, `idleSpeed` scales the frequency. Every sprite gets its own
@@ -346,7 +370,12 @@ For pointer capture on iOS/iPadOS 13.4–16, the consuming application must opt 
 
 See [Apple’s indirect input configuration](https://developer.apple.com/documentation/bundleresources/information-property-list/uiapplicationsupportsindirectinputevents). This application setting is required to distinguish a mouse pointer from a direct touch on older supported systems; the module does not modify the app’s global input configuration at runtime.
 
-Apple keyboard/pointer capture requires iOS/iPadOS 13.4 or later, including Catalyst after the renderer supports it. The source deployment minimum remains iOS 12; UIKit APIs are guarded. On iOS 14+, keyboard/mouse disconnect notifications also release input; earlier UIKit versions deliver cancellation/focus lifecycle events. The upstream Apple OpenGL renderer builds for iOS and Simulator and does not support Catalyst; this feature has no Metal dependency. Android retains its engine touch listener. All resolution runs natively on input transitions, with no per-frame bridge traffic.
+The current Apple module targets iOS/iPadOS 15 or later and supports Mac Catalyst
+with Metal. Its guarded UIKit keyboard/pointer APIs date from iOS 13.4;
+keyboard/mouse disconnect notifications release input on iOS 14 and later.
+Those API availability checks do not lower the package's iOS 15 minimum.
+Android retains its engine touch listener. All action resolution runs natively
+on input transitions, with no per-frame bridge traffic.
 
 Run `python3 tests/input-map/uikit.py` for UIKit focus, raw-key repetition/cancellation and canvas/overlay pointer ownership, using production responder methods with renderer/event-sink fixtures. Run `python3 tests/input-map/run.py` for native resolver regressions and `python3 tests/gamepad-fixture/check.py` for real GameController fanout, disconnect and action delivery without individual listeners. The launcher shows Configurable input on Mac only; phones and tablets retain the touch-ready demos. The source remains available for mobile testing with external peripherals. `example/inputmap.js` moves an animated character with A/D, J/L, arrows or a gamepad. The last pressed direction wins while both are held, and releasing it resumes the other held direction. Space or gamepad A jumps. W/I/Up aims upward (combine with left/right for diagonals); S/K/Down crouches. A left mouse click on the canvas or gamepad X fires projectiles. Escape pauses/resumes through separate action contexts. Right/middle bindings are included for testing, but currently do not trigger actions on Mac; left click is verified. A separate input monitor shows raw key codes/modifiers and the existing gamepad button, stick and trigger events. Instructions stay visible above separate action feedback; an overlaid text field and focus button demonstrate native control ownership. Clicking the canvas after text entry restores game focus; that first click does not fire. The shared back control returns to the launcher. Physical keyboard/mouse/controller and overlay acceptance must be recorded separately from compilation and automated resolver tests.
 
@@ -897,7 +926,7 @@ The compact line shows `FPS`, `MS` and `DC`. Expanded:
 
 | Label | Meaning |
 |---|---|
-| `FPS` | Frames presented in the last second |
+| `FPS` | Frames recorded by the renderer in the last measurement window; a Metal submission does not confirm physical presentation |
 | `MS` | Average engine time per frame (tick + draw; a `maxFps` cap is not counted) |
 | `P95` | 95th percentile of that per-frame time |
 | `MAX` | Worst single frame in the window |
@@ -910,8 +939,8 @@ The compact line shows `FPS`, `MS` and `DC`. Expanded:
 | `UPDATE` | Time in the scene tick (physics, animations, tweens) |
 | `TEXTURE` | Time spent uploading textures |
 | `BATCH` | Time spent batching and drawing |
-| `PRESENT` | **iOS only** — time inside the buffer swap |
-| `PRESENTFAIL` | **iOS only** — failed presents |
+| `PRESENT` | **Apple only** — CPU time acquiring a Metal drawable and submitting presentation; not GPU execution time |
+| `PRESENTFAIL` | **Apple only** — missing drawables and reported command errors |
 
 `PRESENT` and `PRESENTFAIL` have no Android equivalent: `GLSurfaceView` swaps buffers
 on its own thread after the renderer returns, so there is no point at
@@ -934,14 +963,14 @@ Payload: `fps`, `averageCpuMs`, `p95CpuMs`, `maxCpuMs`, `averageUpdateMs`,
 `emitters`, `particles`, `drawCalls`, `textureSwitches`, `surfaceWidth`,
 `surfaceHeight`.
 
-Measuring is opt-in all the way down: with the HUD off and no
-`performance` listener attached, the renderer never reads a clock and the
-HUD costs nothing. `particles.js` and `camera.js` have it switched on.
+Telemetry is opt-in: with the HUD off and no `performance` listener attached,
+the renderer skips telemetry timing and HUD drawing. The frame loop still
+reads its simulation clock. `particles.js` and `camera.js` enable the HUD.
 
 ## Learn from the examples
 
 `example/app.js` is a launcher; each demo is a self-contained file showing
-a feature set — find the one closest to your game and start there. Shared helpers provide the back control (`example/backnav.js`) and optional native action shortcuts (`example/keyboard.js`). Back uses the action bar Up arrow on Android and an overlay button on iOS:
+a feature set — find the one closest to your game and start there. Shared helpers provide the back control (`example/backnav.js`), optional native action shortcuts (`example/keyboard.js`) and Pool's portrait layout (`example/pool-viewport.js`). Back uses the action bar Up arrow on Android and an overlay button on Apple:
 
 | Demo | Shows |
 |---|---|
@@ -981,7 +1010,13 @@ a feature set — find the one closest to your game and start there. Shared help
 | `tilemap.js` | A 120x90 TileLayer, visible-cell rendering, cell collision, live edits, A* and HUD telemetry |
 | `worldwrap.js` | `worldWrapX` camera, touch, collision, swept movement and a full-width TileLayer |
 
-Keyboard shortcuts work while the game canvas has focus (Apple keyboard APIs require iOS/iPadOS 13.4 or later). They call the same functions as the existing controls. Native actions aggregate bindings and ignore key repeat; there is no keyboard polling or global capture. Window blur/close disables actions. Text fields and overlaid native controls retain their input. Platformer and Volley route their mapped gamepad buttons through the same actions; avoid adding a second button listener for those actions.
+Keyboard shortcuts work while the game canvas has focus, including on Mac
+Catalyst. They call the same functions as the existing controls. Native actions
+aggregate bindings and ignore key repeat; there is no keyboard polling or
+global capture. Window blur/close disables actions. Text fields and overlaid
+native controls retain their input. Platformer and Volley route their mapped
+gamepad buttons through the same actions; avoid adding a second button listener
+for those actions.
 
 | Demos | Keys |
 |---|---|
@@ -1000,15 +1035,19 @@ Keyboard shortcuts work while the game canvas has focus (Apple keyboard APIs req
 | Particles, Blend | Space creates a centered burst or flashes the ships |
 | Rhythm | A/S/D or Left/Down/Right hits the three lanes |
 | Swept collision | Space shoots both lanes; Left/Right or A/D changes speed |
-| Camera | Minus/Equal zoom out/in; Space shakes |
+| Camera | Z/X zoom out/in; Space shakes |
 | Time scale | 1/2/3/4 select normal, half, tenth or paused speed |
 
 These demos do not cover every public member. In particular, there is no
 dedicated demo for `wallhit`/`wallSlideSpeed`, resource `unload()`, every
 gamepad event or every creation-time option.
 
-Run them with `ti build -p android` from `android/` (executes
-`example/app.js` on a device/emulator).
+Run the Android launcher with `ti build -p android --sdk 13.4.1.GA` from
+`android/` (executes `example/app.js` on a device/emulator). For Apple, build
+the module and copy `example/` into a Classic Titanium app's `Resources/`,
+register the `iphone` module and add the indirect-input plist setting above
+when testing a mouse. Configurable Input is listed on Mac only; mobile devices
+show the 34 touch-ready demos.
 
 ## Names and percentages
 
@@ -1106,10 +1145,13 @@ Tween easing constants are `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`,
 | `remove(object)` | method | — | Remove one object. Removing a Sprite/Text also removes its attached descendants recursively |
 | `removeAllSprites()` | method | — | Remove Sprite/Text objects and their attachments only. Emitters, ropes and tile layers remain and must be removed separately |
 | `pause()` / `resume()` | method | — | Stop or restart the render loop. App lifecycle handling is automatic |
-| `backgroundColor` | R/W | — | GL clear color |
-| `maxFps` | R/W | `0` | Frame cap; `0` uses the display refresh rate |
+| `backgroundColor` | R/W | — | Native scene clear color |
+| `maxFps` | R/W | `0` | Requested frame cap; `0` leaves display scheduling to the platform |
 | `timeScale` | R/W | `1` | Multiplier for physics, animations, tweens, particles, timers and camera. `0` freezes those systems while rendering and touch continue |
 | `surfaceWidth` / `surfaceHeight` | read-only | — | Current surface size in pixels |
+| `inputMap` | R/W | `{}` | Contexts containing named actions and keyboard/mouse/gamepad bindings; invalid maps throw without replacing the current map |
+| `inputContext` | R/W | `'gameplay'` | Active action context; `null` disables actions. Changing context releases active actions and requires a fresh press |
+| `focusInput()` | method | — | Request canvas keyboard focus on the UI thread, without opening a software keyboard or globally capturing keys |
 | `cameraX` / `cameraY` | R/W | `0` | World-space camera offset |
 | `cameraScale` | R/W | `1` | Zoom around the view center |
 | `cameraBounds` | R/W | `null` | `{ minX, minY, maxX, maxY }`; `null` removes the clamp |
@@ -1141,12 +1183,18 @@ attached — see [Debug HUD](#debug-hud)), and the controller events
 (`trigger`, `value`, `gamepad`; ~20 Hz), `gamepadconnected` /
 `gamepaddisconnected` (`gamepad`, `name`) — see [Gamepads](#gamepads).
 
+Keyboard events `keydown` / `keyup` carry `code`, `character` and
+`modifiers: { shift, control, alt, meta }`. Mapped action events
+`actiondown` / `actionup` carry `action` and `context`. See
+[Configurable digital input](#configurable-digital-input) for focus, capture,
+bindings and cancellation rules.
+
 ### SpriteSheet
 
 The source options are creation-only: required `image`, `frameWidth`/`frameHeight`
 **or** `atlas`, `smoothing` (default `true`) and `repeat` (default `false`).
-`repeat` enables GL_REPEAT for `tileRepeat` sprites and requires a
-power-of-two texture on OpenGL ES 2.0.
+`repeat` enables texture repeat for `tileRepeat` sprites. On Android's
+OpenGL ES 2.0 backend it requires a power-of-two texture.
 
 | Member | Access | Description |
 |---|---|---|
@@ -1523,6 +1571,8 @@ android/src/ti/game/
     ├── DebugHud.java        On-screen performance HUD
     ├── FrameStats.java      Opt-in render telemetry, one-second windows
     ├── GamepadController.java Normalized gamepad input and event throttling
+    ├── CanvasInput.java     Focused keyboard/mouse input and key normalization
+    ├── InputResolver.java   Digital bindings, contexts and action aggregation
     ├── Path.java            Native path-following data
     ├── Pathfinder.java      Grid A* over sprites and TileLayer cells
     ├── PostEffect.java      Fullscreen tint/glitch shader pass
@@ -1534,7 +1584,7 @@ android/src/ti/game/
 ```
 
 Contribution rules for the codebase live in `AGENTS.md`; planned features
-(input, sprite parenting, tile map follow-ups) in `TODO.md`.
+(a virtual joystick, full sprite parenting and tile map follow-ups) in `TODO.md`.
 
 ### iOS
 
@@ -1550,13 +1600,19 @@ behavior, change both platforms (see `AGENTS.md`).
 
 ```bash
 cd android
-ti build -p android --build-only --sdk 13.3.1.GA   # package android/dist/ti.game-android-<version>.zip
-ti build -p android --sdk 13.3.1.GA                # run the example app on a device/emulator
+ti build -p android --build-only --sdk 13.4.1.GA   # package android/dist/ti.game-android-<version>.zip
+ti build -p android --sdk 13.4.1.GA                # run the example app on a device/emulator
 
-cd ios                             # macOS only
-ti build -p ios --build-only       # package iOS, simulator and Catalyst variants
+cd ../ios                          # macOS only, after the Android commands above
+ti build -p ios --build-only --sdk 13.4.1.GA   # package iOS, Simulator and Catalyst
 ```
 
+Both builds use Titanium SDK `13.4.1.GA`. The Apple Xcode project reads its SDK
+path from `ios/titanium.xcconfig`, which selects the same version. If you need a
+different installed SDK, update that setting or use the external SDK-path
+override in [ios/README.md](ios/README.md#build); the CLI's `--sdk` option alone
+does not change the Xcode setting. Both package manifests declare
+`minsdk: 13.4.0`.
 
 The Apple backend preserves the JavaScript API, premultiplied colors, filtering, native scene update and draw order. It compiles its embedded Metal shaders once per device, so consuming applications do not need a `default.metallib`. No Apple OpenGL ES backend or public backend selector is included. `ios/README.md` documents builds, native GPU tests and the iOS 15 minimum required by Titanium 13.4.
 

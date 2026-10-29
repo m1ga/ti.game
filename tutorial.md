@@ -1,25 +1,39 @@
 # Getting started with ti.game
 
+`ti.game` is a native 2D sprite engine for Titanium SDK. Android renders with
+OpenGL ES 2.0; iPhone, iPad and Mac Catalyst render with Metal. JavaScript
+describes the scene while native code runs movement, animation and rendering.
+
 This tutorial builds one small scene from scratch: a sprite that idles,
 plays a walk animation, and walks to wherever you tap. Each step adds a
 few lines; the complete file is at the end. For the full API see
-`README.md`, for bigger patterns see the demos in `example/`.
+[README.md](README.md), for bigger patterns see the demos in `example/`.
 
 ## 1. Install the module
 
-Build it (or grab the prebuilt zip from `android/dist/`):
+Install the ZIP for your platform from [GitHub releases](https://github.com/m1ga/ti.game/releases),
+or build from the repository root:
 
 ```bash
-cd android
-ti build -p android --build-only   # produces android/dist/ti.game-android-<version>.zip
+# Android: produces android/dist/ti.game-android-<version>.zip
+(cd android && ti build -p android --build-only --sdk 13.4.1.GA)
+
+# Apple (macOS): produces ios/dist/ti.game-iphone-<version>.zip
+(cd ios && ti build -p ios --build-only --sdk 13.4.1.GA)
 ```
 
-Add the zip to your app (`~/Library/Application Support/Titanium/modules`
-or the app's `modules/` folder) and register it in `tiapp.xml`:
+The current package manifests require Titanium SDK 13.4.0 or later; Apple
+builds target iOS/iPadOS 15 or later and include Mac Catalyst. Both source
+builds use Titanium SDK 13.4.1.GA. If you select a different SDK for Apple,
+also update Xcode's SDK path as described in [the Apple build notes](ios/README.md#build).
+
+Install the ZIP in Titanium's global modules directory or your app project.
+Register the target platforms in `tiapp.xml`:
 
 ```xml
 <modules>
   <module platform="android">ti.game</module>
+  <module platform="iphone">ti.game</module>
 </modules>
 ```
 
@@ -32,8 +46,8 @@ var Game = require('ti.game');
 ## 2. Set up a basic scene
 
 A scene is a **GameView** inside a normal Titanium window. The engine
-runs the game loop natively at 60 fps — you never write a loop yourself,
-you just describe the scene and react to events.
+runs its own native game loop; `maxFps` lets you request a frame-rate cap.
+You never write a loop yourself; you describe the scene and react to events.
 
 ```javascript
 var win = Ti.UI.createWindow({
@@ -41,7 +55,7 @@ var win = Ti.UI.createWindow({
 	theme: 'Theme.Titanium.DayNight.NoTitleBar'
 });
 var gameView = Game.createGameView({
-	backgroundColor: '#8ed8f8'   // GL clear color = your sky
+	backgroundColor: '#8ed8f8'   // scene clear color = your sky
 });
 win.add(gameView);
 win.open();
@@ -262,4 +276,12 @@ win.open();
   `rotatable` — see `example/basic.js` and `example/puzzle.js`.
 - **Scrolling worlds**: `cameraX/Y`, `follow()`, parallax via
   `wrapX`/`wrapShift` — see `example/skate.js`.
-- The full property/event reference is in `README.md`.
+- **Keyboard, mouse and gamepads**: map named actions with `inputMap`,
+  switch `inputContext` for menus/pause and call `focusInput()` for canvas
+  keyboard focus. See [Configurable digital input](README.md#configurable-digital-input)
+  for the Apple indirect-input plist setting and current mouse limitations.
+  `example/inputmap.js` is a playable Mac example; many touch demos also
+  provide keyboard shortcuts.
+- **Window sizes**: [example layouts](README.md#example-window-layouts)
+  cover Pool's portrait table and full-window demos on Mac and mobile.
+- The full property/event reference is in [README.md](README.md#api-reference).
