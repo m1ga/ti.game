@@ -9,6 +9,7 @@
 #import "TGTextSprite.h"
 #import "TGTileLayer.h"
 #import "TGBitmapFont.h"
+#import "TGBroadphase.h"
 #import "TGDefaultFont.h"
 #import <float.h>
 #import <math.h>
@@ -112,6 +113,11 @@ static float bottomEdge(TGSprite *s)
 
 	float _sweptResult[2]; // entry time in 0..1, entry axis (0 = x, 1 = y)
 
+	// Per-frame scratch (render thread only): the sprites that can take part
+	// in a collision at all, and the grid index over them (see TGBroadphase)
+	NSMutableArray<TGSprite *> *_tagged;
+	TGBroadphase *_broadphase;
+
 	NSMutableArray<TGGameTimer *> *_timers; // guarded by @synchronized(_timers)
 	int _nextTimerId;                       // guarded by @synchronized(_timers)
 }
@@ -123,6 +129,8 @@ static float bottomEdge(TGSprite *s)
 		_emitters = [NSMutableArray array];
 		_ropes = [NSMutableArray array];
 		_tileLayers = [NSMutableArray array];
+		_tagged = [NSMutableArray array];
+		_broadphase = [[TGBroadphase alloc] init];
 		_skidTrail = [[TGSkidTrail alloc] init];
 		_hud = [[TGDebugHud alloc] init];
 		_stats = [[TGFrameStats alloc] init];
@@ -588,12 +596,23 @@ static float bottomEdge(TGSprite *s)
 	[self.skidTrail update:dt];
 	[self updateTimers:dt];
 	[self wrapSprites:list];
+	// Only tagged, visible sprites can be hit or block anything — the
+	// inner collision loops scan broadphase candidates from this list
+	[_tagged removeAllObjects];
+	for (TGSprite *s in list) {
+		if (s.collisionGroup != nil && s.visible) {
+			[_tagged addObject:s];
+		}
+	}
+	[_broadphase rebuild:_tagged wrapWidth:[self worldWrapWidth]];
 	[self resolveSolids:list layers:layerList];
 	for (TGSprite *s in list) {
 		[s finishDamping];
 	}
 	[self applyAttachments:list];
 	[self normalizeWrappedSprites:list];
+	// Attachments and wrap normalization teleport sprites: index again
+	[_broadphase rebuild:_tagged wrapWidth:[self worldWrapWidth]];
 	[self checkCollisions:list];
 	[self updateFollow:dt];
 	[self applyCameraBounds];
@@ -1234,7 +1253,12 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	float earliest = [self sweepAgainstTiles:s layers:layers groups:groups
 										  cx:cx cy:cy dx:dx dy:dy
 										  hw:circle ? r : hw hh:circle ? r : hh];
-	for (TGSprite *solid in list) {
+	float ex = circle ? r : hw;
+	float ey = circle ? r : hh;
+	NSArray<TGSprite *> *nearby = [_broadphase query:s
+												minX:MIN(cx, cx + dx) - ex minY:MIN(cy, cy + dy) - ey
+												maxX:MAX(cx, cx + dx) + ex maxY:MAX(cy, cy + dy) + ey];
+	for (TGSprite *solid in nearby) {
 		NSString *group = solid.collisionGroup;
 		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]
 				|| solid.solidMode != TGSolidBlock) {
@@ -1741,17 +1765,19 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
  */
 - (void)resolveBilateralPairs:(NSArray<TGSprite *> *)list
 {
-	NSUInteger n = list.count;
+	// A pair needs a collisionGroup on both sides: the tagged list suffices.
+	// Each pair is handled once, from the side with the lower index.
+	NSUInteger n = _tagged.count;
 	for (NSUInteger i = 0; i < n; i++) {
-		TGSprite *a = list[i];
+		TGSprite *a = _tagged[i];
 		NSSet<NSString *> *ga = a.solidWith;
 		if (!a.circleHitbox || !a.visible || ga.count == 0
 				|| a.solidMode != TGSolidPush) {
 			continue;
 		}
-		for (NSUInteger j = i + 1; j < n; j++) {
-			TGSprite *b = list[j];
-			if (![self isBilateralPair:a with:b groups:ga]) {
+		NSArray<TGSprite *> *nearby = [_broadphase queryShape:a];
+		for (TGSprite *b in nearby) {
+			if (b.taggedIndex <= (NSInteger)i || ![self isBilateralPair:a with:b groups:ga]) {
 				continue;
 			}
 			[a hitCenter:_centerA];
@@ -1846,7 +1872,9 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 		// The level comes first, moving solids on top of it
 		NSInteger tiles = [self resolveTileRect:s layers:layers groups:groups];
 		[s computeAABB:_aabbA];
-		for (TGSprite *solid in list) {
+		NSArray<TGSprite *> *nearby = [_broadphase query:s minX:_aabbA[0] minY:_aabbA[1]
+													maxX:_aabbA[2] maxY:_aabbA[3]];
+		for (TGSprite *solid in nearby) {
 			NSString *group = solid.collisionGroup;
 			if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]) {
 				continue;
@@ -2007,7 +2035,8 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	NSInteger tiles = [self resolveTileCircle:s layers:layers groups:groups radius:r];
 	grounded = (tiles & TGContactGround) != 0;
 	NSInteger wall = TGWallFromContact(tiles);
-	for (TGSprite *solid in list) {
+	NSArray<TGSprite *> *nearby = [_broadphase queryShape:s];
+	for (TGSprite *solid in nearby) {
 		NSString *group = solid.collisionGroup;
 		if (solid == s || group == nil || !solid.visible || ![groups containsObject:group]) {
 			continue;
@@ -2545,17 +2574,13 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			[self endAllCollisions:s];
 			continue;
 		}
-		for (TGSprite *other in list) {
+		NSArray<TGSprite *> *nearby = s.swept ? [_broadphase querySwept:s] : [_broadphase queryShape:s];
+		for (TGSprite *other in nearby) {
 			NSString *group = other.collisionGroup;
 			if (other == s || group == nil || !other.visible || ![groups containsObject:group]) {
 				continue;
 			}
-			float otherOffsetX = [self periodicOffsetFrom:s to:other];
-			BOOL overlap = [self shapesOverlap:s with:other offsetX:otherOffsetX];
-			if (!overlap && s.swept) {
-				overlap = [self sweptShapesOverlap:s with:other offsetX:otherOffsetX];
-			}
-			if (overlap) {
+			if ([self pairOverlaps:s with:other]) {
 				if (![s.colliding containsObject:other]) {
 					[s.colliding addObject:other];
 					id<TGSpriteEventListener> listener = s.eventListener;
@@ -2569,13 +2594,17 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 		}
 		// Contacts the loop above can no longer see: partner left the
-		// scene, went invisible, or the group filter changed.
+		// scene, went invisible, the group filter changed, or it moved out
+		// of the broadphase neighborhood (not stamped by the query above —
+		// then it cannot overlap, the exact test is the net).
 		if (s.colliding.count > 0) {
+			int stamp = [_broadphase stamp];
 			NSMutableArray<TGSprite *> *stale = nil;
 			for (TGSprite *other in s.colliding) {
 				NSString *group = other.collisionGroup;
 				if (other.scene != self || !other.visible
-						|| group == nil || ![groups containsObject:group]) {
+						|| group == nil || ![groups containsObject:group]
+						|| (other.broadphaseStamp != stamp && ![self pairOverlaps:s with:other])) {
 					if (stale == nil) {
 						stale = [NSMutableArray array];
 					}
@@ -2588,6 +2617,14 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			}
 		}
 	}
+}
+
+/** Exact overlap test for a collidesWith pair, swept when s is swept. */
+- (BOOL)pairOverlaps:(TGSprite *)s with:(TGSprite *)other
+{
+	float otherOffsetX = [self periodicOffsetFrom:s to:other];
+	return [self shapesOverlap:s with:other offsetX:otherOffsetX]
+		|| (s.swept && [self sweptShapesOverlap:s with:other offsetX:otherOffsetX]);
 }
 
 /** Separates every tracked contact of a sprite (hidden/de-configured). */

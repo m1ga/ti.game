@@ -279,6 +279,12 @@ typedef NS_ENUM(int, TGSolidMode) {
 @property (atomic, assign) float frameDeltaX;
 @property (atomic, assign) float frameDeltaY;
 
+// Broadphase bookkeeping (render thread only): position in the scene's
+// per-frame tagged list, and the stamp of the last query that returned
+// this sprite as a candidate (see TGBroadphase).
+@property (nonatomic, assign) NSInteger taggedIndex;
+@property (nonatomic, assign) int broadphaseStamp;
+
 // Velocity contributed during update: by carMode/thrust/gravity/damping,
 // captured before position integration. Render thread only.
 @property (atomic, assign) float frameAccelX;

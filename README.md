@@ -212,7 +212,12 @@ batch). Practical consequence: pack your art into as few sheets as
 possible — a scene whose sprites share one atlas renders in a single draw
 call regardless of sprite count. Per-sprite transform math is done on the
 CPU and is trivial at typical scene sizes; hundreds of animated, moving
-sprites are no problem. Textures upload to the GPU once, lazily, on first
+sprites are no problem. Sprites outside the camera rect are culled before
+batching (a bounding-circle test per sprite, including parallax, world wrap
+and glow margins), so a large level pays draw cost only for what is on
+screen; they are still ticked, sorted and collision-tested. The debug HUD's
+`SPRITES` line and the `visibleSprites` telemetry field count the sprites
+that survived culling. Textures upload to the GPU once, lazily, on first
 use. Android preserves the EGL context across app pauses and recreates resources after context loss. Apple retains encoded resources until GPU command completion and keeps mutable frame resources separate for each view.
 
 **Batching pitfalls.** Everything that changes GPU state mid-scene cuts
@@ -234,16 +239,21 @@ sources instead of discovering them in a profiler:
   blending, so interleaving them with non-normal blend content flushes
   too.
 
-**Collision cost** is O(colliders × candidates) per frame — each sprite
-with `collidesWith`/`solidWith` is tested against sprites carrying a
-matching `collisionGroup`. Keep group lists targeted (a bullet checking
-`['asteroid']` tests 5 sprites, not the whole scene) and it stays
-negligible.
+**Collision cost** is O(colliders × nearby candidates) per frame. Every
+sprite that carries a `collisionGroup` is indexed in a uniform grid twice
+per frame (before solid resolution and before collision events), and each
+sprite with `collidesWith`/`solidWith` tests only the sprites in the grid
+cells its own hitbox covers, matched against its groups. A thousand coins
+spread over a level therefore cost a mover a handful of exact tests, not a
+thousand. Sprites spanning more than 64 cells (a level-wide floor) are
+checked by every mover, so keep oversized solids rare and prefer a
+`TileLayer` for terrain. Run `python3 tests/test_broadphase.py` to compare
+the grid against an exact pair scan.
 
 **Tile maps are the exception to "everything is a sprite".** A level
-built from one sprite per tile pays for every tile every frame — drawn,
-ticked, sorted and scanned as a collision candidate whether it is on
-screen or not. A `TileLayer` costs by what is visible instead: the
+built from one sprite per tile pays for every tile every frame — ticked,
+sorted and scanned as a collision candidate whether it is on screen or not
+(only the drawing is culled). A `TileLayer` costs by what is visible instead: the
 renderer walks only the cells inside the camera rect (one batch run per
 layer, since a layer has one sheet), nothing is ticked, and a mover
 against the layer tests only the few cells under its own hitbox. A
@@ -1575,6 +1585,7 @@ android/src/ti/game/
     ├── InputResolver.java   Digital bindings, contexts and action aggregation
     ├── Path.java            Native path-following data
     ├── Pathfinder.java      Grid A* over sprites and TileLayer cells
+    ├── Broadphase.java      Uniform-grid index over tagged sprites for the collision loops
     ├── PostEffect.java      Fullscreen tint/glitch shader pass
     ├── SkidTrail.java       Fading skid-mark ring buffer
     ├── TextureManager.java  GL upload, context-loss recovery

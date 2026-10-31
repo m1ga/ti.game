@@ -221,7 +221,8 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 		while (nextRope < ropes.count && ropes[nextRope].zIndex < s.zIndex) {
 			[ropes[nextRope++] draw:_batch];
 		}
-		if (s.visible && [s effectiveOpacity] > 0.0f) {
+		if (s.visible && [s effectiveOpacity] > 0.0f
+				&& [self sprite:s inViewLeft:left top:top right:right bottom:bottom]) {
 			visibleSprites++;
 			[_batch draw:s];
 		}
@@ -368,6 +369,34 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 			[_textures track:sheet];
 		}
 	}
+}
+
+/**
+ * View culling, twin of SceneRenderer.inView: YES when any part of the
+ * sprite can land inside the visible rect. A bounding circle around the
+ * drawn anchor (parallax and world wrap applied, as the batcher draws it)
+ * reaches the farthest corner, so rotation, negative scale and anchor
+ * presets need no special case. The glow ring reaches glowBlur px past the
+ * quad and pixelSnap moves it by at most 1 px, both added as margin.
+ * screenFixed sprites are tested against the surface instead.
+ * Conservative by design: a false positive only costs a quad.
+ */
+- (BOOL)sprite:(TGSprite *)s inViewLeft:(float)left top:(float)top right:(float)right bottom:(float)bottom
+{
+	float w = [s drawWidth] * fabsf(s.scaleX);
+	float h = [s drawHeight] * fabsf(s.scaleY);
+	float rx = MAX(s.anchorX, 1.0f - s.anchorX) * w;
+	float ry = MAX(s.anchorY, 1.0f - s.anchorY) * h;
+	float r = sqrtf(rx * rx + ry * ry) + MAX(0.0f, s.glowBlur) + 1.0f;
+	if (s.screenFixed) {
+		left = 0.0f;
+		top = 0.0f;
+		right = _surfaceWidth;
+		bottom = _surfaceHeight;
+	}
+	float x = [_batch parallaxX:s];
+	float y = [_batch parallaxY:s];
+	return x + r >= left && x - r <= right && y + r >= top && y - r <= bottom;
 }
 
 - (void)drawSkidTrail
