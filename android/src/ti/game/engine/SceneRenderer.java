@@ -112,6 +112,34 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		}
 	}
 
+	/**
+	 * View culling: true when any part of the sprite can land inside the
+	 * visible rect. The test uses a bounding circle around the drawn anchor
+	 * (parallax and world wrap applied, as the batcher draws it) that
+	 * reaches the farthest corner, so rotation, negative scale and anchor
+	 * presets need no special case. The glow ring reaches glowBlur px past
+	 * the quad and pixelSnap moves it by at most 1 px, both added as margin.
+	 * screenFixed sprites are tested against the surface instead.
+	 * Conservative by design: a false positive only costs a quad.
+	 */
+	private boolean inView(Sprite s, float left, float top, float right, float bottom)
+	{
+		float w = s.drawWidth() * Math.abs(s.scaleX);
+		float h = s.drawHeight() * Math.abs(s.scaleY);
+		float rx = Math.max(s.anchorX, 1f - s.anchorX) * w;
+		float ry = Math.max(s.anchorY, 1f - s.anchorY) * h;
+		float r = (float) Math.sqrt(rx * rx + ry * ry) + Math.max(0f, s.glowBlur) + 1f;
+		if (s.screenFixed) {
+			left = 0f;
+			top = 0f;
+			right = surfaceWidth;
+			bottom = surfaceHeight;
+		}
+		float x = batch.parallaxX(s);
+		float y = batch.parallaxY(s);
+		return x + r >= left && x - r <= right && y + r >= top && y - r <= bottom;
+	}
+
 	@Override
 	public void onDrawFrame(GL10 unused)
 	{
@@ -241,7 +269,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 			while (nextRope < ropes.size() && ropes.get(nextRope).zIndex < s.zIndex) {
 				ropes.get(nextRope++).draw(batch);
 			}
-			if (s.visible && s.effectiveOpacity() > 0f) {
+			if (s.visible && s.effectiveOpacity() > 0f && inView(s, left, top, right, bottom)) {
 				visibleSprites++;
 				batch.draw(s);
 			}

@@ -35,6 +35,8 @@ public class Scene
 	// Per-frame scratch (GL thread only): the sprites that can take part in
 	// a collision at all, so movers don't rescan every decorative sprite
 	private final List<Sprite> tagged = new ArrayList<>();
+	// Grid index over `tagged`, rebuilt twice per frame (see Broadphase)
+	private final Broadphase broadphase = new Broadphase();
 	private double physicsTime = 0d;
 
 	/** Renders debug overlays for every sprite (GameView.debug = { hitbox: true }). */
@@ -1093,12 +1095,15 @@ public class Scene
 				tagged.add(s);
 			}
 		}
+		broadphase.rebuild(tagged, worldWrapWidth());
 		resolveSolids(list, tileLayersSnapshot());
 		for (Sprite s : list) {
 			s.finishDamping();
 		}
 		applyAttachments(list);
 		normalizeWrappedSprites(list);
+		// Attachments and wrap normalization teleport sprites: index again
+		broadphase.rebuild(tagged, worldWrapWidth());
 		checkCollisions(list);
 		updateCamera(dt);
 		updateShake(dt);
@@ -1557,7 +1562,8 @@ public class Scene
 	 */
 	private void resolveBilateralPairs(List<Sprite> list)
 	{
-		// A pair needs a collisionGroup on both sides: `tagged` suffices
+		// A pair needs a collisionGroup on both sides: `tagged` suffices.
+		// Each pair is handled once, from the side with the lower index.
 		int n = tagged.size();
 		for (int i = 0; i < n; i++) {
 			Sprite a = tagged.get(i);
@@ -1566,9 +1572,10 @@ public class Scene
 					|| a.solidMode != Sprite.SOLID_PUSH) {
 				continue;
 			}
-			for (int j = i + 1; j < n; j++) {
-				Sprite b = tagged.get(j);
-				if (!bilateralPair(a, b, ga)) {
+			List<Sprite> near = broadphase.queryShape(a);
+			for (int j = 0, m = near.size(); j < m; j++) {
+				Sprite b = near.get(j);
+				if (b.taggedIndex <= i || !bilateralPair(a, b, ga)) {
 					continue;
 				}
 				a.hitCenter(centerA);
@@ -1668,8 +1675,9 @@ public class Scene
 			// The level comes first, moving solids on top of it
 			int tiles = resolveTileRect(s, layers, groups);
 			s.computeAABB(aabbA);
-			for (int i = 0, n = tagged.size(); i < n; i++) {
-				Sprite solid = tagged.get(i);
+			List<Sprite> near = broadphase.query(s, aabbA[0], aabbA[1], aabbA[2], aabbA[3]);
+			for (int i = 0, n = near.size(); i < n; i++) {
+				Sprite solid = near.get(i);
 				String group = solid.collisionGroup;
 				if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
 					continue;
@@ -1845,8 +1853,13 @@ public class Scene
 		// (the same approximation a circle gets against a rect solid)
 		float earliest = sweepAgainstTiles(s, layers, groups, cx, cy, dx, dy,
 			circle ? r : hw, circle ? r : hh);
-		for (int ti = 0, tn = tagged.size(); ti < tn; ti++) {
-			Sprite solid = tagged.get(ti);
+		float ex = circle ? r : hw;
+		float ey = circle ? r : hh;
+		List<Sprite> near = broadphase.query(s,
+			Math.min(cx, cx + dx) - ex, Math.min(cy, cy + dy) - ey,
+			Math.max(cx, cx + dx) + ex, Math.max(cy, cy + dy) + ey);
+		for (int ti = 0, tn = near.size(); ti < tn; ti++) {
+			Sprite solid = near.get(ti);
 			String group = solid.collisionGroup;
 			if (solid == s || group == null || !solid.visible || !groups.contains(group)
 					|| solid.solidMode != Sprite.SOLID_BLOCK) {
@@ -2109,8 +2122,9 @@ public class Scene
 		int tiles = resolveTileCircle(s, layers, groups, r);
 		grounded = (tiles & CONTACT_GROUND) != 0;
 		int wall = wallFromContact(tiles);
-		for (int i = 0, n = tagged.size(); i < n; i++) {
-			Sprite solid = tagged.get(i);
+		List<Sprite> near = broadphase.queryShape(s);
+		for (int i = 0, n = near.size(); i < n; i++) {
+			Sprite solid = near.get(i);
 			String group = solid.collisionGroup;
 			if (solid == s || group == null || !solid.visible || !groups.contains(group)) {
 				continue;
@@ -2622,18 +2636,14 @@ public class Scene
 				endAllCollisions(s);
 				continue;
 			}
-			for (int i = 0, n = tagged.size(); i < n; i++) {
-				Sprite other = tagged.get(i);
+			List<Sprite> near = s.swept ? broadphase.querySwept(s) : broadphase.queryShape(s);
+			for (int i = 0, n = near.size(); i < n; i++) {
+				Sprite other = near.get(i);
 				String group = other.collisionGroup;
 				if (other == s || group == null || !other.visible || !groups.contains(group)) {
 					continue;
 				}
-				float otherOffsetX = periodicOffsetX(s, other);
-				boolean overlap = shapesOverlap(s, other, otherOffsetX);
-				if (!overlap && s.swept) {
-					overlap = sweptShapesOverlap(s, other, otherOffsetX);
-				}
-				if (overlap) {
+				if (pairOverlaps(s, other)) {
 					if (s.colliding.add(other)) {
 						Sprite.SpriteEventListener listener = s.eventListener;
 						if (listener != null) {
@@ -2645,14 +2655,18 @@ public class Scene
 				}
 			}
 			// Contacts the loop above can no longer see: partner left the
-			// scene, went invisible, or the group filter changed.
+			// scene, went invisible, the group filter changed, or it moved
+			// out of the broadphase neighborhood (not stamped by the query
+			// above — then it cannot overlap, the exact test is the net).
 			if (!s.colliding.isEmpty()) {
+				int stamp = broadphase.stamp();
 				Iterator<Sprite> it = s.colliding.iterator();
 				while (it.hasNext()) {
 					Sprite other = it.next();
 					String group = other.collisionGroup;
 					if (other.scene != this || !other.visible
-							|| group == null || !groups.contains(group)) {
+							|| group == null || !groups.contains(group)
+							|| (other.broadphaseStamp != stamp && !pairOverlaps(s, other))) {
 						it.remove();
 						fireCollisionEnd(s, other);
 					}
@@ -2662,6 +2676,14 @@ public class Scene
 	}
 
 	/** Separates every tracked contact of a sprite (hidden/de-configured). */
+	/** Exact overlap test for a collidesWith pair, swept when s is swept. */
+	private boolean pairOverlaps(Sprite s, Sprite other)
+	{
+		float otherOffsetX = periodicOffsetX(s, other);
+		return shapesOverlap(s, other, otherOffsetX)
+			|| (s.swept && sweptShapesOverlap(s, other, otherOffsetX));
+	}
+
 	private void endAllCollisions(Sprite s)
 	{
 		if (s.colliding.isEmpty()) {

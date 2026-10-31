@@ -289,6 +289,11 @@ public class Sprite
 	// idle wobble — wrap teleports excluded). The solid resolver applies
 	// the ground's delta to its rider, so moving platforms carry.
 	// GL thread only.
+	// Broadphase bookkeeping (GL thread only): position in the scene's
+	// per-frame tagged list, and the stamp of the last query that returned
+	// this sprite as a candidate (see Broadphase)
+	int taggedIndex = -1;
+	int broadphaseStamp = 0;
 	public float frameDeltaX = 0f;
 	public float frameDeltaY = 0f;
 

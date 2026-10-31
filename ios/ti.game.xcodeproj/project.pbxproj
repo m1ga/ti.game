@@ -61,6 +61,8 @@
 		A1B2C3D40A04000000000000 /* TGTouchController.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40A02000000000000 /* TGTouchController.m */; };
 		A1B2C3D42703000000000000 /* TGGamepadController.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42701000000000000 /* TGGamepadController.h */; };
 		A1B2C3D42704000000000000 /* TGGamepadController.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42702000000000000 /* TGGamepadController.m */; };
+		A1B2C3D42803000000000000 /* TGBroadphase.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42801000000000000 /* TGBroadphase.h */; };
+		A1B2C3D42804000000000000 /* TGBroadphase.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42802000000000000 /* TGBroadphase.m */; };
 		A1B2C3D40B03000000000000 /* TGTween.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40B01000000000000 /* TGTween.h */; };
 		A1B2C3D40B04000000000000 /* TGTween.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40B02000000000000 /* TGTween.m */; };
 		A1B2C3D42403000000000000 /* TGValues.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42401000000000000 /* TGValues.h */; };
@@ -163,6 +165,8 @@
 		A1B2C3D40A02000000000000 /* TGTouchController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTouchController.m"; path = "Classes/TGTouchController.m"; sourceTree = "<group>"; };
 		A1B2C3D42701000000000000 /* TGGamepadController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGGamepadController.h"; path = "Classes/TGGamepadController.h"; sourceTree = "<group>"; };
 		A1B2C3D42702000000000000 /* TGGamepadController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGGamepadController.m"; path = "Classes/TGGamepadController.m"; sourceTree = "<group>"; };
+		A1B2C3D42801000000000000 /* TGBroadphase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGBroadphase.h"; path = "Classes/TGBroadphase.h"; sourceTree = "<group>"; };
+		A1B2C3D42802000000000000 /* TGBroadphase.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGBroadphase.m"; path = "Classes/TGBroadphase.m"; sourceTree = "<group>"; };
 		A1B2C3D40B01000000000000 /* TGTween.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTween.h"; path = "Classes/TGTween.h"; sourceTree = "<group>"; };
 		A1B2C3D40B02000000000000 /* TGTween.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTween.m"; path = "Classes/TGTween.m"; sourceTree = "<group>"; };
 		A1B2C3D42401000000000000 /* TGValues.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGValues.h"; path = "Classes/TGValues.h"; sourceTree = "<group>"; };
@@ -289,6 +293,8 @@
 				A1B2C3D40A02000000000000 /* TGTouchController.m */,
 				A1B2C3D42701000000000000 /* TGGamepadController.h */,
 				A1B2C3D42702000000000000 /* TGGamepadController.m */,
+				A1B2C3D42801000000000000 /* TGBroadphase.h */,
+				A1B2C3D42802000000000000 /* TGBroadphase.m */,
 				A1B2C3D40B01000000000000 /* TGTween.h */,
 				A1B2C3D40B02000000000000 /* TGTween.m */,
 				A1B2C3D42401000000000000 /* TGValues.h */,
@@ -396,6 +402,7 @@
 				A1B2C3D40903000000000000 /* TGTextureManager.h in Headers */,
 				A1B2C3D40A03000000000000 /* TGTouchController.h in Headers */,
 				A1B2C3D42703000000000000 /* TGGamepadController.h in Headers */,
+				A1B2C3D42803000000000000 /* TGBroadphase.h in Headers */,
 				A1B2C3D40B03000000000000 /* TGTween.h in Headers */,
 				A1B2C3D42403000000000000 /* TGValues.h in Headers */,
 				A1B2C3D42903000000000000 /* TGCanvasInput.h in Headers */,
@@ -509,6 +516,7 @@
 				A1B2C3D40904000000000000 /* TGTextureManager.m in Sources */,
 				A1B2C3D40A04000000000000 /* TGTouchController.m in Sources */,
 				A1B2C3D42704000000000000 /* TGGamepadController.m in Sources */,
+				A1B2C3D42804000000000000 /* TGBroadphase.m in Sources */,
 				A1B2C3D40B04000000000000 /* TGTween.m in Sources */,
 				A1B2C3D42404000000000000 /* TGValues.m in Sources */,
 				A1B2C3D42904000000000000 /* TGCanvasInput.m in Sources */,
