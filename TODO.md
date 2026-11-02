@@ -30,19 +30,12 @@ The current implemented API is documented in [README.md](README.md).
 
 ## 4. Font rendering
 
-- [x] The built-in pixel font includes accented Spanish, German, Dutch and
-      selected French characters. `tools/build_default_font.py` rebuilds the
-      embedded atlas; [Font](README.md#font) lists the exact character set.
 - [ ] Add configurable character sets to `tools/genfont.py`, whose custom
       font output still defaults to ASCII 32..126. Broader scripts and
       combining-mark layout remain outside the built-in font's coverage.
 
 ## 5. Input
 
-- [x] Configurable native digital actions for keyboard, mouse buttons and
-      gamepads, with contexts, aggregate press/release, raw keyboard events
-      and canvas focus. See [Configurable digital input](README.md#configurable-digital-input)
-      for the current Mac right/middle mouse limitation.
 - [ ] Native virtual joystick/d-pad that writes directly into a sprite's
       `velocity`/`steering`/`throttle` (`joystick.bind(sprite, ...)`) —
       no bridge in the loop; replaces the hand-rolled button overlays in
@@ -78,11 +71,6 @@ The current implemented API is documented in [README.md](README.md).
 
 ## 9. Performance
 
-- [x] Collision broadphase: `Broadphase.java`/`TGBroadphase` index the
-      tagged sprites in a uniform grid twice per frame; the solid resolver,
-      bilateral pairs, sweeps and collision events query it instead of
-      scanning the full list. `tests/test_broadphase.py` compares it with an
-      exact pair scan.
 - [ ] Tile layer vertex cache: `TileLayer.draw` rebuilds one quad per
       visible cell every frame. Cache a vertex buffer per chunk, invalidated
       by `setTile`/`data` writes and recreated after context loss.
