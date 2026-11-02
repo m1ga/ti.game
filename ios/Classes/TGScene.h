@@ -212,6 +212,24 @@
 - (TGSprite *)hitTestX:(float)x y:(float)y;
 
 /**
+ * Spatial queries (gameView.spritesInRect / spritesNear / spriteAt): the
+ * visible, non-screenFixed sprites carrying a collisionGroup in `groups`
+ * (nil or empty = any tagged sprite) whose hitbox overlaps the world rect
+ * (draw order), comes within `radius` of the point (nearest hit center
+ * first, with `distances` filled in the same order), or contains the point
+ * (topmost, or nil). Circles and turned rects use their real shape, plain
+ * rects their AABB. Like raycast, discrete JS-initiated queries, safe from
+ * any thread. See the Android twin.
+ */
+- (NSArray<TGSprite *> *)spritesInRectMinX:(float)minX minY:(float)minY
+									  maxX:(float)maxX maxY:(float)maxY
+									groups:(NSSet<NSString *> *)groups;
+- (NSArray<TGSprite *> *)spritesNearX:(float)x y:(float)y radius:(float)radius
+							   groups:(NSSet<NSString *> *)groups
+							distances:(NSMutableArray<NSNumber *> *)distances;
+- (TGSprite *)spriteAtX:(float)x y:(float)y groups:(NSSet<NSString *> *)groups;
+
+/**
  * One-shot segment query from (x0, y0) to (x1, y1) against every visible
  * sprite carrying a collisionGroup in `groups` (nil or empty = any tagged
  * sprite). Returns the nearest hit sprite with {x, y, distance, normalX,

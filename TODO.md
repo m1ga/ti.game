@@ -117,9 +117,6 @@ The current implemented API is documented in [README.md](README.md).
 - [ ] `sprite.moveTowards(targetOrPoint, { speed })` with an `arrive` event
       and `lookAt(target)` — homing enemies and turrets without JS polling.
       `followPath`/`findPath` cover fixed routes only.
-- [ ] Native spatial queries: `spritesInRect`, `spritesNear(x, y, radius,
-      groups)` and `spriteAt(x, y)` return once instead of JS reading
-      `x`/`y` per sprite over the bridge.
 - [ ] Bulk read `gameView.snapshot([sprites])` returning one array of
       transforms, and `remove([objects])` to mirror `add([...])`.
 
