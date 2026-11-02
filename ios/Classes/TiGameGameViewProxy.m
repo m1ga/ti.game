@@ -661,13 +661,7 @@ static NSString *const kDebugHudFontKey = @"hudFont";
 	float y0 = (list.count > 1) ? [TiUtils floatValue:list[1] def:0] : 0.0f;
 	float x1 = (list.count > 2) ? [TiUtils floatValue:list[2] def:0] : 0.0f;
 	float y1 = (list.count > 3) ? [TiUtils floatValue:list[3] def:0] : 0.0f;
-	NSMutableSet<NSString *> *groups = nil;
-	if (list.count > 4 && [list[4] isKindOfClass:[NSArray class]]) {
-		groups = [NSMutableSet set];
-		for (id group in (NSArray *)list[4]) {
-			[groups addObject:[TiUtils stringValue:group]];
-		}
-	}
+	NSSet<NSString *> *groups = [self groupFilter:list at:4];
 	float out[5];
 	TGSprite *hit = [self.scene raycastFromX:x0 y:y0 toX:x1 y:y1 groups:groups out:out];
 	if (hit == nil) {
@@ -681,6 +675,92 @@ static NSString *const kDebugHudFontKey = @"hudFont";
 		@"group": (hit.collisionGroup != nil) ? hit.collisionGroup : [NSNull null],
 		@"sprite": (hit.proxy != nil) ? hit.proxy : [NSNull null]
 	};
+}
+
+/** Group filter of a query method: the array argument at `index`, or nil
+ *  for no filter (a missing or non-array argument). */
+- (NSSet<NSString *> *)groupFilter:(NSArray *)list at:(NSUInteger)index
+{
+	if (list.count <= index || ![list[index] isKindOfClass:[NSArray class]]) {
+		return nil;
+	}
+	NSMutableSet<NSString *> *groups = [NSMutableSet set];
+	for (id group in (NSArray *)list[index]) {
+		[groups addObject:[TiUtils stringValue:group]];
+	}
+	return groups;
+}
+
+/** One result row of a spatial query: { sprite, group, x, y } — the
+ *  position comes along so JS never reads it back over the bridge. */
+- (NSMutableDictionary *)queryRow:(TGSprite *)s
+{
+	return [@{
+		@"sprite": (s.proxy != nil) ? s.proxy : [NSNull null],
+		@"group": (s.collisionGroup != nil) ? s.collisionGroup : [NSNull null],
+		@"x": @(s.x),
+		@"y": @(s.y)
+	} mutableCopy];
+}
+
+/**
+ * gameView.spritesInRect(x, y, width, height, groups): every visible
+ * sprite whose hitbox overlaps the world rect and whose collisionGroup is
+ * in `groups` (omit for any tagged sprite), in draw order, as
+ * { sprite, group, x, y } rows. See the Android twin.
+ */
+- (id)spritesInRect:(id)args
+{
+	NSArray *list = [args isKindOfClass:[NSArray class]] ? args : @[];
+	float x = (list.count > 0) ? [TiUtils floatValue:list[0] def:0] : 0.0f;
+	float y = (list.count > 1) ? [TiUtils floatValue:list[1] def:0] : 0.0f;
+	float width = (list.count > 2) ? [TiUtils floatValue:list[2] def:0] : 0.0f;
+	float height = (list.count > 3) ? [TiUtils floatValue:list[3] def:0] : 0.0f;
+	NSArray<TGSprite *> *hits = [self.scene spritesInRectMinX:MIN(x, x + width) minY:MIN(y, y + height)
+														 maxX:MAX(x, x + width) maxY:MAX(y, y + height)
+													   groups:[self groupFilter:list at:4]];
+	NSMutableArray *result = [NSMutableArray arrayWithCapacity:hits.count];
+	for (TGSprite *s in hits) {
+		[result addObject:[self queryRow:s]];
+	}
+	return result;
+}
+
+/**
+ * gameView.spritesNear(x, y, radius, groups): every visible sprite whose
+ * hitbox comes within `radius` px of the point, nearest first, as
+ * { sprite, group, x, y, distance } rows — distance to the hit center.
+ */
+- (id)spritesNear:(id)args
+{
+	NSArray *list = [args isKindOfClass:[NSArray class]] ? args : @[];
+	float x = (list.count > 0) ? [TiUtils floatValue:list[0] def:0] : 0.0f;
+	float y = (list.count > 1) ? [TiUtils floatValue:list[1] def:0] : 0.0f;
+	float radius = (list.count > 2) ? MAX(0.0f, [TiUtils floatValue:list[2] def:0]) : 0.0f;
+	NSMutableArray<NSNumber *> *distances = [NSMutableArray array];
+	NSArray<TGSprite *> *hits = [self.scene spritesNearX:x y:y radius:radius
+												   groups:[self groupFilter:list at:3] distances:distances];
+	NSMutableArray *result = [NSMutableArray arrayWithCapacity:hits.count];
+	for (NSUInteger i = 0; i < hits.count; i++) {
+		NSMutableDictionary *row = [self queryRow:hits[i]];
+		row[@"distance"] = distances[i];
+		[result addObject:row];
+	}
+	return result;
+}
+
+/**
+ * gameView.spriteAt(x, y, groups): the topmost visible sprite whose hitbox
+ * contains the world point, as { sprite, group, x, y }, or null. Reads the
+ * collision shape rather than the drawn rect and ignores touchEnabled.
+ */
+- (id)spriteAt:(id)args
+{
+	NSArray *list = [args isKindOfClass:[NSArray class]] ? args : @[];
+	float x = (list.count > 0) ? [TiUtils floatValue:list[0] def:0] : 0.0f;
+	float y = (list.count > 1) ? [TiUtils floatValue:list[1] def:0] : 0.0f;
+	TGSprite *hit = [self.scene spriteAtX:x y:y groups:[self groupFilter:list at:2]];
+	return (hit == nil) ? [NSNull null] : [self queryRow:hit];
 }
 
 /**

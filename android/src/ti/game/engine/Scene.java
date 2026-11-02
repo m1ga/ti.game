@@ -849,6 +849,190 @@ public class Scene
 		return true;
 	}
 
+	/** One row of spritesNear: a sprite and its hit-center distance to the query point. */
+	public static final class NearHit
+	{
+		public final Sprite sprite;
+		public final float distance;
+
+		NearHit(Sprite sprite, float distance)
+		{
+			this.sprite = sprite;
+			this.distance = distance;
+		}
+	}
+
+	/** Whether a sprite takes part in a spatial query: visible, tagged,
+	 *  in world space, and in `groups` when a filter is given. */
+	private static boolean queryable(Sprite s, Set<String> groups)
+	{
+		String group = s.collisionGroup;
+		return group != null && s.visible && !s.screenFixed
+			&& (groups == null || groups.isEmpty() || groups.contains(group));
+	}
+
+	/**
+	 * gameView.spritesInRect: every queryable sprite whose hitbox overlaps
+	 * the world rect, in draw order. Circles and turned rects use their
+	 * real shape, plain rects their AABB. Like raycast, a discrete
+	 * JS-initiated query: safe from any thread, own scratch.
+	 */
+	public List<Sprite> spritesInRect(float minX, float minY, float maxX, float maxY,
+									  Set<String> groups)
+	{
+		List<Sprite> hits = new ArrayList<>();
+		float[] box = new float[5];
+		float[] center = new float[2];
+		for (Sprite s : orderedSnapshot()) {
+			if (!queryable(s, groups)) {
+				continue;
+			}
+			boolean inside;
+			if (s.circleHitbox) {
+				s.hitCenter(center);
+				inside = circleTouchesRect(center[0], center[1], s.hitRadius(), minX, minY, maxX, maxY);
+			} else if (s.obbHitbox) {
+				s.hitBox(box);
+				inside = rectTouchesObb(minX, minY, maxX, maxY, box);
+			} else {
+				s.computeAABB(box);
+				inside = box[0] < maxX && box[2] > minX && box[1] < maxY && box[3] > minY;
+			}
+			if (inside) {
+				hits.add(s);
+			}
+		}
+		return hits;
+	}
+
+	/**
+	 * gameView.spritesNear: every queryable sprite whose hitbox comes
+	 * within `radius` of the point, nearest hit center first. The
+	 * distance is measured to the hit center, so the sort is stable for
+	 * a ring of equal targets.
+	 */
+	public List<NearHit> spritesNear(float x, float y, float radius, Set<String> groups)
+	{
+		List<NearHit> hits = new ArrayList<>();
+		float[] box = new float[5];
+		float[] center = new float[2];
+		float[] contact = new float[3];
+		for (Sprite s : unorderedSnapshot()) {
+			if (!queryable(s, groups)) {
+				continue;
+			}
+			s.hitCenter(center);
+			boolean inside;
+			if (s.circleHitbox) {
+				float reach = radius + s.hitRadius();
+				float dx = center[0] - x;
+				float dy = center[1] - y;
+				inside = dx * dx + dy * dy < reach * reach;
+			} else if (s.obbHitbox) {
+				s.hitBox(box);
+				inside = circleVsObb(x, y, radius, box, 0f, 0f, contact);
+			} else {
+				s.computeAABB(box);
+				inside = circleTouchesRect(x, y, radius, box[0], box[1], box[2], box[3]);
+			}
+			if (inside) {
+				hits.add(new NearHit(s, (float) Math.hypot(center[0] - x, center[1] - y)));
+			}
+		}
+		// distance is final per row, so the comparator never reads a live field
+		Collections.sort(hits, (a, b) -> Float.compare(a.distance, b.distance));
+		return hits;
+	}
+
+	/**
+	 * gameView.spriteAt: the topmost queryable sprite whose hitbox
+	 * contains the point, or null. Unlike touch hit-testing this reads
+	 * the collision shape, not the drawn rect, and ignores touchEnabled.
+	 */
+	public Sprite spriteAt(float x, float y, Set<String> groups)
+	{
+		List<Sprite> list = orderedSnapshot();
+		float[] box = new float[5];
+		float[] center = new float[2];
+		for (int i = list.size() - 1; i >= 0; i--) {
+			Sprite s = list.get(i);
+			if (!queryable(s, groups)) {
+				continue;
+			}
+			if (s.circleHitbox) {
+				s.hitCenter(center);
+				float r = s.hitRadius();
+				float dx = x - center[0];
+				float dy = y - center[1];
+				if (dx * dx + dy * dy <= r * r) {
+					return s;
+				}
+			} else if (s.obbHitbox) {
+				s.hitBox(box);
+				if (pointInObb(x, y, box)) {
+					return s;
+				}
+			} else {
+				s.computeAABB(box);
+				if (x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]) {
+					return s;
+				}
+			}
+		}
+		return null;
+	}
+
+	private static boolean circleTouchesRect(float cx, float cy, float r,
+											 float minX, float minY, float maxX, float maxY)
+	{
+		float closestX = Math.min(Math.max(cx, minX), maxX);
+		float closestY = Math.min(Math.max(cy, minY), maxY);
+		float dx = cx - closestX;
+		float dy = cy - closestY;
+		return dx * dx + dy * dy < r * r;
+	}
+
+	/** Point inside a turned box: take the point into the box's frame. */
+	private static boolean pointInObb(float px, float py, float[] box)
+	{
+		float cos = (float) Math.cos(box[4]);
+		float sin = (float) Math.sin(box[4]);
+		float rx = px - box[0];
+		float ry = py - box[1];
+		float lx = rx * cos + ry * sin;
+		float ly = -rx * sin + ry * cos;
+		return Math.abs(lx) <= box[2] && Math.abs(ly) <= box[3];
+	}
+
+	/**
+	 * Separating-axis test of an axis-aligned rect against a turned box.
+	 * Self-contained (unlike obbVsObb, which shares the GL thread's
+	 * scratch) so a query thread can run it at any time.
+	 */
+	private static boolean rectTouchesObb(float minX, float minY, float maxX, float maxY, float[] box)
+	{
+		float hw = (maxX - minX) / 2f;
+		float hh = (maxY - minY) / 2f;
+		float dx = box[0] - (minX + maxX) / 2f;
+		float dy = box[1] - (minY + maxY) / 2f;
+		float cos = (float) Math.cos(box[4]);
+		float sin = (float) Math.sin(box[4]);
+		float absCos = Math.abs(cos);
+		float absSin = Math.abs(sin);
+		// the world axes: how far the turned box reaches along x and y
+		if (Math.abs(dx) >= hw + box[2] * absCos + box[3] * absSin
+				|| Math.abs(dy) >= hh + box[2] * absSin + box[3] * absCos) {
+			return false;
+		}
+		// the box's own axes: how far the rect reaches along each
+		float along = dx * cos + dy * sin;
+		if (Math.abs(along) >= box[2] + hw * absCos + hh * absSin) {
+			return false;
+		}
+		along = -dx * sin + dy * cos;
+		return Math.abs(along) < box[3] + hw * absSin + hh * absCos;
+	}
+
 	/**
 	 * One-shot segment query from (x0, y0) to (x1, y1) against every
 	 * visible sprite carrying a collisionGroup in `groups` (null or empty

@@ -509,6 +509,14 @@ Notes:
   "what's the first thing on this line?" without any collision setup on
   the asking side — the targets just need a `collisionGroup`. See the
   GameView method table for the result shape.
+- **Spatial queries**: `spritesInRect(x, y, width, height, groups)`,
+  `spritesNear(x, y, radius, groups)` and `spriteAt(x, y, groups)` answer
+  "what is in this area, within this range, under this point?" in one
+  call. Each row carries the sprite with its `group`, `x` and `y` (and
+  `distance` for `spritesNear`, nearest first), so JS never reads
+  positions back per sprite over the bridge. Hitbox shapes count, not
+  drawn rects, and `touchEnabled` is ignored. Like `raycast`, discrete
+  queries for taps and AI timers, not per-frame polling.
 - **Pathfinding**: `gameView.findPath(from, to, options)` answers "how
   do I walk there around the obstacles?" — grid A* over the sprites
   carrying a `collisionGroup`, returning waypoints ready for
@@ -1010,6 +1018,7 @@ a feature set — find the one closest to your game and start there. Shared help
 | `swept.js` | Fast bullets with and without continuous collision |
 | `path.js` | Looped/smoothed paths, one-shot paths and animation chains |
 | `raycast.js` | Line of sight, ledge probes and tap-fired hitscan |
+| `queries.js` | `spritesInRect` under a draggable scanner, `spriteAt` picks and `spritesNear` blasts |
 | `zones.js` | `collision`/`collisionend`, a pressure plate and contact removal |
 | `demoscene.js` | Path-driven scrollers, glow, blend modes and music |
 | `maze.js` | Raw/simplified A*, tap routing and timer-based re-pathing |
@@ -1118,8 +1127,9 @@ engine, and `creation` means the value must be passed to the factory. Every
 
 Current platform differences:
 
-- Pass `raycast()` groups as an array. Android also accepts loose group
-  arguments, while iOS treats a non-array fifth argument as no filter.
+- Pass `raycast()`, `spritesInRect()`, `spritesNear()` and `spriteAt()`
+  groups as an array. Android also accepts loose group arguments, while
+  iOS treats a non-array groups argument as no filter.
 - Pass `animations` to `createSprite()`. iOS allows later assignment, Android
   does not. Android alone supports the animation definition's completion
   `frame`; both platforms support `frame` in `animate()`.
@@ -1174,6 +1184,9 @@ Tween easing constants are `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`,
 | `zoomTo(scale, { duration, easing })` | method | `500` ms, `easeInOut` | Ease `cameraScale` to `scale` natively on the game clock and fire `zoomcomplete` (payload `scale`) on arrival. The scale is interpolated geometrically, so 0.5x to 2x passes 1x halfway. Follow and bounds keep running against the changing scale. A new call restarts from the current scale, and writing `cameraScale` cancels it. `duration: 0` applies the scale on the next frame |
 | `shake({ strength, duration })` | method | `12` px, `400` ms | Offset the projection only; follow, bounds and touch mapping keep their normal coordinates |
 | `raycast(x0, y0, x1, y1, groups)` | method | — | Return the nearest visible, non-`screenFixed` Sprite with a matching `collisionGroup`, or `null`. The hit is `{ x, y, distance, group, sprite, normal: { x, y } }`. Plain rectangles use their AABB; circles and `rotatedRect` hitboxes use their actual shape. TileLayer cells are not queried. Pass `groups` as an array for portable behavior |
+| `spritesInRect(x, y, width, height, groups)` | method | — | Return every visible, non-`screenFixed` Sprite with a matching `collisionGroup` whose hitbox overlaps the world rect, in draw order, as `{ sprite, group, x, y }` rows. Negative sizes are normalized. Circles and `rotatedRect` hitboxes use their real shape, plain rectangles their AABB. Pass `groups` as an array for portable behavior |
+| `spritesNear(x, y, radius, groups)` | method | — | Return every matching Sprite whose hitbox comes within `radius` px of the point, nearest first, as `{ sprite, group, x, y, distance }` rows. `distance` is measured to the hitbox center |
+| `spriteAt(x, y, groups)` | method | — | Return the topmost matching Sprite whose hitbox contains the point as `{ sprite, group, x, y }`, or `null`. Unlike touch hit-testing it reads the collision shape and ignores `touchEnabled` |
 | `findPath(from, to, options)` | method | — | Grid A* around visible, non-`screenFixed` tagged sprites and fully solid TileLayer cells. Returns `{ x, y }` waypoints or `null`. Options: `cellSize` (`32`), `groups` (all tagged obstacles), `clearance` (`0`), `bounds` (the surface), `diagonals` (`true`) and `simplify` (`true`). One-way cells remain walkable |
 | `after(ms, callback)` | method | — | Run once after `ms` of game time and return a timer id. Without a callback, fires `timer` with that id |
 | `every(ms, callback)` | method | — | Repeat on game time until cancelled. Fires at most once per frame and does not burst after a stall |

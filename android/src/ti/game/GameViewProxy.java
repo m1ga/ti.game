@@ -812,20 +812,7 @@ public class GameViewProxy extends TiViewProxy
 	public KrollDict raycast(float x0, float y0, float x1, float y1,
 							 @Kroll.argument(optional = true) Object[] groups)
 	{
-		// Kroll binds a trailing Object[] parameter as varargs, so a JS
-		// groups array arrives wrapped as the single first element —
-		// unwrap it (raycast(..., ['a', 'b']) and raycast(..., 'a', 'b')
-		// both work).
-		if (groups != null && groups.length == 1 && groups[0] instanceof Object[]) {
-			groups = (Object[]) groups[0];
-		}
-		Set<String> groupSet = null;
-		if (groups != null && groups.length > 0) {
-			groupSet = new HashSet<>();
-			for (Object group : groups) {
-				groupSet.add(TiConvert.toString(group));
-			}
-		}
+		Set<String> groupSet = groupFilter(groups);
 		float[] out = new float[5];
 		Sprite hit = scene.raycast(x0, y0, x1, y1, groupSet, out);
 		if (hit == null) {
@@ -842,6 +829,97 @@ public class GameViewProxy extends TiViewProxy
 		data.put("group", hit.collisionGroup);
 		data.put("sprite", hit.proxy);
 		return data;
+	}
+
+	/**
+	 * Group filter of a query method. Kroll binds a trailing Object[]
+	 * parameter as varargs, so a JS groups array arrives wrapped as the
+	 * single first element — unwrap it (query(..., ['a', 'b']) and
+	 * query(..., 'a', 'b') both work). Null = no filter.
+	 */
+	private static Set<String> groupFilter(Object[] groups)
+	{
+		if (groups != null && groups.length == 1 && groups[0] instanceof Object[]) {
+			groups = (Object[]) groups[0];
+		}
+		if (groups == null || groups.length == 0) {
+			return null;
+		}
+		Set<String> groupSet = new HashSet<>();
+		for (Object group : groups) {
+			groupSet.add(TiConvert.toString(group));
+		}
+		return groupSet;
+	}
+
+	/** One result row of a spatial query: { sprite, group, x, y } — the
+	 *  position comes along so JS never reads it back over the bridge. */
+	private static KrollDict queryRow(Sprite s)
+	{
+		KrollDict row = new KrollDict();
+		row.put("sprite", s.proxy);
+		row.put("group", s.collisionGroup);
+		row.put("x", s.x);
+		row.put("y", s.y);
+		return row;
+	}
+
+	/**
+	 * gameView.spritesInRect(x, y, width, height, groups): every visible
+	 * sprite whose hitbox overlaps the world rect and whose collisionGroup
+	 * is in `groups` (omit for any tagged sprite), in draw order, as
+	 * { sprite, group, x, y } rows. Box selection, spawn-area checks,
+	 * "anything in this room?" — one call instead of reading x/y per
+	 * sprite over the bridge.
+	 */
+	@Kroll.method
+	public Object[] spritesInRect(float x, float y, float width, float height,
+								  @Kroll.argument(optional = true) Object[] groups)
+	{
+		float minX = Math.min(x, x + width);
+		float maxX = Math.max(x, x + width);
+		float minY = Math.min(y, y + height);
+		float maxY = Math.max(y, y + height);
+		List<Sprite> hits = scene.spritesInRect(minX, minY, maxX, maxY, groupFilter(groups));
+		Object[] result = new Object[hits.size()];
+		for (int i = 0; i < result.length; i++) {
+			result[i] = queryRow(hits.get(i));
+		}
+		return result;
+	}
+
+	/**
+	 * gameView.spritesNear(x, y, radius, groups): every visible sprite
+	 * whose hitbox comes within `radius` px of the point, nearest first,
+	 * as { sprite, group, x, y, distance } rows — distance to the hit
+	 * center. Blast radii, pickup ranges, "who is closest?".
+	 */
+	@Kroll.method
+	public Object[] spritesNear(float x, float y, float radius,
+								@Kroll.argument(optional = true) Object[] groups)
+	{
+		List<Scene.NearHit> hits = scene.spritesNear(x, y, Math.max(0f, radius), groupFilter(groups));
+		Object[] result = new Object[hits.size()];
+		for (int i = 0; i < result.length; i++) {
+			Scene.NearHit hit = hits.get(i);
+			KrollDict row = queryRow(hit.sprite);
+			row.put("distance", hit.distance);
+			result[i] = row;
+		}
+		return result;
+	}
+
+	/**
+	 * gameView.spriteAt(x, y, groups): the topmost visible sprite whose
+	 * hitbox contains the world point, as { sprite, group, x, y }, or
+	 * null. Reads the collision shape rather than the drawn rect and
+	 * ignores touchEnabled, so it also finds things taps cannot reach.
+	 */
+	@Kroll.method
+	public KrollDict spriteAt(float x, float y, @Kroll.argument(optional = true) Object[] groups)
+	{
+		Sprite hit = scene.spriteAt(x, y, groupFilter(groups));
+		return (hit == null) ? null : queryRow(hit);
 	}
 
 	/**

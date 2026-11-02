@@ -23,6 +23,7 @@
 //   Swept: fast bullets vs a thin wall — swept: true stops the tunneling
 //   Path & chain: native followPath circuits + play(name, { then }) chains
 //   Raycast: line of sight, ledge probes and tap hitscan via gameView.raycast
+//   Scene queries: spritesInRect under a scanner, spriteAt picks, spritesNear blasts
 //   Zones: collision/collisionend lifecycle — water tint, pressure-plate door
 //   Demoscene: sine text scroller, copper bars, starfield + chiptune loop
 //   Maze: A* playground — tap to route through a maze, a hound re-paths to you
@@ -55,6 +56,7 @@ var demos = [
 	{ title: 'Racing', start: require('/racing') },
 	{ title: 'Raycast', start: require('/raycast') },
 	{ title: 'Rhythm', start: require('/rhythm') },
+	{ title: 'Scene queries', start: require('/queries') },
 	{ title: 'Rope', start: require('/rope') },
 	{ title: 'Skate', start: require('/skate') },
 	{ title: 'Slopes', start: require('/slopes') },

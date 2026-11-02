@@ -107,7 +107,7 @@ test('Tile Map keeps a readable walker scale and moves HUD after window resizing
 test('all launcher demos use the full canvas except the portrait Pool table',()=>{
  const launcher=fs.readFileSync(path.join(root,'app.js'),'utf8');
  const names=Array.from(launcher.matchAll(/start: require\('\/([^']+)'\)/g),match=>match[1]).filter(name=>name!=='inputmap');
- assert.equal(names.length,34);
+ assert.equal(names.length,35);
  for(const name of names)for(const [width,height] of [[320,480],[390,844],[768,1024],[1920,1048],[2560,1080],[640,1600]]){
   const f=fixture(name,2,width,height);
   for(const item of f.view.children){

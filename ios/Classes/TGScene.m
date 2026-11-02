@@ -1122,6 +1122,170 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 	return YES;
 }
 
+/** Whether a sprite takes part in a spatial query: visible, tagged, in
+ *  world space, and in `groups` when a filter is given. */
+static BOOL TGQueryable(TGSprite *s, NSSet<NSString *> *groups)
+{
+	NSString *group = s.collisionGroup;
+	return group != nil && s.visible && !s.screenFixed
+		&& (groups == nil || groups.count == 0 || [groups containsObject:group]);
+}
+
+static BOOL TGCircleTouchesRect(float cx, float cy, float r,
+								float minX, float minY, float maxX, float maxY)
+{
+	float closestX = MIN(MAX(cx, minX), maxX);
+	float closestY = MIN(MAX(cy, minY), maxY);
+	float dx = cx - closestX;
+	float dy = cy - closestY;
+	return dx * dx + dy * dy < r * r;
+}
+
+/** Point inside a turned box: take the point into the box's frame. */
+static BOOL TGPointInObb(float px, float py, const float *box)
+{
+	float c = cosf(box[4]);
+	float s = sinf(box[4]);
+	float rx = px - box[0];
+	float ry = py - box[1];
+	float lx = rx * c + ry * s;
+	float ly = -rx * s + ry * c;
+	return fabsf(lx) <= box[2] && fabsf(ly) <= box[3];
+}
+
+/**
+ * Separating-axis test of an axis-aligned rect against a turned box.
+ * Self-contained (unlike obbVsObb, which shares the render thread's
+ * scratch) so a query thread can run it at any time.
+ */
+static BOOL TGRectTouchesObb(float minX, float minY, float maxX, float maxY, const float *box)
+{
+	float hw = (maxX - minX) / 2.0f;
+	float hh = (maxY - minY) / 2.0f;
+	float dx = box[0] - (minX + maxX) / 2.0f;
+	float dy = box[1] - (minY + maxY) / 2.0f;
+	float c = cosf(box[4]);
+	float s = sinf(box[4]);
+	float absCos = fabsf(c);
+	float absSin = fabsf(s);
+	// the world axes: how far the turned box reaches along x and y
+	if (fabsf(dx) >= hw + box[2] * absCos + box[3] * absSin
+			|| fabsf(dy) >= hh + box[2] * absSin + box[3] * absCos) {
+		return NO;
+	}
+	// the box's own axes: how far the rect reaches along each
+	float along = dx * c + dy * s;
+	if (fabsf(along) >= box[2] + hw * absCos + hh * absSin) {
+		return NO;
+	}
+	along = -dx * s + dy * c;
+	return fabsf(along) < box[3] + hw * absSin + hh * absCos;
+}
+
+- (NSArray<TGSprite *> *)spritesInRectMinX:(float)minX minY:(float)minY
+									  maxX:(float)maxX maxY:(float)maxY
+									groups:(NSSet<NSString *> *)groups
+{
+	NSMutableArray<TGSprite *> *hits = [NSMutableArray array];
+	float box[5];
+	float center[2];
+	for (TGSprite *s in [self snapshot]) {
+		if (!TGQueryable(s, groups)) {
+			continue;
+		}
+		BOOL inside;
+		if (s.circleHitbox) {
+			[s hitCenter:center];
+			inside = TGCircleTouchesRect(center[0], center[1], [s hitRadius], minX, minY, maxX, maxY);
+		} else if (s.obbHitbox) {
+			[s hitBox:box];
+			inside = TGRectTouchesObb(minX, minY, maxX, maxY, box);
+		} else {
+			[s computeAABB:box];
+			inside = box[0] < maxX && box[2] > minX && box[1] < maxY && box[3] > minY;
+		}
+		if (inside) {
+			[hits addObject:s];
+		}
+	}
+	return hits;
+}
+
+- (NSArray<TGSprite *> *)spritesNearX:(float)x y:(float)y radius:(float)radius
+							   groups:(NSSet<NSString *> *)groups
+							distances:(NSMutableArray<NSNumber *> *)distances
+{
+	NSMutableArray<NSArray *> *rows = [NSMutableArray array]; // @[sprite, @(distance)]
+	float box[5];
+	float center[2];
+	float contact[3];
+	for (TGSprite *s in [self snapshot]) {
+		if (!TGQueryable(s, groups)) {
+			continue;
+		}
+		[s hitCenter:center];
+		BOOL inside;
+		if (s.circleHitbox) {
+			float reach = radius + [s hitRadius];
+			float dx = center[0] - x;
+			float dy = center[1] - y;
+			inside = dx * dx + dy * dy < reach * reach;
+		} else if (s.obbHitbox) {
+			[s hitBox:box];
+			inside = [self circleAtX:x y:y radius:radius vsObb:box vx:0.0f vy:0.0f out:contact];
+		} else {
+			[s computeAABB:box];
+			inside = TGCircleTouchesRect(x, y, radius, box[0], box[1], box[2], box[3]);
+		}
+		if (inside) {
+			[rows addObject:@[s, @(hypotf(center[0] - x, center[1] - y))]];
+		}
+	}
+	// the distance is captured per row, so the sort never reads a live property
+	[rows sortUsingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
+		return [(NSNumber *)a[1] compare:(NSNumber *)b[1]];
+	}];
+	NSMutableArray<TGSprite *> *hits = [NSMutableArray arrayWithCapacity:rows.count];
+	for (NSArray *row in rows) {
+		[hits addObject:row[0]];
+		[distances addObject:row[1]];
+	}
+	return hits;
+}
+
+- (TGSprite *)spriteAtX:(float)x y:(float)y groups:(NSSet<NSString *> *)groups
+{
+	NSArray<TGSprite *> *list = [self snapshot];
+	float box[5];
+	float center[2];
+	for (NSInteger i = (NSInteger)list.count - 1; i >= 0; i--) {
+		TGSprite *s = list[i];
+		if (!TGQueryable(s, groups)) {
+			continue;
+		}
+		if (s.circleHitbox) {
+			[s hitCenter:center];
+			float r = [s hitRadius];
+			float dx = x - center[0];
+			float dy = y - center[1];
+			if (dx * dx + dy * dy <= r * r) {
+				return s;
+			}
+		} else if (s.obbHitbox) {
+			[s hitBox:box];
+			if (TGPointInObb(x, y, box)) {
+				return s;
+			}
+		} else {
+			[s computeAABB:box];
+			if (x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]) {
+				return s;
+			}
+		}
+	}
+	return nil;
+}
+
 - (TGSprite *)raycastFromX:(float)x0 y:(float)y0 toX:(float)x1 y:(float)y1
 					groups:(NSSet<NSString *> *)groups out:(float *)out
 {
