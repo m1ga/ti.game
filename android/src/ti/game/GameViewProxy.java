@@ -20,6 +20,7 @@ import org.appcelerator.titanium.view.TiUIView;
 
 import android.graphics.Color;
 
+import ti.game.engine.Easing;
 import ti.game.engine.GamepadController;
 import ti.game.engine.InputResolver;
 import ti.game.engine.PostEffect;
@@ -38,7 +39,7 @@ import ti.game.engine.Sprite;
  */
 @Kroll.proxy(creatableInModule = TiGameModule.class)
 public class GameViewProxy extends TiViewProxy
-	implements Scene.TimerListener
+	implements Scene.TimerListener, Scene.CameraListener
 {
 	// Named actions resolved from keyboard/mouse/gamepad bindings (see
 	// InputResolver). Owned by the proxy so the map survives view recreation.
@@ -62,6 +63,7 @@ public class GameViewProxy extends TiViewProxy
 	public GameViewProxy()
 	{
 		scene.timerListener = this;
+		scene.cameraListener = this;
 	}
 
 	@Override
@@ -548,6 +550,9 @@ public class GameViewProxy extends TiViewProxy
 		scene.followRightFraction = 0.65f;
 		scene.followSmoothing = 0f;
 		scene.cameraMaxY = 0f;
+		scene.followLookAheadX = 0f;
+		scene.followLookAheadY = 0f;
+		scene.followLookAheadSmoothing = 0.08f;
 		if (options != null) {
 			if (options.containsKey("topMargin")) {
 				scene.followTopFraction = Values.ratio(options.get("topMargin"), scene.followTopFraction);
@@ -573,8 +578,59 @@ public class GameViewProxy extends TiViewProxy
 			if (options.containsKey("maxY")) {
 				scene.cameraMaxY = TiConvert.toFloat(options.get("maxY"), scene.cameraMaxY);
 			}
+			// Look-ahead: lead the target by up to N px in its direction of
+			// travel, per axis, eased by lookAheadSmoothing (0 = snap)
+			if (options.containsKey("lookAheadX")) {
+				scene.followLookAheadX = Math.max(0f, TiConvert.toFloat(options.get("lookAheadX"), 0f));
+			}
+			if (options.containsKey("lookAheadY")) {
+				scene.followLookAheadY = Math.max(0f, TiConvert.toFloat(options.get("lookAheadY"), 0f));
+			}
+			if (options.containsKey("lookAheadSmoothing")) {
+				scene.followLookAheadSmoothing = Math.max(0f,
+					Values.ratio(options.get("lookAheadSmoothing"), scene.followLookAheadSmoothing));
+			}
 		}
 		scene.followTarget = spriteProxy.getSprite();
+	}
+
+	/**
+	 * Native camera zoom: gameView.zoomTo(2, { duration: 600, easing:
+	 * Game.EASE_OUT }). Eases cameraScale on the game clock and fires
+	 * 'zoomcomplete' with the final scale; follow and bounds keep
+	 * running against the changing scale. Duration in ms (default 500,
+	 * 0 = next frame); easing defaults to easeInOut. Writing cameraScale
+	 * directly cancels a running zoom.
+	 */
+	@Kroll.method
+	public void zoomTo(Object scale, @Kroll.argument(optional = true) KrollDict options)
+	{
+		float target = Math.max(0.05f, Values.ratio(scale, scene.cameraScale));
+		float duration = 500f;
+		String easing = Easing.EASE_IN_OUT;
+		if (options != null) {
+			if (options.containsKey("duration")) {
+				duration = Math.max(0f, TiConvert.toFloat(options.get("duration"), duration));
+			}
+			if (options.containsKey("easing")) {
+				String name = TiConvert.toString(options.get("easing"));
+				if (name != null) {
+					easing = name;
+				}
+			}
+		}
+		scene.zoomTo(target, duration / 1000f, easing);
+	}
+
+	/** GL thread — fireEvent hands off to the JS thread. */
+	@Override
+	public void onZoomComplete(float scale)
+	{
+		if (hasListeners("zoomcomplete")) {
+			KrollDict data = new KrollDict();
+			data.put("scale", scale);
+			fireEvent("zoomcomplete", data);
+		}
 	}
 
 	/**
@@ -623,6 +679,7 @@ public class GameViewProxy extends TiViewProxy
 	@Kroll.setProperty
 	public void setCameraScale(Object value)
 	{
+		scene.cancelZoom(); // a direct write wins over a running zoomTo
 		scene.cameraScale = Math.max(0.05f, Values.ratio(value, scene.cameraScale));
 	}
 

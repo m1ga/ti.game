@@ -165,6 +165,13 @@
 // not a vector.
 @property (atomic, assign) float gravityX;
 
+// Terminal velocity: downward speed (positive y) is capped at this many
+// px/s once gravity and damping have been applied; 0 = uncapped, the
+// default. Only the fall is capped — a jump or upward thrust keeps its full
+// speed — so a platformer can use a strong gravity for a snappy arc without
+// the player turning into a bullet on a long drop.
+@property (atomic, assign) float maxFallSpeed;
+
 // Newtonian flight (Asteroids-style)
 @property (atomic, assign) float angularVelocity; // deg/s
 @property (atomic, assign) float thrust;          // px/s^2 along heading
@@ -302,6 +309,15 @@ typedef NS_ENUM(int, TGSolidMode) {
 
 // Bounciness against solids: 0 = stop dead, 0..1 = reflect with damping
 @property (atomic, assign) float restitution;
+
+// Weight of a `solidMode: 'push'` body, relative to its partner's. Only the
+// ratio matters: separation and the exchanged impulse are shared by inverse
+// mass, so a 2 that runs into a resting 1 keeps a third of its speed and
+// sends the 1 off at four thirds of it, and two equal masses swap exactly as
+// they did when every body weighed the same. Ignored everywhere else — walls
+// and `'contain'` boundaries are immovable whatever the mover weighs. Always
+// positive; the proxy rejects 0.
+@property (atomic, assign) float mass;
 
 // Discrete physical solid-response event. The proxy maintains the listener
 // flag; per-other gates are allocated lazily and touched only by the render

@@ -250,6 +250,13 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 		if (options.containsKey("restitution")) {
 			sprite.restitution = Values.ratio(options.get("restitution"), sprite.restitution);
 		}
+		if (options.containsKey("mass")) {
+			setMass(TiConvert.toFloat(options.get("mass"), sprite.mass));
+		}
+		if (options.containsKey("maxFallSpeed")) {
+			sprite.maxFallSpeed = Math.max(0f,
+				TiConvert.toFloat(options.get("maxFallSpeed"), sprite.maxFallSpeed));
+		}
 		if (options.containsKey("wallSlideSpeed")) {
 			sprite.wallSlideSpeed = Math.max(0f,
 				TiConvert.toFloat(options.get("wallSlideSpeed"), sprite.wallSlideSpeed));
@@ -1378,6 +1385,38 @@ public class SpriteProxy extends KrollProxy implements Sprite.SpriteEventListene
 	public void setRestitution(Object value)
 	{
 		sprite.restitution = Values.ratio(value, sprite.restitution);
+	}
+
+	/** Weight of a `solidMode: 'push'` body relative to its partner's
+	 *  (default 1; only the ratio matters). Non-positive values are
+	 *  ignored — a body without weight has no collision response at all. */
+	@Kroll.getProperty
+	public float getMass()
+	{
+		return sprite.mass;
+	}
+
+	@Kroll.setProperty
+	public void setMass(float value)
+	{
+		if (value > 0f && !Float.isNaN(value) && !Float.isInfinite(value)) {
+			sprite.mass = value;
+		}
+	}
+
+	/** Terminal velocity in px/s: downward speed is capped here after
+	 *  gravity and damping; 0 = uncapped (the default). Upward speed is
+	 *  never touched. */
+	@Kroll.getProperty
+	public float getMaxFallSpeed()
+	{
+		return sprite.maxFallSpeed;
+	}
+
+	@Kroll.setProperty
+	public void setMaxFallSpeed(float value)
+	{
+		sprite.maxFallSpeed = Math.max(0f, value);
 	}
 
 	/** Max fall speed (px/s) while pressed against a wall; 0 = no wall slide. */

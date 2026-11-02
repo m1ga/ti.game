@@ -96,6 +96,56 @@ public class Scene
 	public volatile float followSmoothing = 0f;
 	public volatile float cameraMaxY = 0f;
 
+	// Follow look-ahead: the camera leads the target by up to this many px
+	// in the direction it is moving (0 = off, per axis), so the player sees
+	// where they are going instead of where they have been. The lead eases
+	// in and out by followLookAheadSmoothing — the fraction of the
+	// remaining lead covered per 1/60 s, 0 = snap — and reads the target's
+	// per-frame movement, so tweens, paths and drags count as much as
+	// velocity. Below LOOK_AHEAD_MIN_SPEED the target counts as standing
+	// still and the lead eases back to zero.
+	public volatile float followLookAheadX = 0f;
+	public volatile float followLookAheadY = 0f;
+	public volatile float followLookAheadSmoothing = 0.08f;
+	private static final float LOOK_AHEAD_MIN_SPEED = 10f; // px/s
+	private float leadX, leadY;      // GL thread
+	private Sprite lastFollowTarget; // GL thread
+
+	// Native camera zoom: requested from any thread, animated on the GL
+	// thread on the game clock. A direct cameraScale write cancels it.
+	private volatile boolean zoomRequested = false;
+	private volatile boolean zoomCancelRequested = false;
+	private volatile float zoomRequestScale = 1f;
+	private volatile float zoomRequestDuration = 0f;
+	private volatile String zoomRequestEasing = Easing.EASE_IN_OUT;
+	private boolean zoomActive; // GL thread, as are the rest
+	private float zoomFromScale, zoomToScale, zoomLength, zoomElapsed;
+	private String zoomCurve;
+
+	/** Receives discrete camera milestones on the GL thread. */
+	public interface CameraListener {
+		void onZoomComplete(float scale);
+	}
+
+	public volatile CameraListener cameraListener;
+
+	/** Eases cameraScale to `scale` over `duration` seconds (0 = next frame). */
+	public void zoomTo(float scale, float duration, String easing)
+	{
+		zoomRequestScale = scale;
+		zoomRequestDuration = duration;
+		zoomRequestEasing = easing;
+		zoomCancelRequested = false;
+		zoomRequested = true;
+	}
+
+	/** Drops a running or pending zoomTo; cameraScale stays where it is. */
+	public void cancelZoom()
+	{
+		zoomRequested = false;
+		zoomCancelRequested = true;
+	}
+
 	// Camera bounds: clamp the visible rect into this world rect.
 	public volatile boolean cameraBoundsEnabled = false;
 	public volatile float boundsMinX, boundsMinY, boundsMaxX, boundsMaxY;
@@ -699,6 +749,10 @@ public class Scene
 	// grow past it. Big enough to swallow a frame of gravity, small enough
 	// to stay invisible.
 	private static final float SLOP = 0.5f;
+
+	// Floor for `mass` in the push resolver, so a stray 0 never divides by
+	// zero (the proxy already refuses non-positive values).
+	private static final float MIN_MASS = 1e-3f;
 	private final float[] sweptResult = new float[2];
 
 	/**
@@ -1109,11 +1163,84 @@ public class Scene
 		updateShake(dt);
 	}
 
-	/** Dead-zone follow + bounds, after physics so the camera never lags. */
+	/** Zoom, dead-zone follow + bounds, after physics so the camera never lags. */
 	private void updateCamera(float dt)
 	{
+		updateZoom(dt);
 		updateFollow(dt);
 		applyCameraBounds();
+	}
+
+	/**
+	 * zoomTo tween. The scale is interpolated geometrically, so a zoom
+	 * from 0.5x to 2x passes 1x at the halfway point instead of at a
+	 * third of the way — a linear ramp through scale factors looks like
+	 * it rushes the near end and crawls the far end.
+	 */
+	private void updateZoom(float dt)
+	{
+		if (zoomCancelRequested) {
+			zoomCancelRequested = false;
+			zoomActive = false;
+		}
+		if (zoomRequested) {
+			zoomRequested = false;
+			zoomFromScale = Math.max(0.0001f, cameraScale);
+			zoomToScale = Math.max(0.0001f, zoomRequestScale);
+			zoomLength = zoomRequestDuration;
+			zoomCurve = zoomRequestEasing;
+			zoomElapsed = 0f;
+			zoomActive = true;
+		}
+		if (!zoomActive) {
+			return;
+		}
+		zoomElapsed += dt;
+		if (zoomLength <= 0f || zoomElapsed >= zoomLength) {
+			cameraScale = zoomToScale;
+			zoomActive = false;
+			CameraListener listener = cameraListener;
+			if (listener != null) {
+				listener.onZoomComplete(zoomToScale);
+			}
+			return;
+		}
+		float t = Easing.apply(zoomCurve, zoomElapsed / zoomLength);
+		cameraScale = zoomFromScale * (float) Math.pow(zoomToScale / zoomFromScale, t);
+	}
+
+	/** Eases the look-ahead lead toward the direction the target moves. */
+	private void updateLookAhead(Sprite target, float dt)
+	{
+		float aheadX = followLookAheadX;
+		float aheadY = followLookAheadY;
+		if (aheadX <= 0f && aheadY <= 0f) {
+			leadX = 0f;
+			leadY = 0f;
+			return;
+		}
+		if (dt <= 0f) {
+			return; // frozen clock: hold the lead where it is
+		}
+		float wantX = 0f;
+		float wantY = 0f;
+		float vx = target.frameDeltaX / dt;
+		float vy = target.frameDeltaY / dt;
+		if (aheadX > 0f && Math.abs(vx) > LOOK_AHEAD_MIN_SPEED) {
+			wantX = vx > 0f ? aheadX : -aheadX;
+		}
+		if (aheadY > 0f && Math.abs(vy) > LOOK_AHEAD_MIN_SPEED) {
+			wantY = vy > 0f ? aheadY : -aheadY;
+		}
+		float smoothing = followLookAheadSmoothing;
+		if (smoothing > 0f) {
+			float factor = 1f - (float) Math.pow(1f - Math.min(0.99f, smoothing), dt * 60f);
+			leadX += (wantX - leadX) * factor;
+			leadY += (wantY - leadY) * factor;
+		} else {
+			leadX = wantX;
+			leadY = wantY;
+		}
 	}
 
 	private void updateFollow(float dt)
@@ -1124,10 +1251,16 @@ public class Scene
 		if (target == null || visibleH <= 0f) {
 			return;
 		}
+		if (target != lastFollowTarget) {
+			lastFollowTarget = target;
+			leadX = 0f; // a new target starts centered, not with the old lead
+			leadY = 0f;
+		}
+		updateLookAhead(target, dt);
 		// vertical dead-zone (fractions of the visible height)
 		float top = visibleH * followTopFraction;
 		float bottom = visibleH * followBottomFraction;
-		float screenY = target.y - viewOriginY();
+		float screenY = target.y + leadY - viewOriginY();
 		float desiredY = cameraY;
 		if (screenY < top) {
 			desiredY += screenY - top;
@@ -1145,7 +1278,7 @@ public class Scene
 			float right = visibleW * followRightFraction;
 			float targetX = (worldWrapXEnabled && target.wrapWorldX && !target.screenFixed)
 				? nearestWorldX(target.x, viewOriginX() + visibleW * 0.5f) : target.x;
-			float screenX = targetX - viewOriginX();
+			float screenX = targetX + leadX - viewOriginX();
 			if (screenX < left) {
 				desiredX += screenX - left;
 			} else if (screenX > right) {
@@ -1551,11 +1684,11 @@ public class Scene
 	/**
 	 * Bilateral circle solids: a pair that lists each other's groups and
 	 * whose sprites are both in `solidMode: 'push'` is resolved once, not
-	 * once per direction. Each body takes half the separation, and the
-	 * closing part of the relative velocity is exchanged at equal mass —
-	 * for two equal circles with restitution 1 that is a straight swap of
-	 * the normal components, which is what a break shot needs. Tangential
-	 * velocity is untouched: no friction, no spin.
+	 * once per direction. Separation and the closing part of the relative
+	 * velocity are shared by inverse mass — for two equal circles with
+	 * restitution 1 that is a straight swap of the normal components,
+	 * which is what a break shot needs; a heavy body barely notices a
+	 * light one. Tangential velocity is untouched: no friction, no spin.
 	 *
 	 * Runs before the one-sided resolver, which skips push solids, so a
 	 * pair is never corrected twice in a frame.
@@ -1599,13 +1732,18 @@ public class Scene
 					ny = -1f;
 					penetration = sum;
 				}
-				// Split the separation instead of moving one body all of it
+				// Share the separation by inverse mass instead of moving one
+				// body all of it: the lighter body gives way
+				float invMassA = 1f / Math.max(MIN_MASS, a.mass);
+				float invMassB = 1f / Math.max(MIN_MASS, b.mass);
+				float invMassSum = invMassA + invMassB;
 				if (penetration > SLOP) {
-					float half = penetration * 0.5f;
-					a.x += nx * half;
-					a.y += ny * half;
-					b.x -= nx * half;
-					b.y -= ny * half;
+					float shareA = penetration * invMassA / invMassSum;
+					float shareB = penetration - shareA;
+					a.x += nx * shareA;
+					a.y += ny * shareA;
+					b.x -= nx * shareB;
+					b.y -= ny * shareB;
 				}
 				float e = Math.max(a.restitution, b.restitution);
 				dispatchBilateralSolidImpact(a, b, nx, ny, e);
@@ -1614,14 +1752,15 @@ public class Scene
 				if (vn >= 0f) {
 					continue; // already separating — leave the velocities alone
 				}
-				// Equal masses: each body takes half of (1 + e) * vn, in
+				// One impulse along the normal, split by inverse mass: at
+				// equal masses each body takes half of (1 + e) * vn, in
 				// opposite directions. The springier of the two wins — the
 				// same mix a body gets against a static surface.
-				float impulse = -(1f + e) * vn * 0.5f;
-				a.velocityX += impulse * nx;
-				a.velocityY += impulse * ny;
-				b.velocityX -= impulse * nx;
-				b.velocityY -= impulse * ny;
+				float impulse = -(1f + e) * vn / invMassSum;
+				a.velocityX += impulse * invMassA * nx;
+				a.velocityY += impulse * invMassA * ny;
+				b.velocityX -= impulse * invMassB * nx;
+				b.velocityY -= impulse * invMassB * ny;
 			}
 		}
 	}

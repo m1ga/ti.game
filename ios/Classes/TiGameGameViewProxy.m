@@ -1,6 +1,7 @@
 #import "TiGameGameViewProxy.h"
 #import "TGBitmapFont.h"
 #import "TGDebugHud.h"
+#import "TGEasing.h"
 #import "TGFrameStats.h"
 #import "TGGamepadController.h"
 #import "TGPostEffect.h"
@@ -19,7 +20,7 @@
 #import "TGValues.h"
 #import "TGInputResolver.h"
 
-@interface TiGameGameViewProxy () <TGSceneTimerListener>
+@interface TiGameGameViewProxy () <TGSceneTimerListener, TGSceneCameraListener>
 @end
 
 @implementation TiGameGameViewProxy {
@@ -41,6 +42,7 @@
 		}];
 		_timerCallbacks = [NSMutableDictionary dictionary];
 		_scene.timerListener = self;
+		_scene.cameraListener = self;
 	}
 	return self;
 }
@@ -252,6 +254,7 @@ static NSString *const kDebugHudFontKey = @"hudFont";
 /** Zoom, anchored on the view center (1 = no zoom, 2 = 2x). */
 - (void)setCameraScale:(id)value
 {
+	[self.scene cancelZoom]; // a direct write wins over a running zoomTo
 	self.scene.cameraScale = MAX(0.05f, [TGValues ratio:value fallback:1]);
 }
 
@@ -485,6 +488,9 @@ static NSString *const kDebugHudFontKey = @"hudFont";
 	self.scene.followRightFraction = 0.65f;
 	self.scene.followSmoothing = 0.0f;
 	self.scene.cameraMaxY = 0.0f;
+	self.scene.followLookAheadX = 0.0f;
+	self.scene.followLookAheadY = 0.0f;
+	self.scene.followLookAheadSmoothing = 0.08f;
 	if (options != nil) {
 		if (options[@"topMargin"] != nil) {
 			self.scene.followTopFraction = [TiUtils floatValue:options[@"topMargin"] def:0.33f];
@@ -510,8 +516,49 @@ static NSString *const kDebugHudFontKey = @"hudFont";
 		if (options[@"maxY"] != nil) {
 			self.scene.cameraMaxY = [TiUtils floatValue:options[@"maxY"] def:0];
 		}
+		// Look-ahead: lead the target by up to N px in its direction of
+		// travel, per axis, eased by lookAheadSmoothing (0 = snap)
+		if (options[@"lookAheadX"] != nil) {
+			self.scene.followLookAheadX = MAX(0.0f, [TiUtils floatValue:options[@"lookAheadX"] def:0]);
+		}
+		if (options[@"lookAheadY"] != nil) {
+			self.scene.followLookAheadY = MAX(0.0f, [TiUtils floatValue:options[@"lookAheadY"] def:0]);
+		}
+		if (options[@"lookAheadSmoothing"] != nil) {
+			self.scene.followLookAheadSmoothing = MAX(0.0f,
+				[TGValues ratio:options[@"lookAheadSmoothing"] fallback:0.08f]);
+		}
 	}
 	self.scene.followTarget = ((TiGameSpriteProxy *)first).sprite;
+}
+
+/**
+ * Native camera zoom: gameView.zoomTo(2, { duration: 600, easing:
+ * Game.EASE_OUT }). Eases cameraScale on the game clock and fires
+ * 'zoomcomplete' with the final scale. Duration in ms (default 500,
+ * 0 = next frame); easing defaults to easeInOut. Writing cameraScale
+ * directly cancels a running zoom. See the Android twin.
+ */
+- (void)zoomTo:(id)args
+{
+	id first = [args isKindOfClass:[NSArray class]] ? [args firstObject] : args;
+	NSDictionary *options = ([args isKindOfClass:[NSArray class]] && [args count] > 1
+		&& [args[1] isKindOfClass:[NSDictionary class]]) ? args[1] : nil;
+	float target = MAX(0.05f, [TGValues ratio:first fallback:self.scene.cameraScale]);
+	float duration = MAX(0.0f, [TiUtils floatValue:options[@"duration"] def:500]);
+	NSString *easing = [TiUtils stringValue:options[@"easing"]];
+	if (easing == nil) {
+		easing = TGEasingEaseInOut;
+	}
+	[self.scene zoomToScale:target duration:duration / 1000.0f easing:easing];
+}
+
+/** Render thread — fireEvent hands off to the JS thread. */
+- (void)onZoomComplete:(float)scale
+{
+	if ([self _hasListeners:@"zoomcomplete"]) {
+		[self fireEvent:@"zoomcomplete" withObject:@{ @"scale": @(scale) }];
+	}
 }
 
 /** Camera shake: gameView.shake({ strength: 14, duration: 400 }). */

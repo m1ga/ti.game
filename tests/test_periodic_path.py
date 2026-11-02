@@ -47,7 +47,7 @@ int main(void){@autoreleasepool {
  float xs[]={990,1100},ys[]={0,0};fixed.path=[TGPath buildWithPointsX:xs y:ys count:2 smoothing:0 loop:NO rotate:NO speed:1080];[fixed update:1.0f/60];closeEnough(fixed.x,1008,"screen fixed absolute");
  printf("Obj-C: %d/%d passed\n",checks-failures,checks);return failures?1:0;}}
 '''
-    fields='x y velocityX velocityY rotation angularVelocity thrust gravity gravityX linearDamping maxSpeed throttle enginePower steering turnRate grip drag skidThreshold frameAccelX frameAccelY frameDeltaX frameDeltaY wrapShift wrapX flashRemaining'.split()
+    fields='x y velocityX velocityY rotation angularVelocity thrust gravity gravityX linearDamping maxSpeed throttle enginePower steering turnRate grip drag skidThreshold frameAccelX frameAccelY frameDeltaX frameDeltaY wrapShift wrapX flashRemaining maxFallSpeed'.split()
     objc=objc.replace('FLOATS','\n'.join('@property float '+f+';' for f in fields)).replace('BOOLS','\n'.join('@property BOOL '+f+';' for f in 'carMode skidMarks drifting wrapWorldX screenFixed'.split()))
     objc=objc.replace('UPDATE',extract('ios/Classes/TGSprite.m','- (void)update:(float)dt')).replace('CAR',extract('ios/Classes/TGSprite.m','- (void)updateCar:(float)dt')).replace('FINISH',extract('ios/Classes/TGSprite.m','- (void)finishDamping'))
     # Repeated float stepping may accumulate sub-millipixel error.

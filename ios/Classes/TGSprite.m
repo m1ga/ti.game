@@ -98,6 +98,7 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 		_scrollFactor = 1.0f;
 		_enginePower = 600.0f;
 		_maxSpeed = 500.0f;
+		_mass = 1.0f;
 		_turnRate = 200.0f;
 		_grip = 4.0f;
 		_drag = 0.6f;
@@ -360,6 +361,10 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 		}
 		self.velocityX = dvx;
 		self.velocityY = dvy;
+	}
+	float fallCap = self.maxFallSpeed;
+	if (fallCap > 0.0f && self.velocityY > fallCap) {
+		self.velocityY = fallCap; // terminal velocity, downward only
 	}
 	self.frameAccelX = self.velocityX - startVelocityX;
 	self.frameAccelY = self.velocityY - startVelocityY;
