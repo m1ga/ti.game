@@ -11,6 +11,7 @@
 #import "TGBitmapFont.h"
 #import "TGBroadphase.h"
 #import "TGDefaultFont.h"
+#import "TGEasing.h"
 #import <float.h>
 #import <math.h>
 
@@ -21,6 +22,10 @@
 // velocity is still cancelled, so the sink can never grow past it. Big
 // enough to swallow a frame of gravity, small enough to stay invisible.
 static const float TGSlop = 0.5f;
+
+// Floor for `mass` in the push resolver, so a stray 0 never divides by zero
+// (the proxy already refuses non-positive values).
+static const float TGMinMass = 1e-3f;
 
 // Contact bits reported by the tile resolvers (twin of Scene.CONTACT_*)
 static const NSInteger TGContactGround = 1;
@@ -95,6 +100,21 @@ static float bottomEdge(TGSprite *s)
 	volatile float _pendingShakeStrength;
 	volatile float _pendingShakeDuration;
 	float _shakeStrength, _shakeDuration, _shakeRemaining, _shakeTime;
+
+	// Follow look-ahead lead (render thread only)
+	float _leadX, _leadY;
+	__weak TGSprite *_lastFollowTarget;
+
+	// Native camera zoom: requested from any thread, animated on the render
+	// thread on the game clock. A direct cameraScale write cancels it.
+	volatile BOOL _zoomRequested;
+	volatile BOOL _zoomCancelRequested;
+	volatile float _zoomRequestScale;
+	volatile float _zoomRequestDuration;
+	NSString *_zoomRequestEasing; // guarded by @synchronized(self)
+	BOOL _zoomActive;             // render thread, as are the rest
+	float _zoomFromScale, _zoomToScale, _zoomLength, _zoomElapsed;
+	NSString *_zoomCurve;
 	BOOL _zOrderDirty;   // guarded by @synchronized(_sprites)
 	BOOL _hasYSort;      // guarded by @synchronized(_sprites)
 	NSArray<TGSprite *> *_snapshotCache; // guarded by @synchronized(_sprites)
@@ -144,6 +164,7 @@ static float bottomEdge(TGSprite *s)
 		_followBottomFraction = 0.7f;
 		_followLeftFraction = -1.0f;
 		_followRightFraction = 0.65f;
+		_followLookAheadSmoothing = 0.08f;
 		_pendingShakeStrength = -1.0f;
 		_bgAlpha = 1.0f;
 		_timers = [NSMutableArray array];
@@ -614,6 +635,7 @@ static float bottomEdge(TGSprite *s)
 	// Attachments and wrap normalization teleport sprites: index again
 	[_broadphase rebuild:_tagged wrapWidth:[self worldWrapWidth]];
 	[self checkCollisions:list];
+	[self updateZoom:dt];
 	[self updateFollow:dt];
 	[self applyCameraBounds];
 	[self updateShake:dt];
@@ -657,6 +679,98 @@ static float bottomEdge(TGSprite *s)
 {
 	_pendingShakeDuration = duration;
 	_pendingShakeStrength = strength;
+}
+
+- (void)zoomToScale:(float)scale duration:(float)duration easing:(NSString *)easing
+{
+	@synchronized (self) {
+		_zoomRequestEasing = easing;
+	}
+	_zoomRequestScale = scale;
+	_zoomRequestDuration = duration;
+	_zoomCancelRequested = NO;
+	_zoomRequested = YES;
+}
+
+- (void)cancelZoom
+{
+	_zoomRequested = NO;
+	_zoomCancelRequested = YES;
+}
+
+/**
+ * zoomTo tween. The scale is interpolated geometrically, so a zoom from
+ * 0.5x to 2x passes 1x at the halfway point instead of at a third of the
+ * way — a linear ramp through scale factors looks like it rushes the near
+ * end and crawls the far end. See the Android twin.
+ */
+- (void)updateZoom:(float)dt
+{
+	if (_zoomCancelRequested) {
+		_zoomCancelRequested = NO;
+		_zoomActive = NO;
+	}
+	if (_zoomRequested) {
+		_zoomRequested = NO;
+		_zoomFromScale = MAX(0.0001f, self.cameraScale);
+		_zoomToScale = MAX(0.0001f, _zoomRequestScale);
+		_zoomLength = _zoomRequestDuration;
+		@synchronized (self) {
+			_zoomCurve = _zoomRequestEasing;
+		}
+		_zoomElapsed = 0.0f;
+		_zoomActive = YES;
+	}
+	if (!_zoomActive) {
+		return;
+	}
+	_zoomElapsed += dt;
+	if (_zoomLength <= 0.0f || _zoomElapsed >= _zoomLength) {
+		self.cameraScale = _zoomToScale;
+		_zoomActive = NO;
+		id<TGSceneCameraListener> listener = self.cameraListener;
+		if (listener != nil) {
+			[listener onZoomComplete:_zoomToScale];
+		}
+		return;
+	}
+	float t = TGEasingApply(_zoomCurve, _zoomElapsed / _zoomLength);
+	self.cameraScale = _zoomFromScale * powf(_zoomToScale / _zoomFromScale, t);
+}
+
+/** Eases the look-ahead lead toward the direction the target moves. */
+- (void)updateLookAhead:(TGSprite *)target dt:(float)dt
+{
+	float aheadX = self.followLookAheadX;
+	float aheadY = self.followLookAheadY;
+	if (aheadX <= 0.0f && aheadY <= 0.0f) {
+		_leadX = 0.0f;
+		_leadY = 0.0f;
+		return;
+	}
+	if (dt <= 0.0f) {
+		return; // frozen clock: hold the lead where it is
+	}
+	static const float minSpeed = 10.0f; // px/s: below it the target stands still
+	float wantX = 0.0f;
+	float wantY = 0.0f;
+	float vx = target.frameDeltaX / dt;
+	float vy = target.frameDeltaY / dt;
+	if (aheadX > 0.0f && fabsf(vx) > minSpeed) {
+		wantX = vx > 0.0f ? aheadX : -aheadX;
+	}
+	if (aheadY > 0.0f && fabsf(vy) > minSpeed) {
+		wantY = vy > 0.0f ? aheadY : -aheadY;
+	}
+	float smoothing = self.followLookAheadSmoothing;
+	if (smoothing > 0.0f) {
+		float factor = 1.0f - powf(1.0f - MIN(0.99f, smoothing), dt * 60.0f);
+		_leadX += (wantX - _leadX) * factor;
+		_leadY += (wantY - _leadY) * factor;
+	} else {
+		_leadX = wantX;
+		_leadY = wantY;
+	}
 }
 
 - (float)viewOriginX
@@ -727,10 +841,16 @@ static float bottomEdge(TGSprite *s)
 	if (target == nil || visibleH <= 0.0f) {
 		return;
 	}
+	if (target != _lastFollowTarget) {
+		_lastFollowTarget = target;
+		_leadX = 0.0f; // a new target starts centered, not with the old lead
+		_leadY = 0.0f;
+	}
+	[self updateLookAhead:target dt:dt];
 	// vertical dead-zone (fractions of the visible height)
 	float top = visibleH * self.followTopFraction;
 	float bottom = visibleH * self.followBottomFraction;
-	float screenY = target.y - [self viewOriginY];
+	float screenY = target.y + _leadY - [self viewOriginY];
 	float desiredY = self.cameraY;
 	if (screenY < top) {
 		desiredY += screenY - top;
@@ -749,7 +869,7 @@ static float bottomEdge(TGSprite *s)
 		float targetX = (self.worldWrapXEnabled && target.wrapWorldX && !target.screenFixed)
 			? [self nearestWorldX:target.x reference:[self viewOriginX] + visibleW * 0.5f]
 			: target.x;
-		float screenX = targetX - [self viewOriginX];
+		float screenX = targetX + _leadX - [self viewOriginX];
 		if (screenX < left) {
 			desiredX += screenX - left;
 		} else if (screenX > right) {
@@ -1754,11 +1874,11 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 /**
  * Bilateral circle solids: a pair that lists each other's groups and whose
  * sprites are both in `solidMode: 'push'` is resolved once, not once per
- * direction. Each body takes half the separation, and the closing part of
- * the relative velocity is exchanged at equal mass — for two equal circles
- * with restitution 1 that is a straight swap of the normal components,
- * which is what a break shot needs. Tangential velocity is untouched: no
- * friction, no spin. See the Android twin.
+ * direction. Separation and the closing part of the relative velocity are
+ * shared by inverse mass — for two equal circles with restitution 1 that is
+ * a straight swap of the normal components, which is what a break shot
+ * needs; a heavy body barely notices a light one. Tangential velocity is
+ * untouched: no friction, no spin. See the Android twin.
  *
  * Runs before the one-sided resolver, which skips push solids, so a pair is
  * never corrected twice in a frame.
@@ -1801,13 +1921,18 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 				ny = -1.0f;
 				penetration = sum;
 			}
-			// Split the separation instead of moving one body all of it
+			// Share the separation by inverse mass instead of moving one
+			// body all of it: the lighter body gives way
+			float invMassA = 1.0f / MAX(TGMinMass, a.mass);
+			float invMassB = 1.0f / MAX(TGMinMass, b.mass);
+			float invMassSum = invMassA + invMassB;
 			if (penetration > TGSlop) {
-				float half = penetration * 0.5f;
-				a.x += nx * half;
-				a.y += ny * half;
-				b.x -= nx * half;
-				b.y -= ny * half;
+				float shareA = penetration * invMassA / invMassSum;
+				float shareB = penetration - shareA;
+				a.x += nx * shareA;
+				a.y += ny * shareA;
+				b.x -= nx * shareB;
+				b.y -= ny * shareB;
 			}
 			float e = MAX(a.restitution, b.restitution);
 			[self dispatchBilateralSolidImpactFor:a with:b normalX:nx normalY:ny
@@ -1817,14 +1942,15 @@ static BOOL TGSegmentVsAabb(float cx, float cy, float dx, float dy,
 			if (vn >= 0.0f) {
 				continue; // already separating — leave the velocities alone
 			}
-			// Equal masses: each body takes half of (1 + e) * vn, in opposite
+			// One impulse along the normal, split by inverse mass: at equal
+			// masses each body takes half of (1 + e) * vn, in opposite
 			// directions. The springier of the two wins — the same mix a body
 			// gets against a static surface.
-			float impulse = -(1.0f + e) * vn * 0.5f;
-			a.velocityX += impulse * nx;
-			a.velocityY += impulse * ny;
-			b.velocityX -= impulse * nx;
-			b.velocityY -= impulse * ny;
+			float impulse = -(1.0f + e) * vn / invMassSum;
+			a.velocityX += impulse * invMassA * nx;
+			a.velocityY += impulse * invMassA * ny;
+			b.velocityX -= impulse * invMassB * nx;
+			b.velocityY -= impulse * invMassB * ny;
 		}
 	}
 }

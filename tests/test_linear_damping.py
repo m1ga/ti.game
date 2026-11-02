@@ -30,7 +30,7 @@ public class DampingCheck {
  static class Path { boolean rotate; boolean advance(float dt,float[] out){return false;} }
  interface SpriteEventListener { void onPathComplete(Sprite s); }
  static class Sprite {
- float x,y,velocityX,velocityY,rotation,angularVelocity,thrust,gravity,gravityX,linearDamping;
+ float x,y,velocityX,velocityY,rotation,angularVelocity,thrust,gravity,gravityX,linearDamping,maxFallSpeed;
  float maxSpeed=500,throttle,enginePower=600,steering,turnRate=200,grip=4,drag=.6f,skidThreshold;
  float frameAccelX,frameAccelY,frameDeltaX,frameDeltaY,wrapShift,wrapX,flashRemaining;
  boolean screenFixed,carMode,skidMarks,drifting,wrapWorldX; int wallSide; float driveX,driveY,driveTolerance;
@@ -72,6 +72,9 @@ public class DampingCheck {
  check(tiny.velocityY<-.8f,"driven equilibrium below4 persists");
  Sprite braking=new Sprite();braking.velocityX=2;braking.rotation=90;braking.thrust=-100;braking.linearDamping=1.2f;braking.update(1f/60);braking.finishDamping();close(braking.velocityX,0,"opposing force can settle");braking.update(1f/60);braking.finishDamping();check(braking.velocityX<0,"opposing force relaunches in reverse");
  Sprite noDamping=new Sprite();noDamping.velocityX=2;noDamping.update(1f/60);noDamping.finishDamping();close(noDamping.velocityX,2,"zero damping unchanged");
+ Sprite fall=new Sprite();fall.gravity=3000;fall.maxFallSpeed=200;for(int i=0;i<60;i++)fall.update(1f/60);close(fall.velocityY,200,"maxFallSpeed caps the fall");
+ Sprite rise=new Sprite();rise.velocityY=-900;rise.gravity=30;rise.maxFallSpeed=200;rise.update(1f/60);close(rise.velocityY,-899.5f,"maxFallSpeed leaves upward speed alone");
+ Sprite uncapped=new Sprite();uncapped.gravity=3000;for(int i=0;i<60;i++)uncapped.update(1f/60);check(uncapped.velocityY>2999,"maxFallSpeed 0 is uncapped");
 
  Sprite held=new Sprite();held.wallSide=1;held.velocityX=20;held.velocityY=3;held.gravityX=30;held.linearDamping=1.2f;held.update(1f/60);held.finishDamping();close(held.velocityY,0,"retained wall normal does not protect tangent");check(held.velocityX>0,"wall normal velocity retained");
  Sprite heldLeft=new Sprite();heldLeft.wallSide=-1;heldLeft.velocityX=-20;heldLeft.velocityY=3;heldLeft.gravityX=-30;heldLeft.linearDamping=1.2f;heldLeft.update(1f/60);heldLeft.finishDamping();close(heldLeft.velocityY,0,"left wall tangential rest");check(heldLeft.velocityX<0,"left wall normal velocity retained");
@@ -137,6 +140,9 @@ int main(void){@autoreleasepool {
  TGSprite *reverse=sprite();reverse.thrust=-100;reverse.linearDamping=1.2f;[reverse update:1.0f/120];check(reverse.velocityY>0,"negative thrust");
  TGSprite *still=sprite();still.linearDamping=1.2f;[still update:1.0f/60];closeEnough(still.x,0,"stationary x");closeEnough(still.y,0,"stationary y");
  TGSprite *cap=sprite();cap.velocityX=600;cap.thrust=100;cap.linearDamping=1.2f;[cap update:1.0f/60];check(hypotf(cap.velocityX,cap.velocityY)<=500,"speed cap");
+ TGSprite *fall=sprite();fall.gravity=3000;fall.maxFallSpeed=200;for(int i=0;i<60;i++)[fall update:1.0f/60];closeEnough(fall.velocityY,200,"maxFallSpeed caps the fall");
+ TGSprite *rise=sprite();rise.velocityY=-900;rise.gravity=30;rise.maxFallSpeed=200;[rise update:1.0f/60];closeEnough(rise.velocityY,-899.5f,"maxFallSpeed leaves upward speed alone");
+ TGSprite *uncapped=sprite();uncapped.gravity=3000;for(int i=0;i<60;i++)[uncapped update:1.0f/60];check(uncapped.velocityY>2999,"maxFallSpeed 0 is uncapped");
 
  TGSprite *cancelled=sprite();cancelled.velocityX=2;cancelled.thrust=30;cancelled.gravity=30;cancelled.linearDamping=1.2f;[cancelled update:1.0f/60];[cancelled finishDamping];closeEnough(cancelled.velocityX,0,"cancelled forces restore cutoff");
  TGSprite *floor=sprite();floor.velocityX=3;floor.gravity=30;floor.linearDamping=1.2f;
@@ -168,7 +174,7 @@ def run():
         subprocess.run(['javac', str(folder / 'DampingCheck.java')], check=True)
         failures.append(subprocess.run(['java', '-cp', directory, 'DampingCheck']).returncode)
         if platform.system() == 'Darwin':
-            fields = 'x y velocityX velocityY rotation angularVelocity thrust gravity gravityX linearDamping maxSpeed throttle enginePower steering turnRate grip drag skidThreshold frameAccelX frameAccelY frameDeltaX frameDeltaY wrapShift wrapX flashRemaining'.split()
+            fields = 'x y velocityX velocityY rotation angularVelocity thrust gravity gravityX linearDamping maxSpeed throttle enginePower steering turnRate grip drag skidThreshold frameAccelX frameAccelY frameDeltaX frameDeltaY wrapShift wrapX flashRemaining maxFallSpeed'.split()
             objc = OBJC.replace('FLOATS', '\n'.join('@property float '+f+';' for f in fields)).replace('BOOLS', '\n'.join('@property BOOL '+f+';' for f in 'carMode skidMarks drifting wrapWorldX screenFixed'.split()))
             objc = objc.replace('UPDATE', method('ios/Classes/TGSprite.m', '- (void)update:(float)dt')).replace('CAR', method('ios/Classes/TGSprite.m', '- (void)updateCar:(float)dt'))
             source = (ROOT / 'ios/Classes/TGSprite.m').read_text()

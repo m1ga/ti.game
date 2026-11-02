@@ -891,6 +891,34 @@ static NSSet<NSString *> *toGroupSet(id value)
 	return @(self.sprite.restitution);
 }
 
+/** Weight of a `solidMode: 'push'` body relative to its partner's (default
+ *  1; only the ratio matters). Non-positive values are ignored — a body
+ *  without weight has no collision response at all. */
+- (void)setMass:(id)value
+{
+	float mass = [TiUtils floatValue:value def:0.0f];
+	if (mass > 0.0f && isfinite(mass)) {
+		self.sprite.mass = mass;
+	}
+}
+
+- (NSNumber *)mass
+{
+	return @(self.sprite.mass);
+}
+
+/** Terminal velocity in px/s: downward speed is capped here after gravity
+ *  and damping; 0 = uncapped (the default). Upward speed is never touched. */
+- (void)setMaxFallSpeed:(id)value
+{
+	self.sprite.maxFallSpeed = MAX(0.0f, [TiUtils floatValue:value def:0.0f]);
+}
+
+- (NSNumber *)maxFallSpeed
+{
+	return @(self.sprite.maxFallSpeed);
+}
+
 /** Max fall speed (px/s) while pressed against a wall; 0 = no wall slide. */
 - (void)setWallSlideSpeed:(id)value
 {

@@ -155,6 +155,13 @@ public class Sprite
 	// one, not a vector.
 	public volatile float gravityX = 0f;
 
+	// Terminal velocity: downward speed (positive y) is capped at this many
+	// px/s once gravity and damping have been applied; 0 = uncapped, the
+	// default. Only the fall is capped — a jump or upward thrust keeps its
+	// full speed — so a platformer can use a strong gravity for a snappy
+	// arc without the player turning into a bullet on a long drop.
+	public volatile float maxFallSpeed = 0f;
+
 	// Newtonian flight (Asteroids-style): angularVelocity spins the sprite
 	// (deg/s); thrust accelerates along the current heading (px/s^2, speed
 	// capped at maxSpeed); wrapAround teleports the sprite to the opposite
@@ -317,6 +324,15 @@ public class Sprite
 	// Bounciness against solids: 0 = stop dead (platformer feet),
 	// 0..1 = reflect velocity with damping (balls). Tiny bounces come to rest.
 	public volatile float restitution = 0f;
+
+	// Weight of a `solidMode: 'push'` body, relative to its partner's. Only
+	// the ratio matters: separation and the exchanged impulse are shared by
+	// inverse mass, so a 2 that runs into a resting 1 keeps a third of its
+	// speed and sends the 1 off at four thirds of it, and two equal masses
+	// swap exactly as they did when every body weighed the same. Ignored
+	// everywhere else — walls and `'contain'` boundaries are immovable
+	// whatever the mover weighs. Always positive; the proxy rejects 0.
+	public volatile float mass = 1f;
 
 	// Discrete physical-contact event. The proxy keeps the listener flag in
 	// native state so the resolver can skip every gate/contact calculation
@@ -644,6 +660,10 @@ public class Sprite
 				velocityX = 0f; // under 4 px/s: invisible, so stop for real
 				velocityY = 0f;
 			}
+		}
+		float fallCap = maxFallSpeed;
+		if (fallCap > 0f && velocityY > fallCap) {
+			velocityY = fallCap; // terminal velocity, downward only
 		}
 		frameAccelX = velocityX - startVelocityX;
 		frameAccelY = velocityY - startVelocityY;

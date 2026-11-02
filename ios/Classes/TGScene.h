@@ -17,6 +17,11 @@
 - (void)onTimer:(int)timerId repeats:(BOOL)repeats;
 @end
 
+/** Receives discrete camera milestones on the render thread. */
+@protocol TGSceneCameraListener <NSObject>
+- (void)onZoomComplete:(float)scale;
+@end
+
 /**
  * The native scene graph: an ordered list of sprites plus background color.
  * Shared between the main thread (add/remove, property writes, touch
@@ -78,6 +83,24 @@
 @property (atomic, assign) float followRightFraction;
 @property (atomic, assign) float followSmoothing;
 @property (atomic, assign) float cameraMaxY;
+
+// Follow look-ahead: the camera leads the target by up to this many px in
+// the direction it is moving (0 = off, per axis), eased by
+// followLookAheadSmoothing (fraction of the remaining lead covered per
+// 1/60 s, 0 = snap). Reads the target's per-frame movement, so tweens,
+// paths and drags count as much as velocity. See the Android twin.
+@property (atomic, assign) float followLookAheadX;
+@property (atomic, assign) float followLookAheadY;
+@property (atomic, assign) float followLookAheadSmoothing;
+
+@property (atomic, weak) id<TGSceneCameraListener> cameraListener;
+
+/** Eases cameraScale to `scale` over `duration` seconds (0 = next frame),
+ *  on the game clock; fires the camera listener when it arrives. */
+- (void)zoomToScale:(float)scale duration:(float)duration easing:(NSString *)easing;
+
+/** Drops a running or pending zoomTo; cameraScale stays where it is. */
+- (void)cancelZoom;
 
 // Camera bounds: clamp the visible rect into this world rect.
 @property (atomic, assign) BOOL cameraBoundsEnabled;

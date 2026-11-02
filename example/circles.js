@@ -12,14 +12,17 @@
 // leaving balls parked on a flat top that is not there, so it declares
 // `'rotatedRect'` and the box turns with the art.
 //
-// Bottom half: the same shot fired twice, at the two `solidMode` values.
-// In the BLOCK row (the default) the balls separate and stop overlapping,
-// but the struck ball takes none of the momentum — every solid is
-// immovable, so the shooter bounces off it and the target sits there. In
-// the PUSH row each pair is resolved once instead of once per direction:
-// half the separation to each body, and the closing velocity exchanged at
-// equal mass, so the struck ball actually leaves and the shooter stops.
-// Same restitution, same speed, same geometry — only the mode differs.
+// Bottom half: the same shot fired three times. In the BLOCK row (the
+// default) the balls separate and stop overlapping, but the struck ball
+// takes none of the momentum — every solid is immovable, so the shooter
+// bounces off it and the target sits there. In the PUSH row each pair is
+// resolved once instead of once per direction: half the separation to each
+// body, and the closing velocity exchanged at equal mass, so the struck
+// ball actually leaves and the shooter stops. The MASS row is the same push
+// contact with a shooter four times as heavy (`mass: 4`): separation and
+// impulse are shared by inverse mass, so the shooter keeps most of its
+// speed and the light target leaves faster than the shooter arrived. Same
+// restitution, same speed, same geometry — only mode and mass differ.
 //
 // The shape overlay starts off, because the comparison should read as a
 // scene first. Turn it on to see the collision geometry: on
@@ -282,7 +285,7 @@ module.exports = function () {
 		// --- Ball vs ball: block (default) above, push below --------------
 
 		gameView.add(Game.createText({
-			text: 'ONE SHOT  /  TWO SOLID MODES',
+			text: 'ONE SHOT  /  BLOCK, PUSH, MASS',
 			align: 'center',
 			x: W / 2, y: H * 0.675,
 			scale: UNIT * 0.8,
@@ -291,8 +294,9 @@ module.exports = function () {
 		}));
 
 		var rows = [
-			{ y: H * 0.755, mode: 'block', label: "BLOCK  /  target stays put", color: '#ff8a80' },
-			{ y: H * 0.875, mode: 'push', label: "PUSH  /  momentum transfers", color: '#69f0ae' }
+			{ y: H * 0.745, mode: 'block', mass: 1, label: "BLOCK  /  target stays put", color: '#ff8a80' },
+			{ y: H * 0.83, mode: 'push', mass: 1, label: "PUSH  /  momentum transfers", color: '#69f0ae' },
+			{ y: H * 0.915, mode: 'push', mass: 4, label: "MASS 4:1  /  heavy shooter plows on", color: '#ffd180' }
 		];
 
 		rows.forEach(function (row) {
@@ -318,9 +322,9 @@ module.exports = function () {
 				zIndex: 20
 			}));
 
-			// Each row gets its own group, so the two rows never interact
-			var group = 'ball-' + row.mode;
-			function rowBall(x, color) {
+			// Each row gets its own group, so the rows never interact
+			var group = 'ball-' + row.mode + '-' + row.mass;
+			function rowBall(x, color, mass) {
 				var ball = Game.createSprite({
 					sheet: ballSheet,
 					x: x, y: row.y,
@@ -334,19 +338,20 @@ module.exports = function () {
 					collisionGroup: group,
 					solidWith: [group, 'wall'],
 					solidMode: row.mode,
+					mass: mass,          // only the ratio to the partner matters
 					zIndex: 10
 				});
 				gameView.add(ball);
 				return ball;
 			}
-			row.shooter = rowBall(W * 0.2, '#ffd54a');
-			row.target = rowBall(W * 0.62, '#e0e0e0');
+			row.shooter = rowBall(W * 0.2, '#ffd54a', row.mass);
+			row.target = rowBall(W * 0.62, '#e0e0e0', 1);
 		});
 
 		var shootButton = Game.createText({
 			text: '[ SHOOT AGAIN ]',
 			align: 'center',
-			x: W / 2, y: H * 0.955,
+			x: W / 2, y: H * 0.97,
 			scale: UNIT,
 			tintColor: '#8ab4ff',
 			zIndex: 20

@@ -1,13 +1,17 @@
-// ti.game camera demo — follow, dead-zones, bounds, zoom and shake.
+// ti.game camera demo — follow, look-ahead, dead-zones, bounds, zoomTo and shake.
 //
 // - a world twice the screen size in both directions: one ground sprite
 //   tiling a 64px texture via tileRepeat, oak trees as landmarks
 //   (ySort-depth with the player)
 // - tap anywhere to walk there; the camera follows with a dead-zone in
 //   BOTH axes (leftMargin/rightMargin + topMargin/bottomMargin) and
-//   `smoothing`, clamped to the world rect via cameraBounds
-// - − / + buttons zoom `cameraScale` around the view center — taps keep
-//   working while zoomed because touch mapping goes through the camera
+//   `smoothing`, clamped to the world rect via cameraBounds. `lookAheadX`
+//   / `lookAheadY` lead the walk: the view slides ahead of the player
+//   while they move and eases back when they stop
+// - − / + buttons call `zoomTo`, a native eased zoom around the view
+//   center; the label reports the target while the zoom runs and the
+//   final scale from the `zoomcomplete` event. Taps keep working while
+//   zoomed because touch mapping goes through the camera
 // - 💥 triggers a native camera shake (projection-only, so follow,
 //   bounds and touches are unaffected)
 // - 🎛 cycles fullscreen camera effects (cameraEffect): a green
@@ -146,12 +150,15 @@ module.exports = function () {
 		player.play('idle');
 		gameView.add(player);
 
-		// Dead-zone follow on both axes, eased, clamped to the world rect.
-		// maxY is the legacy platformer clamp — lift it for a free world.
+		// Dead-zone follow on both axes, eased, clamped to the world rect,
+		// leading the walk by a tenth of the screen so the player sees
+		// where they are going. maxY is the legacy platformer clamp — lift
+		// it for a free world.
 		gameView.follow(player, {
 			leftMargin: 0.4, rightMargin: 0.6,
 			topMargin: 0.4, bottomMargin: 0.6,
 			smoothing: 0.12,
+			lookAheadX: W * 0.1, lookAheadY: H * 0.06,
 			maxY: WORLD_H
 		});
 		gameView.cameraBounds = { minX: 0, minY: 0, maxX: WORLD_W, maxY: WORLD_H };
@@ -192,11 +199,17 @@ module.exports = function () {
 			top: 90 // below the Back button
 		});
 
+		// The target scale lives in JS: cameraScale is mid-tween while a
+		// zoomTo runs, so stepping from it would compound partial zooms
+		var zoom = 1;
 		function setZoom(factor) {
-			var scale = Math.min(2.5, Math.max(0.5, gameView.cameraScale * factor));
-			gameView.cameraScale = scale;
-			zoomLabel.text = 'Tap to walk — zoom ' + scale.toFixed(1) + 'x';
+			zoom = Math.min(2.5, Math.max(0.5, zoom * factor));
+			gameView.zoomTo(zoom, { duration: 350, easing: Game.EASE_OUT });
+			zoomLabel.text = 'Tap to walk — zooming to ' + zoom.toFixed(1) + 'x';
 		}
+		gameView.addEventListener('zoomcomplete', function (e) {
+			zoomLabel.text = 'Tap to walk — zoom ' + e.scale.toFixed(1) + 'x';
+		});
 
 		function makeButton(title, position, onPress) {
 			var button = Ti.UI.createLabel({

@@ -527,8 +527,11 @@ Notes:
   `follow(sprite, options)` tracks a sprite natively with dead-zones —
   vertical always (the platformer demo scrolls up when the player climbs
   into the top third), horizontal when `leftMargin`/`rightMargin` are
-  given, optionally eased with `smoothing`. `shake()` adds impact rumble
-  without touching the camera position. Touch input is mapped back to
+  given, optionally eased with `smoothing`. `lookAheadX`/`lookAheadY`
+  lead the target in its direction of travel, so the player sees where
+  they are going instead of where they have been. `zoomTo(scale,
+  options)` eases the zoom natively and fires `zoomcomplete`. `shake()`
+  adds impact rumble without touching the camera position. Touch input is mapped back to
   world space automatically (zoom included), so taps and drags work
   while scrolled; overlaid Titanium controls are screen-fixed and
   unaffected.
@@ -988,7 +991,7 @@ a feature set — find the one closest to your game and start there. Shared help
 | `basic.js` | Sheets, frame animations, drag/pinch/rotate and tween completion |
 | `puzzle.js` | Multi-touch drag, snapping and tween-back |
 | `flappy.js` | Gravity impulse, invisible trigger zones and wrapping parallax |
-| `platformer.js` | Platform solids, one-way platforms, rider carrying, camera follow, multi-touch controls and gamepad buttons |
+| `platformer.js` | Platform solids, one-way platforms, rider carrying, `maxFallSpeed`, camera follow, multi-touch controls and gamepad buttons |
 | `volley.js` | Restitution, landing and a coarse AI timer |
 | `racing.js` | `carMode`, drift, skid marks, checkpoints and laps |
 | `cards.js` | Dealing, a fanned hand, selection tweens and idle wobble |
@@ -998,7 +1001,7 @@ a feature set — find the one closest to your game and start there. Shared help
 | `pointclick.js` | Tap-to-walk with `findPath()` and `followPath()`, hotspots and `ySort` |
 | `particles.js` | Continuous and burst emitters, a sprite target and HUD telemetry |
 | `rhythm.js` | Pooled notes, native velocity, view `press` controls and audio feedback |
-| `camera.js` | Two-axis follow, bounds, zoom, shake, camera effects, parallax and a `topRight` HUD |
+| `camera.js` | Two-axis follow with look-ahead, bounds, `zoomTo`, shake, camera effects, parallax and a `topRight` HUD |
 | `rope.js` | A rope pinned to a sprite and a fixed-head rope with a tail weight |
 | `flip.js` | Draw-only flips driven by direction and inverted gravity |
 | `hitbox.js` | Global and per-sprite debug overlays with per-axis hitbox correction |
@@ -1011,7 +1014,7 @@ a feature set — find the one closest to your game and start there. Shared help
 | `demoscene.js` | Path-driven scrollers, glow, blend modes and music |
 | `maze.js` | Raw/simplified A*, tap routing and timer-based re-pathing |
 | `timescale.js` | Slow/frozen scenes and game-time versus real-time timers |
-| `circles.js` | Rect/circle/rotated-rect contacts and `block` versus bilateral `push` |
+| `circles.js` | Rect/circle/rotated-rect contacts, `block` versus bilateral `push`, and `mass` |
 | `slopes.js` | Rotated-rect ramp normals and restitution supplied by a surface |
 | `plinko.js` | Circular pegs, swept balls, trigger slots and `solidimpact` audio |
 | `pool.js` | Bilateral circle momentum, rails, pockets, damping and `solidimpact` |
@@ -1163,11 +1166,12 @@ Tween easing constants are `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`,
 | `inputContext` | R/W | `'gameplay'` | Active action context; `null` disables actions. Changing context releases active actions and requires a fresh press |
 | `focusInput()` | method | — | Request canvas keyboard focus on the UI thread, without opening a software keyboard or globally capturing keys |
 | `cameraX` / `cameraY` | R/W | `0` | World-space camera offset |
-| `cameraScale` | R/W | `1` | Zoom around the view center |
+| `cameraScale` | R/W | `1` | Zoom around the view center. Writing it cancels a running `zoomTo` |
 | `cameraBounds` | R/W | `null` | `{ minX, minY, maxX, maxY }`; `null` removes the clamp |
 | `worldWrapX` | R/W | `null` | `{ minX, maxX }` enables a finite circular horizontal world. Invalid or non-positive intervals disable it. Horizontal camera bounds are ignored while it is active |
-| `follow(sprite, options)` | method | — | Native dead-zone camera follow. Options: `topMargin` (`0.33`), `bottomMargin` (`0.7`), `leftMargin` (`0.35`), `rightMargin` (`0.65`), `smoothing` (`0`) and `maxY` (`0`). Horizontal follow starts only when a horizontal margin is supplied. Every call resets omitted options to their defaults; a non-Sprite target clears follow |
+| `follow(sprite, options)` | method | — | Native dead-zone camera follow. Options: `topMargin` (`0.33`), `bottomMargin` (`0.7`), `leftMargin` (`0.35`), `rightMargin` (`0.65`), `smoothing` (`0`) and `maxY` (`0`). Horizontal follow starts only when a horizontal margin is supplied. Look-ahead: `lookAheadX` and `lookAheadY` (px, `0` = off) lead the target by that much in the direction it moves (tweens, paths and drags count as much as velocity), and `lookAheadSmoothing` (`0.08`, fraction of the remaining lead per 1/60 s, `0` = snap) eases the lead in and back out when the target stops. Every call resets omitted options to their defaults; a non-Sprite target clears follow |
 | `stopFollow()` | method | — | Stop following without changing the current camera position |
+| `zoomTo(scale, { duration, easing })` | method | `500` ms, `easeInOut` | Ease `cameraScale` to `scale` natively on the game clock and fire `zoomcomplete` (payload `scale`) on arrival. The scale is interpolated geometrically, so 0.5x to 2x passes 1x halfway. Follow and bounds keep running against the changing scale. A new call restarts from the current scale, and writing `cameraScale` cancels it. `duration: 0` applies the scale on the next frame |
 | `shake({ strength, duration })` | method | `12` px, `400` ms | Offset the projection only; follow, bounds and touch mapping keep their normal coordinates |
 | `raycast(x0, y0, x1, y1, groups)` | method | — | Return the nearest visible, non-`screenFixed` Sprite with a matching `collisionGroup`, or `null`. The hit is `{ x, y, distance, group, sprite, normal: { x, y } }`. Plain rectangles use their AABB; circles and `rotatedRect` hitboxes use their actual shape. TileLayer cells are not queried. Pass `groups` as an array for portable behavior |
 | `findPath(from, to, options)` | method | — | Grid A* around visible, non-`screenFixed` tagged sprites and fully solid TileLayer cells. Returns `{ x, y }` waypoints or `null`. Options: `cellSize` (`32`), `groups` (all tagged obstacles), `clearance` (`0`), `bounds` (the surface), `diagonals` (`true`) and `simplify` (`true`). One-way cells remain walkable |
@@ -1185,7 +1189,8 @@ Tween easing constants are `EASE_LINEAR`, `EASE_IN`, `EASE_OUT`,
 
 Events: `press`, `tap`, `release` (any touch; payload `x`, `y`),
 `resize` (payload `width`, `height`), `timer` (payload `id` — only for
-`after()`/`every()` calls made without a callback), `performance`
+`after()`/`every()` calls made without a callback), `zoomcomplete`
+(payload `scale`, when a `zoomTo` arrives), `performance`
 (render telemetry, at most once a second, only while a listener is
 attached — see [Debug HUD](#debug-hud)), and the controller events
 `buttondown` / `buttonup` (payload `button`, `input`, `gamepad`,
@@ -1274,6 +1279,7 @@ also accepts later assignments, while Android does not expose a setter.
 |---|---|
 | `velocityX`, `velocityY` | px/s, integrated every frame |
 | `gravity` | px/s² applied to `velocityY` |
+| `maxFallSpeed` | Terminal velocity in px/s: downward `velocityY` is capped here each frame after gravity and damping (0 = uncapped, the default). Upward speed is never touched, so a jump keeps its takeoff speed while a long drop stops accelerating. A strong `gravity` then gives a snappy arc without the player outrunning the collision sweep on the way down |
 | `gravityX` | px/s² applied to `velocityX` — wind, conveyors, a top-down game whose "down" is sideways. `gravity` stays the vertical one; this is its sibling, not half of a vector |
 | `linearDamping` | Speed attenuation coefficient in 1/s (0 = none, the default; ~0.6 ≈ a pool ball on felt). Each step retains `max(0, 1 - linearDamping * dt)` of the velocity. The car model also has its own `drag`. The 4 px/s rest cutoff stops coasting and blocked bodies, while effective thrust, gravity or powered car input can build velocity from rest |
 | `maxSpeed` | Speed cap in px/s for `thrust` and `carMode` (default 500) |
@@ -1297,11 +1303,12 @@ device test as well.
 | `onGround` | true while standing on a solid (read-only — gate jumps on it) |
 | `onWallLeft` / `onWallRight` | true while pressed against a solid's side this frame — a rect pushed out horizontally, or a circle/OBB contact whose normal is mostly horizontal (read-only — gate wall jumps on them; a wall only counts while movement pushes into it) |
 | `wallSlideSpeed` | Wall slide: while `onWallLeft`/`onWallRight`, downward velocity is capped at this many px/s, so a player holding into a wall clings and drifts down instead of dropping (0 = off, the default). Native, no per-frame JS |
-| `restitution` | Bounciness of a contact: 0 = stop dead, 1 = give it all back. It reads off **both** sides — the springier of the two surfaces decides, the way Box2D mixes it — so a bouncy floor can be given `restitution: 0.5` and everything that lands on it rebounds, without touching the riders. Every solid defaults to 0, so a scene that never sets it on a surface behaves exactly as it always did: the mover's own value is the whole answer. The same mix applies between two `solidMode: 'push'` bodies; because push assumes equal masses there is no `mass` to weight it with. Small bounces are damped to a stop instead of buzzing, so below a low closing speed a body settles and grounds rather than reflecting |
+| `restitution` | Bounciness of a contact: 0 = stop dead, 1 = give it all back. It reads off **both** sides — the springier of the two surfaces decides, the way Box2D mixes it — so a bouncy floor can be given `restitution: 0.5` and everything that lands on it rebounds, without touching the riders. Every solid defaults to 0, so a scene that never sets it on a surface behaves exactly as it always did: the mover's own value is the whole answer. The same mix applies between two `solidMode: 'push'` bodies, weighted by their `mass`. Small bounces are damped to a stop instead of buzzing, so below a low closing speed a body settles and grounds rather than reflecting |
+| `mass` | Weight of a `solidMode: 'push'` body relative to its partner's (default `1`, only the ratio matters). Separation and the exchanged impulse are shared by inverse mass, so a `4` that runs into a resting `1` keeps most of its speed and sends the `1` off faster than it arrived, while two equal masses swap as before. Ignored against `'block'` walls and `'contain'` boundaries, which are immovable whatever the mover weighs. Non-positive values are ignored |
 | `impactThreshold` | Minimum compensated relative normal speed in px/s for this receiver's `solidimpact` event (default 40, minimum 0). The pair rearms only after more than 100 ms of confirmed separation in game time; thresholds and gates are independent on both participants |
 | `oneWay` | As a solid: catches landings on the top edge only — pass-through from below and sideways |
 | `carryRiders` | As a solid: riders inherit this sprite's movement (default true); false for world-scroll terrain |
-| `solidMode` | As a solid: `'block'` (default — an immovable wall, what every solid did before this existed), `'contain'` (inward circular boundary: matched circles are kept *inside* its circumference instead of outside — drums, bowls, lottery cages) or `'push'` (a body in its own right: a matched circle and this one share the separation and exchange momentum along the contact normal at equal mass). The last two are circle-on-circle only, and unknown values fall back to `'block'`. `'push'` is the only one that needs agreement: **both** sprites must be `'push'` with circle hitboxes and **each must list the other's `collisionGroup`** in its own `solidWith`, or the pair falls back to one body shoving an immovable one. `'contain'` is one-directional — only the ball lists the drum |
+| `solidMode` | As a solid: `'block'` (default — an immovable wall, what every solid did before this existed), `'contain'` (inward circular boundary: matched circles are kept *inside* its circumference instead of outside — drums, bowls, lottery cages) or `'push'` (a body in its own right: a matched circle and this one share the separation and exchange momentum along the contact normal, weighted by `mass`). The last two are circle-on-circle only, and unknown values fall back to `'block'`. `'push'` is the only one that needs agreement: **both** sprites must be `'push'` with circle hitboxes and **each must list the other's `collisionGroup`** in its own `solidWith`, or the pair falls back to one body shoving an immovable one. `'contain'` is one-directional — only the ball lists the drum |
 
 #### Collision
 

@@ -138,9 +138,6 @@ The current implemented API is documented in [README.md](README.md).
 
 ## 13. Physics, text and tween follow-ups
 
-- [ ] `mass` for `solidMode: 'push'` pairs (equal mass is assumed today) and
-      `maxFallSpeed`. Surface friction is tracked under section 2.
-- [ ] Camera `zoomTo` and follow look-ahead alongside `panTo`.
 - [ ] Tween sequencing (`then` chain on `animate`, like `play`), reverse
       playback for sheet animations, `width`/`height` as tween targets.
 - [ ] Text outline/drop shadow in the glyph pass; native typewriter reveal

@@ -29,7 +29,7 @@ function fixture(name, density = 2, width = 1920, height = 1048) {
  const Game = new Proxy({}, {get(target,key) {
   return props => {
    const value=object({...props, kind:key});
-   if(key==='createGameView') value.cameraScale=props.cameraScale ?? 1;
+   if(key==='createGameView') { value.cameraScale=props.cameraScale ?? 1; value.zoomTo=scale=>{ value.cameraScale=scale; value.emit('zoomcomplete',{scale}); }; }
    if(key==='createTileLayer') {
     value.width=props.data[0].length*props.tileWidth; value.height=props.data.length*props.tileHeight;
     value.isBlocked=()=>false; value.cellAt=(col,row)=>({x:col*props.tileWidth,y:row*props.tileHeight});

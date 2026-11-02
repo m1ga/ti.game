@@ -162,6 +162,7 @@ module.exports = function () {
 			height: PLAYER_SIZE,
 			zIndex: 10,
 			gravity: GRAVITY,
+			maxFallSpeed: H * 1.5,  // terminal velocity: a long drop stays readable and never outruns the sweep
 			hitboxScale: 0.85,
 			hitboxScaleX: 0.66, // the blob is 38px wide in its 64px frame but nearly full height
 			solidWith: ['solid', 'trampoline'],
