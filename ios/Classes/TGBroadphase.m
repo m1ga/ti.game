@@ -18,9 +18,9 @@ static inline int TGBroadphaseHash(int cx, int cy)
 	return (int)((unsigned)cx * 73856093u ^ (unsigned)cy * 19349663u);
 }
 
-static inline long long TGBroadphaseKey(int cx, int cy)
+static inline unsigned long long TGBroadphaseKey(int cx, int cy)
 {
-	return ((long long)cx << 32) | ((long long)cy & 0xffffffffLL);
+	return ((unsigned long long)(unsigned int)cx << 32) | (unsigned int)cy;
 }
 
 @implementation TGBroadphase {
@@ -36,7 +36,7 @@ static inline long long TGBroadphaseKey(int cx, int cy)
 	int _bucketMask;
 	int *_entrySprite;                       // index into _sprites
 	int *_entryNext;
-	long long *_entryKey;
+	unsigned long long *_entryKey;
 	int _entryCount;
 	int _entryCap;
 	float _invCell;
@@ -56,7 +56,7 @@ static inline long long TGBroadphaseKey(int cx, int cy)
 		_entryCap = 64;
 		_entrySprite = malloc(sizeof(int) * _entryCap);
 		_entryNext = malloc(sizeof(int) * _entryCap);
-		_entryKey = malloc(sizeof(long long) * _entryCap);
+		_entryKey = malloc(sizeof(unsigned long long) * _entryCap);
 		_invCell = 1.0f / 64.0f;
 	}
 	return self;
@@ -84,7 +84,7 @@ static inline long long TGBroadphaseKey(int cx, int cy)
 	_entriesMaxX = -FLT_MAX;
 	if (_spriteCap < n) {
 		_spriteCap = MAX(n, _spriteCap * 2);
-		_sprites = realloc(_sprites, sizeof(TGSprite *) * _spriteCap);
+		_sprites = (__unsafe_unretained TGSprite **)realloc(_sprites, sizeof(TGSprite *) * _spriteCap);
 	}
 	if (_boundsCap < n * 4) {
 		_boundsCap = MAX(n * 4, _boundsCap * 2);
@@ -209,7 +209,7 @@ static inline long long TGBroadphaseKey(int cx, int cy)
 	}
 	for (int cy = cy0; cy <= cy1; cy++) {
 		for (int cx = cx0; cx <= cx1; cx++) {
-			long long key = TGBroadphaseKey(cx, cy);
+			unsigned long long key = TGBroadphaseKey(cx, cy);
 			for (int e = _bucketHead[TGBroadphaseHash(cx, cy) & _bucketMask]; e >= 0; e = _entryNext[e]) {
 				if (_entryKey[e] == key) {
 					[self mark:_sprites[_entrySprite[e]]];
@@ -233,7 +233,7 @@ static inline long long TGBroadphaseKey(int cx, int cy)
 		_entryCap *= 2;
 		_entrySprite = realloc(_entrySprite, sizeof(int) * _entryCap);
 		_entryNext = realloc(_entryNext, sizeof(int) * _entryCap);
-		_entryKey = realloc(_entryKey, sizeof(long long) * _entryCap);
+		_entryKey = realloc(_entryKey, sizeof(unsigned long long) * _entryCap);
 	}
 	int b = TGBroadphaseHash(cx, cy) & _bucketMask;
 	_entrySprite[_entryCount] = spriteIndex;
