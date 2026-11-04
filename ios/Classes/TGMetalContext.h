@@ -7,6 +7,9 @@
 + (instancetype)sharedContext;
 - (id<MTLRenderPipelineState>)spritePipelineWithBlend:(NSInteger)blend silhouette:(BOOL)silhouette;
 - (id<MTLRenderPipelineState>)effectPipeline:(NSInteger)mode;
+/** Glow mask passes (TGGlowMaskCache): fullscreen, no blending, BGRA8 targets. */
+- (id<MTLRenderPipelineState>)glowDownsamplePipeline;
+- (id<MTLRenderPipelineState>)glowBlurPipeline;
 - (id<MTLSamplerState>)samplerWithSmoothing:(BOOL)smoothing repeat:(BOOL)repeat;
 @end
 

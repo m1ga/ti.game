@@ -34,13 +34,29 @@ static NSString *const TGShaderSource =
 	 " float split=.006*e.intensity*(.5+.5*sin(e.time*40));\n"
 	 " float4 c; c.r=t.sample(s,float2(fract(uv.x+split),1-uv.y)).r;c.g=t.sample(s,float2(uv.x,1-uv.y)).g;\n"
 	 " c.b=t.sample(s,float2(fract(uv.x-split),1-uv.y)).b;c.a=t.sample(s,float2(uv.x,1-uv.y)).a;\n"
-	 " c.rgb*=1-.15*e.intensity*rnd(float2(floor(uv.y*120),jump));return c;}\n";
+	 " c.rgb*=1-.15*e.intensity*rnd(float2(floor(uv.y*120),jump));return c;}\n"
+	 // Glow mask passes (TGGlowMaskCache): 2x2 box halving (off = 0 on an axis
+	 // that is not halved) and a separable 9-tap Gaussian with a final gain.
+	 "fragment float4 glowDownsampleFragment(Out i [[stage_in]], texture2d<float> t [[texture(0)]], sampler s "
+	 "[[sampler(0)]], constant float2 &off [[buffer(0)]]) {\n"
+	 " float a=t.sample(s,i.uv+float2(-off.x,-off.y)).a+t.sample(s,i.uv+float2(off.x,-off.y)).a\n"
+	 "  +t.sample(s,i.uv+float2(-off.x,off.y)).a+t.sample(s,i.uv+off).a; return float4(a*0.25); }\n"
+	 "struct GlowBlur { float2 step; float gain; float w0; float w1; float w2; float w3; float w4; };\n"
+	 "fragment float4 glowBlurFragment(Out i [[stage_in]], texture2d<float> t [[texture(0)]], sampler s "
+	 "[[sampler(0)]], constant GlowBlur &b [[buffer(0)]]) {\n"
+	 " float a=t.sample(s,i.uv).a*b.w0;\n"
+	 " a+=(t.sample(s,i.uv+b.step).a+t.sample(s,i.uv-b.step).a)*b.w1;\n"
+	 " a+=(t.sample(s,i.uv+b.step*2).a+t.sample(s,i.uv-b.step*2).a)*b.w2;\n"
+	 " a+=(t.sample(s,i.uv+b.step*3).a+t.sample(s,i.uv-b.step*3).a)*b.w3;\n"
+	 " a+=(t.sample(s,i.uv+b.step*4).a+t.sample(s,i.uv-b.step*4).a)*b.w4;\n"
+	 " return float4(min(1.0,a*b.gain)); }\n";
 
 @implementation TGMetalContext
 {
 	id<MTLLibrary> _library;
 	id<MTLRenderPipelineState> _sprites[2][4];
 	id<MTLRenderPipelineState> _effects[2];
+	id<MTLRenderPipelineState> _glow[2];
 	id<MTLSamplerState> _samplers[2][2];
 }
 + (instancetype)sharedContext
@@ -106,6 +122,20 @@ static NSString *const TGShaderSource =
 			return nil;
 		}
 	}
+	for (int pass = 0; pass < 2; pass++)
+	{
+		MTLRenderPipelineDescriptor *p = [MTLRenderPipelineDescriptor new];
+		p.vertexFunction = [_library newFunctionWithName:@"effectVertex"];
+		p.fragmentFunction =
+			[_library newFunctionWithName:pass ? @"glowBlurFragment" : @"glowDownsampleFragment"];
+		p.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+		_glow[pass] = [_device newRenderPipelineStateWithDescriptor:p error:&error];
+		if (!_glow[pass])
+		{
+			NSLog(@"[ERROR] ti.game: Metal glow pipeline: %@", error);
+			return nil;
+		}
+	}
 	for (int smoothing = 0; smoothing < 2; smoothing++)
 	{
 		for (int repeat = 0; repeat < 2; repeat++)
@@ -127,6 +157,14 @@ static NSString *const TGShaderSource =
 - (id<MTLRenderPipelineState>)effectPipeline:(NSInteger)mode
 {
 	return _effects[mode == 2 ? 1 : 0];
+}
+- (id<MTLRenderPipelineState>)glowDownsamplePipeline
+{
+	return _glow[0];
+}
+- (id<MTLRenderPipelineState>)glowBlurPipeline
+{
+	return _glow[1];
 }
 - (id<MTLSamplerState>)samplerWithSmoothing:(BOOL)smoothing repeat:(BOOL)repeat
 {

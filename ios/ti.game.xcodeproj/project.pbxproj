@@ -87,6 +87,8 @@
 		A1B2C3D42304000000000000 /* TGPathfinder.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42302000000000000 /* TGPathfinder.m */; };
 		A1B2C3D42B03000000000000 /* TGTileLayer.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42B01000000000000 /* TGTileLayer.h */; };
 		A1B2C3D42B04000000000000 /* TGTileLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42B02000000000000 /* TGTileLayer.m */; };
+		A1B2C3D42E03000000000000 /* TGGlowMaskCache.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E01000000000000 /* TGGlowMaskCache.h */; };
+		A1B2C3D42E04000000000000 /* TGGlowMaskCache.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42E02000000000000 /* TGGlowMaskCache.m */; };
 		A1B2C3D41603000000000000 /* TGPostEffect.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41601000000000000 /* TGPostEffect.h */; };
 		A1B2C3D41604000000000000 /* TGPostEffect.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41602000000000000 /* TGPostEffect.m */; };
 		A1B2C3D41103000000000000 /* TGRope.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D41101000000000000 /* TGRope.h */; };
@@ -191,6 +193,8 @@
 		A1B2C3D42302000000000000 /* TGPathfinder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGPathfinder.m"; path = "Classes/TGPathfinder.m"; sourceTree = "<group>"; };
 		A1B2C3D42B01000000000000 /* TGTileLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGTileLayer.h"; path = "Classes/TGTileLayer.h"; sourceTree = "<group>"; };
 		A1B2C3D42B02000000000000 /* TGTileLayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGTileLayer.m"; path = "Classes/TGTileLayer.m"; sourceTree = "<group>"; };
+		A1B2C3D42E01000000000000 /* TGGlowMaskCache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGGlowMaskCache.h"; path = "Classes/TGGlowMaskCache.h"; sourceTree = "<group>"; };
+		A1B2C3D42E02000000000000 /* TGGlowMaskCache.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGGlowMaskCache.m"; path = "Classes/TGGlowMaskCache.m"; sourceTree = "<group>"; };
 		A1B2C3D41601000000000000 /* TGPostEffect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGPostEffect.h"; path = "Classes/TGPostEffect.h"; sourceTree = "<group>"; };
 		A1B2C3D41602000000000000 /* TGPostEffect.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "TGPostEffect.m"; path = "Classes/TGPostEffect.m"; sourceTree = "<group>"; };
 		A1B2C3D41101000000000000 /* TGRope.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TGRope.h"; path = "Classes/TGRope.h"; sourceTree = "<group>"; };
@@ -319,6 +323,8 @@
 				A1B2C3D42302000000000000 /* TGPathfinder.m */,
 				A1B2C3D42B01000000000000 /* TGTileLayer.h */,
 				A1B2C3D42B02000000000000 /* TGTileLayer.m */,
+				A1B2C3D42E01000000000000 /* TGGlowMaskCache.h */,
+				A1B2C3D42E02000000000000 /* TGGlowMaskCache.m */,
 				A1B2C3D41601000000000000 /* TGPostEffect.h */,
 				A1B2C3D41602000000000000 /* TGPostEffect.m */,
 				A1B2C3D41101000000000000 /* TGRope.h */,
@@ -374,6 +380,7 @@
 				A1B2C3D42203000000000000 /* TGPath.h in Headers */,
 				A1B2C3D42303000000000000 /* TGPathfinder.h in Headers */,
 				A1B2C3D42B03000000000000 /* TGTileLayer.h in Headers */,
+				A1B2C3D42E03000000000000 /* TGGlowMaskCache.h in Headers */,
 				A1B2C3D41603000000000000 /* TGPostEffect.h in Headers */,
 				A1B2C3D41103000000000000 /* TGRope.h in Headers */,
 				A1B2C3D41203000000000000 /* TGSound.h in Headers */,
@@ -488,6 +495,7 @@
 				A1B2C3D42204000000000000 /* TGPath.m in Sources */,
 				A1B2C3D42304000000000000 /* TGPathfinder.m in Sources */,
 				A1B2C3D42B04000000000000 /* TGTileLayer.m in Sources */,
+				A1B2C3D42E04000000000000 /* TGGlowMaskCache.m in Sources */,
 				A1B2C3D41604000000000000 /* TGPostEffect.m in Sources */,
 				A1B2C3D41104000000000000 /* TGRope.m in Sources */,
 				A1B2C3D41204000000000000 /* TGSound.m in Sources */,

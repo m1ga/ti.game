@@ -1,5 +1,6 @@
 #import "TGSpriteBatch.h"
 #import "TGBitmapFont.h"
+#import "TGGlowMaskCache.h"
 #import "TGSprite.h"
 #import "TGSpriteSheet.h"
 #import "TGTextSprite.h"
@@ -37,26 +38,6 @@ static const int kMaxQuads = 1000;
 static const int kFloatsPerVertex = 8; // x, y, u, v, r, g, b, a
 static const int kVerticesPerQuad = 6; // two triangles
 
-// Glow stamp pattern: unit (x, y, alpha) triples — an outer ring of 8
-// at the full blur radius and an inner ring of 8 at 0.55r, rotated
-// half a step. Overlaps build a solid core with soft edges.
-static float kGlowRing[16 * 3];
-static void buildGlowRing(void)
-{
-	for (int i = 0; i < 8; i++) {
-		float outer = (float)(M_PI * 2.0 * i / 8.0);
-		float inner = outer + (float)(M_PI / 8.0);
-		int o = i * 3;
-		kGlowRing[o] = cosf(outer);
-		kGlowRing[o + 1] = sinf(outer);
-		kGlowRing[o + 2] = 0.20f;
-		int n = (8 + i) * 3;
-		kGlowRing[n] = cosf(inner) * 0.55f;
-		kGlowRing[n + 1] = sinf(inner) * 0.55f;
-		kGlowRing[n + 2] = 0.30f;
-	}
-}
-
 static inline float snapToPixel(TGSprite *s, float value, float origin, float screenScale)
 {
 	if (s.screenFixed) {
@@ -73,6 +54,9 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	TGBlendMode _blendMode;
 
 	TGMetalContext *_context;
+	// Glow halos: blurred silhouette masks, built offscreen between
+	// frames and cached — one textured quad per glow at draw time.
+	TGGlowMaskCache *_glowMasks;
 	id<MTLRenderCommandEncoder> _encoder;
 	NSMutableArray<id<MTLBuffer>> *_buffers[3];
 	NSUInteger _slot, _bufferCursor, _bufferOffset;
@@ -131,8 +115,7 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 		_vertices = malloc(sizeof(float) * kMaxQuads * kVerticesPerQuad * kFloatsPerVertex);
 		_context = context;
 		for (int i = 0; i < 3; i++) _buffers[i] = [NSMutableArray array];
-		static dispatch_once_t once;
-		dispatch_once(&once, ^{ buildGlowRing(); });
+		_glowMasks = [[TGGlowMaskCache alloc] initWithContext:context];
 		_currentTexture = nil;
 		_pixelScale = 1.0f;
 	}
@@ -156,6 +139,59 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 - (void)setRenderEncoder:(id<MTLRenderCommandEncoder>)encoder
 {
 	_encoder = encoder;
+}
+
+- (void)buildGlowMasksWithCommandBuffer:(id<MTLCommandBuffer>)command
+{
+	[_glowMasks beginFrame:self commandBuffer:command];
+}
+
+- (void)renderSilhouette:(TGGlowSilhouette *)key ortho:(const float *)ortho
+				 encoder:(id<MTLRenderCommandEncoder>)encoder
+{
+	TGSpriteSheet *sheet = key.sheet;
+	TGMetalTexture *texture = [sheet textureResource];
+	_encoder = encoder;
+	[self begin:ortho screenProjection:ortho originX:0.0f originY:0.0f screenScale:1.0f
+		travelX:0.0f travelY:0.0f];
+	[self useSilhouette:YES];
+	if ([key.layout isKindOfClass:[TGTextLayout class]]) {
+		[self putGlyphQuads:sheet layout:(TGTextLayout *)key.layout texture:texture
+						  x:0.0f y:0.0f ax:0.0f ay:0.0f cos:1.0f sin:0.0f sx:1.0f sy:1.0f
+						  r:1.0f g:1.0f b:1.0f a:1.0f];
+	} else {
+		[self ensureCapacity:texture];
+		[self putQuadX0:0.0f y0:0.0f u0:key.u0 v0:key.v0
+					 x1:key.w y1:0.0f u1:key.u1 v1:key.v0
+					 x2:0.0f y2:key.h u2:key.u0 v2:key.v1
+					 x3:key.w y3:key.h u3:key.u1 v3:key.v1
+					  r:1.0f g:1.0f b:1.0f a:1.0f];
+	}
+	[self end];
+	_encoder = nil;
+}
+
+/** The glow mask quad: sprite-local rect [-padX, w+padX] x [-padY,
+ *  h+padY] through the sprite transform, mask UVs mirrored for flips.
+ *  Switches to the silhouette pipeline and back (two draw calls). */
+- (void)putGlowMask:(TGGlowMaskEntry *)mask x:(float)x y:(float)y ax:(float)ax ay:(float)ay
+				  w:(float)w h:(float)h cos:(float)cosr sin:(float)sinr sx:(float)sx sy:(float)sy
+			  flipX:(BOOL)flipX flipY:(BOOL)flipY r:(float)r g:(float)g b:(float)b a:(float)a
+{
+	float lx0 = (-mask.padX - ax) * sx, ly0 = (-mask.padY - ay) * sy;
+	float lx1 = (w + mask.padX - ax) * sx, ly1 = ly0;
+	float lx2 = lx0, ly2 = (h + mask.padY - ay) * sy;
+	float lx3 = lx1, ly3 = ly2;
+	float u0 = flipX ? 1.0f : 0.0f, u1 = 1.0f - u0;
+	float v0 = flipY ? 1.0f : 0.0f, v1 = 1.0f - v0;
+	[self useSilhouette:YES];
+	[self ensureCapacity:mask.texture];
+	[self putQuadX0:x + lx0 * cosr - ly0 * sinr y0:y + lx0 * sinr + ly0 * cosr u0:u0 v0:v0
+				 x1:x + lx1 * cosr - ly1 * sinr y1:y + lx1 * sinr + ly1 * cosr u1:u1 v1:v0
+				 x2:x + lx2 * cosr - ly2 * sinr y2:y + lx2 * sinr + ly2 * cosr u2:u0 v2:v1
+				 x3:x + lx3 * cosr - ly3 * sinr y3:y + lx3 * sinr + ly3 * cosr u3:u1 v3:v1
+				  r:r g:g b:b a:a];
+	[self useSilhouette:NO];
 }
 
 - (void)begin:(const float *)projectionMatrix
@@ -289,6 +325,8 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	if (s.tileRepeatY && f.height > 0.0f) {
 		v1 = f.v0 + (f.v1 - f.v0) * (h / f.height);
 	}
+	// The glow mask is keyed on the unflipped rect; flips mirror it
+	float ku0 = u0, kv0 = v0, ku1 = u1, kv1 = v1;
 
 	// flip: mirror the texture by swapping the UV range end-for-end
 	if (s.flipX) {
@@ -313,27 +351,21 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float x2 = x + lx2 * cosr - ly2 * sinr, y2 = y + lx2 * sinr + ly2 * cosr;
 	float x3 = x + lx3 * cosr - ly3 * sinr, y3 = y + lx3 * sinr + ly3 * cosr;
 
+	// Glow: the cached blurred mask, one quad padded past the sprite
+	// rect, through the same anchor/scale/rotation as the frame
 	float blur = s.glowBlur;
 	float glow = MAX(0.0f, MIN(1.0f, s.glowOpacity)) * alpha;
 	if (blur > 0.0f && glow > 0.0f) {
-		[self useSilhouette:YES];
-		float gr = s.glowR;
-		float gg = s.glowG;
-		float gb = s.glowB;
-		TGMetalTexture *texture = [sheet textureResource];
-		for (int k = 0; k < 16 * 3; k += 3) {
-			float ox = kGlowRing[k] * blur;
-			float oy = kGlowRing[k + 1] * blur;
-			float ga = kGlowRing[k + 2] * glow;
-			[self ensureCapacity:texture];
-			[self putQuadX0:x0 + ox y0:y0 + oy u0:u0 v0:v0
-						 x1:x1 + ox y1:y1 + oy u1:u1 v1:v0
-						 x2:x2 + ox y2:y2 + oy u2:u0 v2:v1
-						 x3:x3 + ox y3:y3 + oy u3:u1 v3:v1
-						  r:gr * ga g:gg * ga b:gb * ga a:ga];
+		TGGlowMaskEntry *mask = [_glowMasks lookupSheet:sheet layout:nil
+													 u0:ku0 v0:kv0 u1:ku1 v1:kv1 w:w h:h
+												 sigmaX:TGGlowLocalSigma(blur, sx)
+												 sigmaY:TGGlowLocalSigma(blur, sy)];
+		if (mask) {
+			[self putGlowMask:mask x:x y:y ax:ax ay:ay w:w h:h cos:cosr sin:sinr sx:sx sy:sy
+						flipX:s.flipX flipY:s.flipY
+							r:s.glowR * glow g:s.glowG * glow b:s.glowB * glow a:glow];
+			[self ensureCapacity:[sheet textureResource]];
 		}
-		[self useSilhouette:NO];
-		[self ensureCapacity:texture];
 	}
 
 	[self putQuadX0:x0 y0:y0 u0:u0 v0:v0
@@ -364,8 +396,8 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 /**
  * Text: one quad per glyph, transformed by the sprite's anchor, scale
  * and rotation like a single frame would be. All glyphs share the
- * font's texture, so a label is one batch run; glow and flash reuse
- * the silhouette shader per glyph.
+ * font's texture, so a label is one batch run; the glow mask covers
+ * the whole layout and the flash reuses the silhouette shader per glyph.
  */
 - (void)drawText:(TGTextSprite *)s
 {
@@ -403,17 +435,16 @@ static inline float snapToPixel(TGSprite *s, float value, float origin, float sc
 	float blur = s.glowBlur;
 	float glow = MAX(0.0f, MIN(1.0f, s.glowOpacity)) * alpha;
 	if (blur > 0.0f && glow > 0.0f) {
-		[self useSilhouette:YES];
-		for (int k = 0; k < 16 * 3; k += 3) {
-			float ox = kGlowRing[k] * blur;
-			float oy = kGlowRing[k + 1] * blur;
-			float ga = kGlowRing[k + 2] * glow;
-			[self putGlyphQuads:sheet layout:layout texture:texture
-							  x:x + ox y:y + oy ax:ax ay:ay
-							cos:cosr sin:sinr sx:sx sy:sy
-							  r:s.glowR * ga g:s.glowG * ga b:s.glowB * ga a:ga];
+		TGGlowMaskEntry *mask = [_glowMasks lookupSheet:sheet layout:layout
+													 u0:0.0f v0:0.0f u1:0.0f v1:0.0f
+													  w:layout.width h:layout.height
+												 sigmaX:TGGlowLocalSigma(blur, sx)
+												 sigmaY:TGGlowLocalSigma(blur, sy)];
+		if (mask) {
+			[self putGlowMask:mask x:x y:y ax:ax ay:ay w:layout.width h:layout.height
+						  cos:cosr sin:sinr sx:sx sy:sy flipX:NO flipY:NO
+							r:s.glowR * glow g:s.glowG * glow b:s.glowB * glow a:glow];
 		}
-		[self useSilhouette:NO];
 	}
 
 	[self putGlyphQuads:sheet layout:layout texture:texture

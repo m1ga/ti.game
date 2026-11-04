@@ -111,6 +111,10 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 {
 	int effectMode = _scene.cameraEffect;
 	BOOL effectActive = effectMode != TGPostEffectNone && [_postEffect beginWithWidth:_surfaceWidth height:_surfaceHeight];
+	// Glow masks requested last frame are blurred in their own offscreen
+	// passes now, ahead of the scene's pass in this command buffer
+	[_batch beginFrameWithEncoder:nil slot:slot];
+	[_batch buildGlowMasksWithCommandBuffer:command];
 	MTLRenderPassDescriptor *pass = [MTLRenderPassDescriptor renderPassDescriptor];
 	pass.colorAttachments[0].texture = effectActive ? _postEffect.target : target;
 	pass.colorAttachments[0].loadAction = MTLLoadActionClear;
@@ -118,7 +122,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	pass.colorAttachments[0].clearColor = MTLClearColorMake(_scene.bgRed, _scene.bgGreen, _scene.bgBlue, _scene.bgAlpha);
 	id<MTLRenderCommandEncoder> encoder = [command renderCommandEncoderWithDescriptor:pass];
 	if (!encoder) return NO;
-	[_batch beginFrameWithEncoder:encoder slot:slot];
+	[_batch setRenderEncoder:encoder];
 	float dt = (_lastFrameTime == 0) ? 0.0f : (float)(frameTime - _lastFrameTime);
 	_lastFrameTime = frameTime;
 	// Clamp so a paused/debugged app doesn't fast-forward animations
@@ -376,8 +380,9 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
  * sprite can land inside the visible rect. A bounding circle around the
  * drawn anchor (parallax and world wrap applied, as the batcher draws it)
  * reaches the farthest corner, so rotation, negative scale and anchor
- * presets need no special case. The glow ring reaches glowBlur px past the
- * quad and pixelSnap moves it by at most 1 px, both added as margin.
+ * presets need no special case. The glow mask reaches 1.25 x glowBlur px
+ * past the quad and pixelSnap moves it by at most 1 px, both added as
+ * margin.
  * screenFixed sprites are tested against the surface instead.
  * Conservative by design: a false positive only costs a quad.
  */
@@ -387,7 +392,7 @@ static void orthoM(float *m, float left, float right, float bottom, float top,
 	float h = [s drawHeight] * fabsf(s.scaleY);
 	float rx = MAX(s.anchorX, 1.0f - s.anchorX) * w;
 	float ry = MAX(s.anchorY, 1.0f - s.anchorY) * h;
-	float r = sqrtf(rx * rx + ry * ry) + MAX(0.0f, s.glowBlur) + 1.0f;
+	float r = sqrtf(rx * rx + ry * ry) + MAX(0.0f, s.glowBlur) * 1.5f + 1.0f;
 	if (s.screenFixed) {
 		left = 0.0f;
 		top = 0.0f;

@@ -6,6 +6,7 @@
 #import "TGSpriteSheet.h"
 
 @class TGSprite;
+@class TGGlowSilhouette;
 
 /** Blend modes, all on premultiplied colors. Sprites/emitters carry one
  *  of these; the batcher flushes once per mode change. */
@@ -43,6 +44,19 @@ NSString *TGBlendModeName(TGBlendMode mode);
 /** Reset one slot only after its previous command buffer completed. */
 - (void)beginFrameWithEncoder:(id<MTLRenderCommandEncoder>)encoder slot:(NSUInteger)slot;
 - (void)setRenderEncoder:(id<MTLRenderCommandEncoder>)encoder;
+
+/** Encodes the glow masks requested last frame and frees idle ones; call
+ *  once per frame after beginFrameWithEncoder:slot: and before the scene's
+ *  encoder exists (it encodes its own offscreen passes into `command`). */
+- (void)buildGlowMasksWithCommandBuffer:(id<MTLCommandBuffer>)command;
+
+/** Offscreen silhouette pass for TGGlowMaskCache: the silhouette's quad(s)
+ *  in sprite-local units (origin at the sprite's top-left, unscaled,
+ *  unrotated) through the silhouette pipeline in solid white, with the
+ *  cache's projection, into `encoder`. Between frames only — it runs its
+ *  own begin/end and leaves the batch without an encoder. */
+- (void)renderSilhouette:(TGGlowSilhouette *)key ortho:(const float *)ortho
+				 encoder:(id<MTLRenderCommandEncoder>)encoder;
 
 - (void)begin:(const float *)projectionMatrix
 	screenProjection:(const float *)screenProjectionMatrix

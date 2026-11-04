@@ -104,9 +104,10 @@ public class Sprite
 	// zIndex.
 	public volatile int blendMode = SpriteBatch.BLEND_NORMAL;
 
-	// Glow: when glowBlur > 0 a tinted, blurred silhouette of the current
-	// frame draws behind the sprite (selection highlights, power-ups).
-	// glowBlur is the blur radius in px; color as parsed 0..1 channels.
+	// Glow: when glowBlur > 0 a tinted, Gaussian-blurred silhouette of the
+	// current frame draws behind the sprite (selection highlights,
+	// power-ups). glowBlur is the fade distance in px (sigma = blur / 2;
+	// see GlowMaskCache); color as parsed 0..1 channels.
 	public volatile float glowBlur = 0f;
 	public volatile float glowOpacity = 1f; // halo strength 0..1
 	public volatile float glowR = 1f;

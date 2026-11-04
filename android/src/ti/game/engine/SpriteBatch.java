@@ -49,9 +49,9 @@ public class SpriteBatch
 		+ "  gl_FragColor = texture2D(uTex, vUV) * vColor;\n"
 		+ "}\n";
 
-	// Silhouette shader for glows: the frame's alpha tinted with the
-	// vertex color, ignoring the art's own colors — stamped in soft
-	// rings behind the sprite it reads as a blurred halo.
+	// Silhouette shader: the frame's alpha tinted with the vertex color,
+	// ignoring the art's own colors — flashes, glow masks (built from it
+	// and composited with it) and the offscreen silhouette pass.
 	private static final String GLOW_FRAGMENT_SHADER =
 		"precision mediump float;\n"
 		+ "uniform sampler2D uTex;\n"
@@ -67,28 +67,9 @@ public class SpriteBatch
 	private static final int ATTR_UV = 1;
 	private static final int ATTR_COLOR = 2;
 
-	// Glow stamp pattern: unit (x, y, alpha) triples — an outer ring of 8
-	// at the full blur radius and an inner ring of 8 at 0.55r, rotated
-	// half a step. Overlaps build a solid core with soft edges.
-	private static final float[] GLOW_RING = buildGlowRing();
-
-	private static float[] buildGlowRing()
-	{
-		float[] ring = new float[16 * 3];
-		for (int i = 0; i < 8; i++) {
-			double outer = Math.PI * 2.0 * i / 8.0;
-			double inner = outer + Math.PI / 8.0;
-			int o = i * 3;
-			ring[o] = (float) Math.cos(outer);
-			ring[o + 1] = (float) Math.sin(outer);
-			ring[o + 2] = 0.20f;
-			int n = (8 + i) * 3;
-			ring[n] = (float) Math.cos(inner) * 0.55f;
-			ring[n + 1] = (float) Math.sin(inner) * 0.55f;
-			ring[n + 2] = 0.30f;
-		}
-		return ring;
-	}
+	// Glow halos: blurred silhouette masks, built offscreen between
+	// frames and cached — one textured quad per glow at draw time.
+	private final GlowMaskCache glowMasks = new GlowMaskCache();
 
 	private final float[] vertices = new float[MAX_QUADS * VERTICES_PER_QUAD * FLOATS_PER_VERTEX];
 	private final FloatBuffer buffer;
@@ -141,6 +122,41 @@ public class SpriteBatch
 		glowProgram = buildProgram(GLOW_FRAGMENT_SHADER);
 		uProjGlow = GLES20.glGetUniformLocation(glowProgram, "uProj");
 		uTexGlow = GLES20.glGetUniformLocation(glowProgram, "uTex");
+		glowMasks.createGLResources();
+	}
+
+	/** Builds the glow masks requested last frame and frees idle ones;
+	 *  call once per frame before the first begin (it renders offscreen). */
+	public void buildGlowMasks()
+	{
+		glowMasks.beginFrame(this);
+	}
+
+	/**
+	 * Offscreen silhouette pass for GlowMaskCache: the silhouette's quad(s)
+	 * in sprite-local units (origin at the sprite's top-left, unscaled,
+	 * unrotated) through the silhouette shader in solid white, with the
+	 * cache's projection. Call between frames only — it runs its own
+	 * begin/end and leaves the batch idle.
+	 */
+	void renderSilhouette(GlowMaskCache.Silhouette key, float[] ortho)
+	{
+		SpriteSheet sheet = key.sheet;
+		int texture = sheet.textureId();
+		begin(ortho, ortho, 0f, 0f, 1f, 0f, 0f);
+		useProgram(glowProgram);
+		if (key.layout instanceof TextSprite.Layout) {
+			putGlyphQuads(sheet, (TextSprite.Layout) key.layout, texture, 0f, 0f, 0f, 0f,
+				1f, 0f, 1f, 1f, 1f, 1f, 1f, 1f);
+		} else {
+			ensureCapacity(texture);
+			putQuad(0f, 0f, key.u0, key.v0,
+				key.w, 0f, key.u1, key.v0,
+				0f, key.h, key.u0, key.v1,
+				key.w, key.h, key.u1, key.v1,
+				1f, 1f, 1f, 1f);
+		}
+		end();
 	}
 
 	private static int buildProgram(String fragmentSource)
@@ -379,6 +395,8 @@ public class SpriteBatch
 		if (s.tileRepeatY && f.height > 0f) {
 			v1 = f.v0 + (f.v1 - f.v0) * (h / f.height);
 		}
+		// The glow mask is keyed on the unflipped rect; flips mirror it
+		float ku0 = u0, kv0 = v0, ku1 = u1, kv1 = v1;
 
 		// flip: mirror the texture by swapping the UV range end-for-end
 		if (s.flipX) {
@@ -403,27 +421,18 @@ public class SpriteBatch
 		float x2 = x + lx2 * cos - ly2 * sin, y2 = y + lx2 * sin + ly2 * cos;
 		float x3 = x + lx3 * cos - ly3 * sin, y3 = y + lx3 * sin + ly3 * cos;
 
+		// Glow: the cached blurred mask, one quad padded past the sprite
+		// rect, through the same anchor/scale/rotation as the frame
 		float blur = s.glowBlur;
 		float glow = Math.max(0f, Math.min(1f, s.glowOpacity)) * alpha;
 		if (blur > 0f && glow > 0f) {
-			useProgram(glowProgram);
-			float gr = s.glowR;
-			float gg = s.glowG;
-			float gb = s.glowB;
-			int texture = sheet.textureId();
-			for (int k = 0; k < GLOW_RING.length; k += 3) {
-				float ox = GLOW_RING[k] * blur;
-				float oy = GLOW_RING[k + 1] * blur;
-				float ga = GLOW_RING[k + 2] * glow;
-				ensureCapacity(texture);
-				putQuad(x0 + ox, y0 + oy, u0, v0,
-					x1 + ox, y1 + oy, u1, v0,
-					x2 + ox, y2 + oy, u0, v1,
-					x3 + ox, y3 + oy, u1, v1,
-					gr * ga, gg * ga, gb * ga, ga);
+			GlowMaskCache.Entry mask = glowMasks.lookup(sheet, null, ku0, kv0, ku1, kv1, w, h,
+				GlowMaskCache.localSigma(blur, sx), GlowMaskCache.localSigma(blur, sy));
+			if (mask != null) {
+				putGlowMask(mask, x, y, ax, ay, w, h, cos, sin, sx, sy, s.flipX, s.flipY,
+					s.glowR * glow, s.glowG * glow, s.glowB * glow, glow);
+				ensureCapacity(sheet.textureId());
 			}
-			useProgram(program);
-			ensureCapacity(texture);
 		}
 
 		putQuad(x0, y0, u0, v0,
@@ -449,6 +458,29 @@ public class SpriteBatch
 				s.flashR * fa, s.flashG * fa, s.flashB * fa, fa);
 			useProgram(program);
 		}
+	}
+
+	/** The glow mask quad: sprite-local rect [-padX, w+padX] x [-padY,
+	 *  h+padY] through the sprite transform, mask UVs mirrored for flips.
+	 *  Switches to the silhouette program and back (two draw calls). */
+	private void putGlowMask(GlowMaskCache.Entry mask, float x, float y, float ax, float ay,
+							 float w, float h, float cos, float sin, float sx, float sy,
+							 boolean flipX, boolean flipY, float r, float g, float b, float a)
+	{
+		float lx0 = (-mask.padX - ax) * sx, ly0 = (-mask.padY - ay) * sy;
+		float lx1 = (w + mask.padX - ax) * sx, ly1 = ly0;
+		float lx2 = lx0, ly2 = (h + mask.padY - ay) * sy;
+		float lx3 = lx1, ly3 = ly2;
+		float u0 = flipX ? 1f : 0f, u1 = 1f - u0;
+		float v0 = flipY ? 1f : 0f, v1 = 1f - v0;
+		useProgram(glowProgram);
+		ensureCapacity(mask.texture);
+		putQuad(x + lx0 * cos - ly0 * sin, y + lx0 * sin + ly0 * cos, u0, v0,
+			x + lx1 * cos - ly1 * sin, y + lx1 * sin + ly1 * cos, u1, v0,
+			x + lx2 * cos - ly2 * sin, y + lx2 * sin + ly2 * cos, u0, v1,
+			x + lx3 * cos - ly3 * sin, y + lx3 * sin + ly3 * cos, u1, v1,
+			r, g, b, a);
+		useProgram(program);
 	}
 
 	/** Draw-time x for parallax: the sprite keeps (1 - scrollFactor) of the
@@ -491,8 +523,8 @@ public class SpriteBatch
 	/**
 	 * Text: one quad per glyph, transformed by the sprite's anchor, scale
 	 * and rotation like a single frame would be. All glyphs share the
-	 * font's texture, so a label is one batch run; glow and flash reuse
-	 * the silhouette shader per glyph.
+	 * font's texture, so a label is one batch run; the glow mask covers
+	 * the whole layout and the flash reuses the silhouette shader per glyph.
 	 */
 	private void drawText(TextSprite s)
 	{
@@ -530,18 +562,16 @@ public class SpriteBatch
 		float blur = s.glowBlur;
 		float glow = Math.max(0f, Math.min(1f, s.glowOpacity)) * alpha;
 		if (blur > 0f && glow > 0f) {
-			useProgram(glowProgram);
-			for (int k = 0; k < GLOW_RING.length; k += 3) {
-				float ox = GLOW_RING[k] * blur;
-				float oy = GLOW_RING[k + 1] * blur;
-				float ga = GLOW_RING[k + 2] * glow;
-				putGlyphQuads(s, sheet, layout, texture, x + ox, y + oy, ax, ay,
-					cos, sin, sx, sy, s.glowR * ga, s.glowG * ga, s.glowB * ga, ga);
+			GlowMaskCache.Entry mask = glowMasks.lookup(sheet, layout, 0f, 0f, 0f, 0f,
+				layout.width, layout.height,
+				GlowMaskCache.localSigma(blur, sx), GlowMaskCache.localSigma(blur, sy));
+			if (mask != null) {
+				putGlowMask(mask, x, y, ax, ay, layout.width, layout.height, cos, sin, sx, sy,
+					false, false, s.glowR * glow, s.glowG * glow, s.glowB * glow, glow);
 			}
-			useProgram(program);
 		}
 
-		putGlyphQuads(s, sheet, layout, texture, x, y, ax, ay, cos, sin, sx, sy,
+		putGlyphQuads(sheet, layout, texture, x, y, ax, ay, cos, sin, sx, sy,
 			s.tintR * alpha, s.tintG * alpha, s.tintB * alpha, alpha);
 
 		float flashLeft = s.flashRemaining;
@@ -549,13 +579,13 @@ public class SpriteBatch
 		if (flashLeft > 0f && flashDuration > 0f) {
 			float fa = Math.min(1f, flashLeft / flashDuration) * alpha;
 			useProgram(glowProgram);
-			putGlyphQuads(s, sheet, layout, texture, x, y, ax, ay, cos, sin, sx, sy,
+			putGlyphQuads(sheet, layout, texture, x, y, ax, ay, cos, sin, sx, sy,
 				s.flashR * fa, s.flashG * fa, s.flashB * fa, fa);
 			useProgram(program);
 		}
 	}
 
-	private void putGlyphQuads(TextSprite s, SpriteSheet sheet, TextSprite.Layout layout,
+	private void putGlyphQuads(SpriteSheet sheet, TextSprite.Layout layout,
 							   int texture, float x, float y, float ax, float ay,
 							   float cos, float sin, float sx, float sy,
 							   float r, float g, float b, float a)

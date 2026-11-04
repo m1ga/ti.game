@@ -117,8 +117,9 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 	 * visible rect. The test uses a bounding circle around the drawn anchor
 	 * (parallax and world wrap applied, as the batcher draws it) that
 	 * reaches the farthest corner, so rotation, negative scale and anchor
-	 * presets need no special case. The glow ring reaches glowBlur px past
-	 * the quad and pixelSnap moves it by at most 1 px, both added as margin.
+	 * presets need no special case. The glow mask reaches 1.25 x glowBlur
+	 * px past the quad and pixelSnap moves it by at most 1 px, both added
+	 * as margin.
 	 * screenFixed sprites are tested against the surface instead.
 	 * Conservative by design: a false positive only costs a quad.
 	 */
@@ -128,7 +129,7 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		float h = s.drawHeight() * Math.abs(s.scaleY);
 		float rx = Math.max(s.anchorX, 1f - s.anchorX) * w;
 		float ry = Math.max(s.anchorY, 1f - s.anchorY) * h;
-		float r = (float) Math.sqrt(rx * rx + ry * ry) + Math.max(0f, s.glowBlur) + 1f;
+		float r = (float) Math.sqrt(rx * rx + ry * ry) + Math.max(0f, s.glowBlur) * 1.5f + 1f;
 		if (s.screenFixed) {
 			left = 0f;
 			top = 0f;
@@ -187,6 +188,10 @@ public class SceneRenderer implements GLSurfaceView.Renderer
 		// NaN after ~27 min on fp16 GPUs). 60 s is a whole number of every
 		// period the shader uses, so the wrap itself is invisible.
 		effectTime = (effectTime + dt) % 60f;
+
+		// Glow masks requested last frame are blurred offscreen now, before
+		// any framebuffer of this frame is bound
+		batch.buildGlowMasks();
 
 		// Camera effect: render the whole scene into an offscreen texture,
 		// then draw it to the screen through the effect shader at the end

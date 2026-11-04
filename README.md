@@ -235,6 +235,13 @@ sources instead of discovering them in a profiler:
   shader and back: **2 extra draw calls per glowing sprite per frame**
   (plus 2 more while a `flash()` runs), even on a shared texture. A few
   highlights are free; putting a glow on every coin in a level is not.
+  The blur itself is not per frame: the engine renders each glowing
+  silhouette once into a small offscreen mask (Gaussian blur at reduced
+  resolution), caches it by frame, draw size and radius, and frees masks
+  idle for a few seconds. A new glow appears one frame after it is
+  requested (a few masks are built per frame); scaling a glowing sprite
+  re-blurs in 12% radius steps and shows the nearest cached radius
+  meanwhile.
 - *Ropes, skid marks and debug overlays* always draw with normal
   blending, so interleaving them with non-normal blend content flushes
   too.
@@ -1380,7 +1387,7 @@ device test as well.
 |---|---|
 | `tintColor` | Multiplies the frame's colors, e.g. `'#ff5252'` (team colors, day/night shading); `null` or `'#fff'` = art unchanged |
 | `glowColor` | Glow tint, e.g. `'#ffc94d'` — a tinted, blurred silhouette drawn behind the sprite (selection highlights, power-ups); follows shape, rotation and opacity. Draws nothing on its own: `glowBlur` defaults to `0`, so set the radius with the color |
-| `glowBlur` | Glow blur radius in px; `0` = off. An active glow costs 2 extra draw calls per sprite per frame (shader switches) — fine for a few highlights, not for every coin on screen |
+| `glowBlur` | Glow fade distance in px (a Gaussian blur with sigma = `glowBlur / 2`, fully opaque at the sprite edge and faded out about `glowBlur` px away); `0` = off. An active glow costs 2 extra draw calls per sprite per frame (shader switches) — fine for a few highlights, not for every coin on screen |
 | `glowOpacity` | Halo strength 0..1, tweenable via `animate` — fade a glow in/out without touching the blur |
 | `blend` | `'normal'`/`'add'`/`'multiply'`/`'screen'` — `add` brightens the backdrop instead of covering it (glows, fire, lasers), `multiply` darkens it (shadows, stains), `screen` lightens softly without blowing out to white (fog, soft light); costs one batch flush per mode change, so group same-blend sprites by `zIndex` |
 
@@ -1597,6 +1604,7 @@ android/src/ti/game/
     ├── Animation.java       Frame indices + fps + loop
     ├── SceneRenderer.java   GLSurfaceView.Renderer — the game loop
     ├── SpriteBatch.java     ES 2.0 batcher, one draw call per texture
+    ├── GlowMaskCache.java   Offscreen Gaussian-blurred glow masks, cached per silhouette
     ├── ScreenOverlay.java   Screen-space pass: surface-pixel projection
     ├── DebugHud.java        On-screen performance HUD
     ├── FrameStats.java      Opt-in render telemetry, one-second windows
