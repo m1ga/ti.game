@@ -128,13 +128,26 @@ module.exports = function () {
 				swept: lane.swept,
 				collidesWith: ['wall', 'void']
 			});
+			var result = null;
 			bullet.addEventListener('collision', function (e) {
-				gameView.remove(bullet);
+				// A long frame can queue both contacts. Count one result,
+				// with a wall hit taking precedence in either delivery order.
+				if (result === 'wall' || (result === 'void' && e.group !== 'wall')) {
+					return;
+				}
+				if (result === null) {
+					gameView.remove(bullet);
+				}
 				if (e.group === 'wall') {
+					if (result === 'void') {
+						lane.misses--;
+					}
+					result = 'wall';
 					lane.hits++;
 					lane.wall.flash('#fff', 200);
 					lane.burst.emit(14);
 				} else {
+					result = 'void';
 					lane.misses++; // reached the catch zone: tunneled through
 					lane.score.flash('#ff5252', 250);
 				}

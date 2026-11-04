@@ -97,6 +97,35 @@ test('keyboard shortcuts invoke existing demo actions and release listeners on c
  }
 });
 
+test('Swept demo scores each bullet once and wall hits win in either contact order', () => {
+ for(const swept of [false,true]) {
+  for(const groups of [['wall','void','wall','void'],['void','void','wall','wall']]) {
+   const f=fixture('swept');
+   const removed=[];f.view.remove=bullet=>removed.push(bullet);
+   f.view.emit('actiondown',{action:'fire'});
+   const bullet=f.objects.find(s=>s.kind==='createSprite'&&s.swept===swept&&s.events.collision);
+   assert.ok(bullet);
+   for(const group of groups) bullet.emit('collision',{group});
+   const score=f.objects.filter(s=>typeof s.text==='string'&&s.text.startsWith('HIT '))[swept?1:0];
+   assert.equal(score.text,'HIT 1   MISS 0',`${swept}: ${groups}`);
+   assert.equal(removed.filter(s=>s===bullet).length,1,'remove a scored bullet once');
+  }
+ }
+});
+
+test('Swept demo keeps genuine misses and independent bullets in their own lanes', () => {
+ const f=fixture('swept');
+ f.view.emit('actiondown',{action:'fire'});
+ f.view.emit('actiondown',{action:'fire'});
+ const bullets=f.objects.filter(s=>s.kind==='createSprite'&&s.events.collision);
+ const normal=bullets.filter(s=>s.swept===false),swept=bullets.filter(s=>s.swept===true);
+ for(const bullet of normal) { bullet.emit('collision',{group:'void'});bullet.emit('collision',{group:'void'}); }
+ for(const bullet of swept) { bullet.emit('collision',{group:'wall'});bullet.emit('collision',{group:'wall'}); }
+ const scores=f.objects.filter(s=>typeof s.text==='string'&&s.text.startsWith('HIT '));
+ assert.equal(scores[0].text,'HIT 0   MISS 2');
+ assert.equal(scores[1].text,'HIT 2   MISS 0');
+});
+
 test('keyboard directions restore the held direction and do not release a held touch control', () => {
  for(const name of ['platformer','volley']) {
   const f=fixture(name); const player=f.objects.find(s=>s.kind==='createSprite'&&s.sheet?.image==='assets/player.png');
