@@ -4,8 +4,8 @@ Guidance for AI agents working on this repository.
 
 ## What this is
 
-A Titanium SDK Android module implementing a 2D sprite game engine on
-OpenGL ES 2.0. Full architecture and API reference live in `README.md` —
+A Titanium SDK module implementing a native 2D sprite game engine: OpenGL ES
+2.0 on Android and Metal on iPhone, iPad and Mac Catalyst. Full architecture and API reference live in `README.md` —
 read it first. `documentation/index.md` only points at the README; keep
 docs in the README.
 
@@ -20,7 +20,8 @@ ti build -p android --sdk 13.4.1.GA                # runs example/app.js as a te
 Build both modules with Titanium SDK `13.4.1.GA`. The package manifests declare
 `minsdk: 13.4.0`; compiling with an older SDK does not lower that requirement.
 
-There are no unit tests; a successful `--build-only` build is the minimum
+Native regression fixtures live under `tests/`; Apple GPU/XCTest fixtures are in
+`tests/apple-renderer/`. A successful `--build-only` build is the minimum
 verification for any Java change. `android/build/` and `android/dist/` are
 build output — never edit them.
 
@@ -64,12 +65,17 @@ build output — never edit them.
 
 ## iOS twin
 
-`ios/Classes/` is a class-per-class Obj-C port of the Android module —
-`TG*` files mirror `engine/*.java` (each header names its twin),
-`TiGame*` files mirror the proxies. The architecture rules above apply
+`ios/Classes/` preserves the Android engine behavior and proxy API in Objective-C.
+Simulation classes mirror `engine/*.java`; the Apple graphics backend uses
+`TGMetalView`, `TGMetalContext`, native texture references and Metal render passes.
+Android keeps its OpenGL ES backend. `TiGame*` files mirror the proxies. The architecture rules above apply
 identically (render thread instead of GL thread; atomic properties
 instead of volatile fields; `_hasListeners:` before `fireEvent:`).
-**When changing engine behavior, change both platforms** — the twins
+Metal queues, frame slots and mutable buffers belong to each view; immutable
+pipelines and samplers are shared per device. Never reuse a frame slot before
+its command completes or invalidate another view’s texture on close.
+
+**When changing shared engine behavior, change both platforms** — the twins
 must not drift. Building the iOS side requires macOS (`ios/README.md`);
 on other machines, verify Java changes as usual and port the same edit
 to the corresponding `TG*` file by hand.
