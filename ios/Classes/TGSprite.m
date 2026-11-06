@@ -49,7 +49,9 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	// Animation state, guarded by @synchronized(self)
 	NSMutableDictionary<NSString *, TGAnimation *> *_animations;
 	TGAnimation *_currentAnimation;
-	float _animationTime;
+	// Keep long-running loops aligned with the elapsed time supplied by the
+	// renderer; float accumulation can drift by whole animation frames.
+	double _animationTime;
 	BOOL _playing;
 	atomic_bool _animationActive;
 	// Chained follow-ups (play:then:): each queued name auto-plays as

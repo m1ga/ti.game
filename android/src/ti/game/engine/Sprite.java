@@ -396,7 +396,9 @@ public class Sprite
 	public volatile int frame = 0;
 	private final Map<String, Animation> animations = new HashMap<>();
 	private Animation currentAnimation;
-	private float animationTime = 0f;
+	// Looping animations keep this elapsed total indefinitely. Float summation
+	// drifts by whole frames in long sessions even when every dt is accurate.
+	private double animationTime = 0.0;
 	private boolean playing = false;
 	// Chained follow-ups (play(name, { then: ... })): each queued name
 	// auto-plays as the previous non-looping animation finishes.
