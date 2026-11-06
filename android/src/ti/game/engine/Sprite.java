@@ -377,7 +377,7 @@ public class Sprite
 	private static final AtomicInteger IDLE_SEQ =
 		new AtomicInteger();
 	private final float idlePhase = IDLE_SEQ.getAndIncrement() * 1.7f;
-	private float idleTime = 0f;
+	private double idleTime = 0.0;
 	private float idleAppliedRot = 0f;
 	private float idleAppliedX = 0f;
 	private float idleAppliedY = 0f;
