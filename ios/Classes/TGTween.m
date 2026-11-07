@@ -4,7 +4,7 @@
 
 @implementation TGTween {
 	float _fromX, _fromY, _fromScaleX, _fromScaleY, _fromRotation, _fromOpacity, _fromGlowOpacity;
-	float _elapsed;
+	double _elapsed;
 	BOOL _started;
 }
 
@@ -39,7 +39,7 @@
 		[self captureStartValues:s];
 		_started = YES;
 	}
-	float t = (_duration > 0.0f) ? MIN(1.0f, (_elapsed - _delay) / _duration) : 1.0f;
+	float t = (_duration > 0.0f) ? (float)MIN(1.0, (_elapsed - _delay) / _duration) : 1.0f;
 	float e = TGEasingApply(_easing, t);
 
 	if (_toX != nil) {

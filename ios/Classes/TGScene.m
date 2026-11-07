@@ -113,7 +113,8 @@ static float bottomEdge(TGSprite *s)
 	volatile float _zoomRequestDuration;
 	NSString *_zoomRequestEasing; // guarded by @synchronized(self)
 	BOOL _zoomActive;             // render thread, as are the rest
-	float _zoomFromScale, _zoomToScale, _zoomLength, _zoomElapsed;
+	float _zoomFromScale, _zoomToScale, _zoomLength;
+	double _zoomElapsed;
 	NSString *_zoomCurve;
 	BOOL _zOrderDirty;   // guarded by @synchronized(_sprites)
 	BOOL _hasYSort;      // guarded by @synchronized(_sprites)
@@ -734,7 +735,7 @@ static float bottomEdge(TGSprite *s)
 		}
 		return;
 	}
-	float t = TGEasingApply(_zoomCurve, _zoomElapsed / _zoomLength);
+	float t = TGEasingApply(_zoomCurve, (float)(_zoomElapsed / _zoomLength));
 	self.cameraScale = _zoomFromScale * powf(_zoomToScale / _zoomFromScale, t);
 }
 

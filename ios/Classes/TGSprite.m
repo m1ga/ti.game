@@ -36,7 +36,7 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	float _driveX, _driveY, _driveTolerance;
 	// Idle wobble state (render thread only)
 	float _idlePhase;
-	float _idleTime;
+	double _idleTime;
 	float _idleAppliedRot;
 	float _idleAppliedX;
 	float _idleAppliedY;
@@ -49,7 +49,9 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	// Animation state, guarded by @synchronized(self)
 	NSMutableDictionary<NSString *, TGAnimation *> *_animations;
 	TGAnimation *_currentAnimation;
-	float _animationTime;
+	// Keep long-running loops aligned with the elapsed time supplied by the
+	// renderer; float accumulation can drift by whole animation frames.
+	double _animationTime;
 	BOOL _playing;
 	atomic_bool _animationActive;
 	// Chained follow-ups (play:then:): each queued name auto-plays as
@@ -435,9 +437,9 @@ static const NSTimeInterval TGImpactTimeEpsilon = 1e-9;
 	if (self.idleAnimation && (self.idleRotation != 0.0f || self.idleMovement != 0.0f)) {
 		_idleTime += dt;
 		float w = (float)(M_PI * 2.0) * self.idleSpeed;
-		newRot = self.idleRotation * sinf(_idleTime * w * 0.50f + _idlePhase);
-		newX = self.idleMovement * 0.6f * sinf(_idleTime * w * 0.37f + _idlePhase * 1.3f);
-		newY = self.idleMovement * sinf(_idleTime * w * 0.43f + _idlePhase * 2.1f);
+		newRot = self.idleRotation * (float)sin(_idleTime * w * 0.50f + _idlePhase);
+		newX = self.idleMovement * 0.6f * (float)sin(_idleTime * w * 0.37f + _idlePhase * 1.3f);
+		newY = self.idleMovement * (float)sin(_idleTime * w * 0.43f + _idlePhase * 2.1f);
 	} else if (_idleAppliedRot == 0.0f && _idleAppliedX == 0.0f && _idleAppliedY == 0.0f) {
 		return;
 	}

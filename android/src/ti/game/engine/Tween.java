@@ -16,7 +16,7 @@ public class Tween
 	public String easing = Easing.LINEAR;
 
 	private float fromX, fromY, fromScaleX, fromScaleY, fromRotation, fromOpacity, fromGlowOpacity;
-	private float elapsed = 0f;
+	private double elapsed = 0.0;
 	private boolean started = false;
 
 	void captureStartValues(Sprite s)
@@ -42,7 +42,7 @@ public class Tween
 			captureStartValues(s);
 			started = true;
 		}
-		float t = (duration > 0f) ? Math.min(1f, (elapsed - delay) / duration) : 1f;
+		float t = (duration > 0f) ? (float) Math.min(1.0, (elapsed - delay) / duration) : 1f;
 		float e = Easing.apply(easing, t);
 
 		if (toX != null) {

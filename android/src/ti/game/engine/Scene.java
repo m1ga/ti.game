@@ -119,7 +119,8 @@ public class Scene
 	private volatile float zoomRequestDuration = 0f;
 	private volatile String zoomRequestEasing = Easing.EASE_IN_OUT;
 	private boolean zoomActive; // GL thread, as are the rest
-	private float zoomFromScale, zoomToScale, zoomLength, zoomElapsed;
+	private float zoomFromScale, zoomToScale, zoomLength;
+	private double zoomElapsed;
 	private String zoomCurve;
 
 	/** Receives discrete camera milestones on the GL thread. */
@@ -1389,7 +1390,7 @@ public class Scene
 			}
 			return;
 		}
-		float t = Easing.apply(zoomCurve, zoomElapsed / zoomLength);
+		float t = Easing.apply(zoomCurve, (float) (zoomElapsed / zoomLength));
 		cameraScale = zoomFromScale * (float) Math.pow(zoomToScale / zoomFromScale, t);
 	}
 
